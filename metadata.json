@@ -1,0 +1,7 @@
+{
+  "name": "Quiz Me!",
+  "description": "A high-precision multimodal assessment platform that transforms text, documents, code, audio, and media into structured, classified quizzes with Teacher and Student modes, dark/light themes, and deep pedagogical analytics.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

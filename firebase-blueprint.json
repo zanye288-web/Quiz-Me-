@@ -1,0 +1,162 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with gamified learning stats and progression metrics.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique user ID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "email": { "type": ["string", "null"], "description": "User email address" },
+        "photoURL": { "type": ["string", "null"], "description": "User avatar photo URL" },
+        "role": { "type": "string", "enum": ["Student", "Teacher"], "description": "Active user persona" },
+        "headline": { "type": "string", "description": "User academic headline or specialization" },
+        "bio": { "type": "string", "description": "User personal bio or study motto" },
+        "avatarType": { "type": "string", "enum": ["google", "icon", "custom"], "description": "Avatar display mode" },
+        "avatarIcon": { "type": "string", "description": "Selected avatar emoji or icon" },
+        "avatarBg": { "type": "string", "description": "Selected avatar background color class or hex" },
+        "learningGoal": { "type": "string", "description": "Primary study or learning objective" },
+        "hasCustomizedProfile": { "type": "boolean", "description": "Whether user customized or completed initial profile step" },
+        "streak": { "type": "number", "minimum": 0, "description": "Consecutive days study streak" },
+        "hearts": { "type": "number", "minimum": 0, "description": "Current lives/hearts" },
+        "maxHearts": { "type": "number", "minimum": 1, "description": "Maximum lives/hearts" },
+        "xp": { "type": "number", "minimum": 0, "description": "Experience points earned" },
+        "gems": { "type": "number", "minimum": 0, "description": "Gems currency earned" },
+        "level": { "type": "number", "minimum": 1, "description": "Current scholar level" },
+        "quizzesCompleted": { "type": "number", "minimum": 0, "description": "Total completed quiz sessions" },
+        "totalCorrect": { "type": "number", "minimum": 0, "description": "Total correct answers submitted" },
+        "totalQuestions": { "type": "number", "minimum": 0, "description": "Total questions answered" },
+        "badges": { "type": "array", "items": { "type": "string" }, "description": "Unlocked badge identifiers" },
+        "lastActiveDate": { "type": "string", "description": "Last active ISO date string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "role", "xp", "level", "quizzesCompleted", "totalCorrect", "totalQuestions"]
+    },
+    "QuizHistoryRecord": {
+      "title": "QuizHistoryRecord",
+      "description": "Historical record of a completed quiz session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "quizTitle": { "type": "string" },
+        "date": { "type": "string" },
+        "score": { "type": "number" },
+        "total": { "type": "number" },
+        "percentage": { "type": "number" },
+        "timeSpentSeconds": { "type": "number" },
+        "xpEarned": { "type": "number" },
+        "difficulty": { "type": "string" },
+        "persona": { "type": "string" },
+        "quizData": { "type": "object" },
+        "answers": { "type": "array" },
+        "flaggedCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "quizTitle", "score", "total", "percentage"]
+    },
+    "SavedQuiz": {
+      "title": "SavedQuiz",
+      "description": "User-authored or AI-generated saved quiz.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "quiz_title": { "type": "string" },
+        "summary": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "persona": { "type": "string" },
+        "questions": { "type": "array" },
+        "study_guide": { "type": ["object", "null"] },
+        "isPublic": { "type": "boolean" },
+        "likesCount": { "type": "number", "minimum": 0 },
+        "commentsCount": { "type": "number", "minimum": 0 },
+        "savesCount": { "type": "number", "minimum": 0 },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "creatorId", "quiz_title", "questions"]
+    },
+    "QuizComment": {
+      "title": "QuizComment",
+      "description": "User discussion comment on a posted quiz.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "quizId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorPhotoURL": { "type": ["string", "null"] },
+        "authorRole": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "quizId", "authorId", "authorName", "content"]
+    },
+    "QuizLike": {
+      "title": "QuizLike",
+      "description": "User like record for a posted quiz.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "quizId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "quizId"]
+    },
+    "UserSavedQuiz": {
+      "title": "UserSavedQuiz",
+      "description": "User bookmark / saved quiz record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "quizId": { "type": "string" },
+        "quizTitle": { "type": "string" },
+        "savedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "quizId", "quizTitle"]
+    }
+  },
+  "collections": {
+    "users": {
+      "path": "users/{userId}",
+      "entity": "UserProfile",
+      "description": "User profile with gamified stats and achievements",
+      "subcollections": {
+        "history": {
+          "path": "users/{userId}/history/{recordId}",
+          "entity": "QuizHistoryRecord",
+          "description": "Past assessment run history records for user"
+        },
+        "favorites": {
+          "path": "users/{userId}/favorites/{favoriteId}",
+          "description": "User's starred topics and catalog presets"
+        },
+        "savedQuizzes": {
+          "path": "users/{userId}/savedQuizzes/{quizId}",
+          "entity": "UserSavedQuiz",
+          "description": "Quizzes saved or bookmarked by the user"
+        }
+      }
+    },
+    "quizzes": {
+      "path": "quizzes/{quizId}",
+      "entity": "SavedQuiz",
+      "description": "Shared and user-authored quizzes stored in Firestore",
+      "subcollections": {
+        "comments": {
+          "path": "quizzes/{quizId}/comments/{commentId}",
+          "entity": "QuizComment",
+          "description": "User comments and discussions on posted quizzes"
+        },
+        "likes": {
+          "path": "quizzes/{quizId}/likes/{userId}",
+          "entity": "QuizLike",
+          "description": "User likes on posted quizzes"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4338ca" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="40" fill="url(#grad)" />
+  <!-- Graduation cap icon -->
+  <path d="M96 48L32 80l64 32 64-32-64-32z" fill="#ffffff" />
+  <path d="M52 98v36c0 15 20 28 44 28s44-13 44-28V98L96 120 52 98z" fill="#e0e7ff" opacity="0.9" />
+  <path d="M160 88v40c0 4-4 8-8 8s-8-4-8-8V92l16-4z" fill="#fbbf24" />
+  <circle cx="96" cy="78" r="6" fill="#fbbf24" />
+</svg>
