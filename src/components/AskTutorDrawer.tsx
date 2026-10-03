@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Send, Bot, User, RefreshCw, Lightbulb, Sparkles, BookOpen } from 'lucide-react';
 import { Question, PersonaType } from '../types/quiz';
 import { soundFx } from '../utils/audio';
+import { MascotAvatar } from './MascotAvatar';
 
 interface AskTutorDrawerProps {
   isOpen: boolean;
@@ -73,14 +74,15 @@ export const AskTutorDrawer: React.FC<AskTutorDrawerProps> = ({
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200">
       <div className="w-full max-w-md sm:max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col justify-between border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-300 transition-colors">
         {/* Header */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/80">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/70 via-purple-50/40 to-white dark:from-slate-900 dark:via-indigo-950/20 dark:to-slate-900">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
-              <Bot className="w-5 h-5" />
-            </div>
+            <MascotAvatar
+              mood={persona === 'Teacher' ? 'teacher' : 'thinking'}
+              size="sm"
+            />
             <div>
               <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                <span>AI Tutor</span>
+                <span>AI Academic Tutor</span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                   {persona} Mode
                 </span>
@@ -176,8 +178,11 @@ export const AskTutorDrawer: React.FC<AskTutorDrawerProps> = ({
               }`}
             >
               {msg.sender === 'tutor' && (
-                <div className="w-7 h-7 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0 border border-indigo-200 dark:border-indigo-800">
-                  <Bot className="w-4 h-4" />
+                <div className="shrink-0 -mt-1">
+                  <MascotAvatar
+                    mood={persona === 'Teacher' ? 'teacher' : 'happy'}
+                    size="sm"
+                  />
                 </div>
               )}
               <div

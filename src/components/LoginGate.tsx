@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { soundFx } from '../utils/audio';
 import { PersonaType } from '../types/quiz';
+import { AppLogo } from './AppLogo';
 
 export const LoginGate: React.FC = () => {
   const {
@@ -241,21 +242,7 @@ export const LoginGate: React.FC = () => {
 
       {/* Header with Brand & Theme Switcher */}
       <header className="w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/25">
-            <GraduationCap className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                QuizMe<span className="text-indigo-600 dark:text-indigo-400">.Studio</span>
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
-                AI Assessment
-              </span>
-            </div>
-          </div>
-        </div>
+        <AppLogo size="md" mood="happy" subtitleText="AI Multimodal Assessment Platform" />
 
         <button
           type="button"

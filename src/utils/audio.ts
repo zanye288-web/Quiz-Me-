@@ -354,6 +354,33 @@ class SoundEngine {
   }
 
   // ==========================================
+  // 2b. MASCOT POP / BUBBLE INTERACTION
+  // ==========================================
+  public playPop() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.06);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(now);
+      osc.stop(now + 0.07);
+    } catch {
+      // Audio fallback
+    }
+  }
+
+  // ==========================================
   // 3. THEME TOGGLE (LIGHT / DARK SWITCH)
   // ==========================================
   public playThemeToggle() {

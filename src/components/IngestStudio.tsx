@@ -48,6 +48,7 @@ import { RecommendedQuizzesSection } from './RecommendedQuizzesSection';
 import { QuizHistoryRecord } from './HistoryView';
 import { QuizTrackDetailDrawer, SelectedTrackInfo } from './QuizTrackDetailDrawer';
 import { SUPPORTED_LANGUAGES, SupportedLanguage, getLanguageByCode } from '../data/languages';
+import { MascotAvatar } from './MascotAvatar';
 
 interface IngestStudioProps {
   persona: PersonaType;
@@ -60,6 +61,7 @@ interface IngestStudioProps {
   assessmentConfig: AssessmentConfig;
   onOpenRawJsonModal?: (quiz: QuizResponse) => void;
   onOpenUploadQuiz?: () => void;
+  onOpenTutor?: (questionId?: number) => void;
   stats?: UserStats;
   historyRecords?: QuizHistoryRecord[];
 }
@@ -74,6 +76,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   setErrorMessage,
   assessmentConfig,
   onOpenUploadQuiz,
+  onOpenTutor,
   stats = {
     streak: 3,
     hearts: 5,
@@ -411,17 +414,24 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
         <div className="absolute -top-16 -right-16 w-64 h-64 bg-gradient-to-bl from-indigo-500/15 via-purple-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
-          <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40 dark:border-indigo-700/50 shadow-2xs">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
-              <span>AI Multi-Modal Assessment Studio</span>
+          <div className="flex items-center gap-4 max-w-2xl min-w-0">
+            <MascotAvatar
+              mood={persona === 'Teacher' ? 'teacher' : 'happy'}
+              size="md"
+              className="shrink-0 hidden sm:inline-flex"
+            />
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40 dark:border-indigo-700/50 shadow-2xs">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
+                <span>AI Multi-Modal Assessment Studio</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                Create Custom Quizzes in Seconds
+              </h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                Generate tailored, interactive quizzes from custom topics, documents, voice audio recordings, or YouTube video lectures.
+              </p>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              Create Custom Quizzes in Seconds
-            </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Generate tailored, interactive quizzes from custom topics, documents, voice audio recordings, or YouTube video lectures.
-            </p>
           </div>
 
           <div className="flex items-center gap-3 bg-gradient-to-br from-slate-50 to-indigo-50/50 dark:from-slate-800/80 dark:to-indigo-950/30 p-3.5 rounded-2xl border border-slate-200/80 dark:border-indigo-900/40 shrink-0 shadow-2xs">
@@ -495,6 +505,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
         historyRecords={historyRecords}
         onStartQuiz={onStartQuiz}
         onCustomizeTopic={handleCustomizeTopic}
+        onOpenTutor={onOpenTutor}
       />
 
       {/* Main Creation Card */}

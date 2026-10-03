@@ -31,6 +31,9 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
       shortcuts: [
         { keys: ['⌘', 'K'], description: 'Open Quick Command Palette & Search' },
         { keys: ['?'], description: 'Toggle this Keyboard Shortcuts Cheatsheet' },
+        { keys: ['N'], description: 'Quick jump to AI Study Notes' },
+        { keys: ['T'], description: 'Open 1-on-1 AI Tutor Drawer' },
+        { keys: ['M'], description: 'Toggle Sound Effects Audio on/off' },
         { keys: ['Esc'], description: 'Close active modal, drawer or palette' },
       ],
     },

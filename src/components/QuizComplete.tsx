@@ -27,6 +27,8 @@ import {
   Printer,
   Video,
   Bot,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { QuizResponse, PersonaType, UserStats, CognitiveDomain } from '../types/quiz';
 import { soundFx } from '../utils/audio';

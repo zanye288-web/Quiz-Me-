@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="fav_body" x1="24" y1="18" x2="96" y2="112" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="42%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <linearGradient id="fav_belly" x1="60" y1="44" x2="60" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95" />
+      <stop offset="60%" stop-color="#F8FAFC" stop-opacity="0.92" />
+      <stop offset="100%" stop-color="#E2E8F0" stop-opacity="0.88" />
+    </linearGradient>
+    <linearGradient id="fav_wing" x1="16" y1="42" x2="36" y2="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#065F46" />
+    </linearGradient>
+    <linearGradient id="fav_beak" x1="53" y1="52" x2="67" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FDE68A" />
+      <stop offset="60%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <radialGradient id="fav_iris" cx="43" cy="46" r="10" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="70%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#020617" />
+    </radialGradient>
+  </defs>
+
+  <!-- Ground Shadow -->
+  <ellipse cx="60" cy="113" rx="34" ry="5" fill="#0F172A" fill-opacity="0.16" />
+
+  <!-- Ear Crests -->
+  <path d="M33 36C26 23 19 12 21 11C23 10 32 18 39 25C43 29 44 33 44 35" fill="url(#fav_wing)" />
+  <path d="M87 36C94 23 101 12 99 11C97 10 88 18 81 25C77 29 76 33 76 35" fill="url(#fav_wing)" />
+
+  <!-- Body -->
+  <path d="M60 18C36 18 21 34 21 63C21 89 37 109 60 109C83 109 99 89 99 63C99 34 84 18 60 18Z" fill="url(#fav_body)" />
+
+  <!-- Wings -->
+  <path d="M22 55C12 59 10 77 17 89C22 98 28 88 28 88" fill="url(#fav_wing)" />
+  <path d="M98 55C108 59 110 77 103 89C98 98 92 88 92 88" fill="url(#fav_wing)" />
+
+  <!-- Belly -->
+  <ellipse cx="60" cy="76" rx="27" ry="29" fill="url(#fav_belly)" />
+
+  <!-- Feather Marks -->
+  <g stroke="#059669" stroke-width="2.2" stroke-linecap="round" opacity="0.65">
+    <path d="M53 68C57 71.5 63 71.5 67 68" />
+    <path d="M48 79C54 83.5 66 83.5 72 79" />
+  </g>
+
+  <!-- Eyes -->
+  <circle cx="43" cy="46" r="16.5" fill="white" />
+  <circle cx="77" cy="46" r="16.5" fill="white" />
+  <circle cx="43" cy="46" r="9.8" fill="url(#fav_iris)" />
+  <circle cx="77" cy="46" r="9.8" fill="url(#fav_iris)" />
+  <circle cx="46.5" cy="42.5" r="3.8" fill="white" />
+  <circle cx="80.5" cy="42.5" r="3.8" fill="white" />
+  <circle cx="39.5" cy="49" r="1.8" fill="white" />
+  <circle cx="73.5" cy="49" r="1.8" fill="white" />
+
+  <!-- Beak -->
+  <path d="M60 52C53 52 50 62 60 66C70 62 67 52 60 52Z" fill="url(#fav_beak)" />
+
+  <!-- Feet -->
+  <ellipse cx="46" cy="108.5" rx="8" ry="4.5" fill="#F59E0B" />
+  <ellipse cx="74" cy="108.5" rx="8" ry="4.5" fill="#F59E0B" />
+</svg>

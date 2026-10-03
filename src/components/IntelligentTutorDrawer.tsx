@@ -19,6 +19,7 @@ import {
 import { Question, PersonaType } from '../types/quiz';
 import { TutorChatMessage, IntelligentNote } from '../types/learningSystem';
 import { soundFx } from '../utils/audio';
+import { MascotAvatar } from './MascotAvatar';
 
 interface IntelligentTutorDrawerProps {
   isOpen: boolean;
@@ -164,13 +165,14 @@ export const IntelligentTutorDrawer: React.FC<IntelligentTutorDrawerProps> = ({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/70 via-purple-50/30 to-white dark:from-slate-900 dark:via-indigo-950/20 dark:to-slate-900">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center font-black shadow-md shadow-indigo-500/20">
-              <Bot className="w-5 h-5" />
-            </div>
+            <MascotAvatar
+              mood={persona === 'Teacher' ? 'teacher' : 'thinking'}
+              size="sm"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                  AI Personal Academic Tutor
+                  AI Academic Tutor
                 </h3>
                 <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                   {persona}
@@ -260,8 +262,11 @@ export const IntelligentTutorDrawer: React.FC<IntelligentTutorDrawerProps> = ({
               }`}
             >
               {msg.sender === 'tutor' && (
-                <div className="w-7 h-7 rounded-xl bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-xs shrink-0 border border-indigo-200 dark:border-indigo-800">
-                  <Bot className="w-4 h-4" />
+                <div className="shrink-0 -mt-1">
+                  <MascotAvatar
+                    mood={persona === 'Teacher' ? 'teacher' : 'happy'}
+                    size="sm"
+                  />
                 </div>
               )}
 

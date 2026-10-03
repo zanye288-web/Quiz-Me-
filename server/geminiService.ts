@@ -1096,7 +1096,9 @@ export interface QuizRecommendationsInput {
  * Intelligent adaptive heuristic recommendations built from student performance history
  */
 function buildAdaptiveHeuristicRecommendations(input: QuizRecommendationsInput) {
-  const recentQuizzes = input.recentQuizzes || [];
+  const rawQuizzes = input.recentQuizzes || [];
+  // Prioritize quizzes where user scored lowest
+  const recentQuizzes = [...rawQuizzes].sort((a, b) => a.percentage - b.percentage);
   const recs = [];
 
   // Gather weak questions across recent quizzes
@@ -1104,6 +1106,7 @@ function buildAdaptiveHeuristicRecommendations(input: QuizRecommendationsInput) 
     (q.weakQuestions || []).map((wq) => ({
       ...wq,
       quizTitle: q.quizTitle,
+      quizPercentage: q.percentage,
       quizDifficulty: q.difficulty || 'Intermediate',
     }))
   );
@@ -1113,32 +1116,32 @@ function buildAdaptiveHeuristicRecommendations(input: QuizRecommendationsInput) 
     const firstWeak = allWeakQuestions[0];
     recs.push({
       id: 'rec_adaptive_remediation_1',
-      title: `${firstWeak.domain || 'Concept'} Precision Review`,
-      topic: `${firstWeak.quizTitle} Focus Area`,
-      description: `Targeted remediation on: "${firstWeak.questionText.slice(0, 90)}..." to lock in core definitions and reasoning.`,
+      title: `${firstWeak.quizTitle}: Targeted Remediation`,
+      topic: `${firstWeak.quizTitle} - Weak Spot`,
+      description: `Targeted review on: "${firstWeak.questionText.slice(0, 90)}..." to master concepts missed during your lowest scoring assessment.`,
       difficulty: (firstWeak.quizDifficulty as DifficultyType) || 'Intermediate',
       targetDomain: firstWeak.domain || 'Syntax & Execution',
       reasonCategory: 'Remediation' as const,
-      matchReason: `Diagnostic: Revisit missed items from "${firstWeak.quizTitle}" to reinforce key conceptual definitions.`,
+      matchReason: `Diagnostic Need: Identified from your lowest score (${firstWeak.quizPercentage}%) on "${firstWeak.quizTitle}" to reinforce key definitions and reasoning.`,
       suggestedQuestionCount: 4,
       suggestedTypes: ['multiple_choice' as QuestionType, 'fill_in_blank' as QuestionType],
       estimatedMinutes: 4,
-      xpReward: 130,
+      xpReward: 140,
       icon: '🎯',
-      samplePrompt: `Remediation challenge: ${firstWeak.questionText}. Review why ${firstWeak.correctAnswer} is correct and explore related subtopics.`,
+      samplePrompt: `Remediation challenge: ${firstWeak.questionText}. Review why ${firstWeak.correctAnswer} is correct and explore related core principles.`,
     });
 
     if (allWeakQuestions.length > 1) {
       const secondWeak = allWeakQuestions[1];
       recs.push({
         id: 'rec_adaptive_remediation_2',
-        title: `${secondWeak.domain || 'Analytical'} Diagnostic Drill`,
-        topic: `${secondWeak.quizTitle} Remediation`,
+        title: `${secondWeak.quizTitle}: Concept Rebuilder`,
+        topic: `${secondWeak.quizTitle} Review`,
         description: `Reinforce understanding around: "${secondWeak.questionText.slice(0, 90)}...".`,
         difficulty: (secondWeak.quizDifficulty as DifficultyType) || 'Intermediate',
         targetDomain: secondWeak.domain || 'Foundations',
         reasonCategory: 'Remediation' as const,
-        matchReason: `Pedagogical Analysis: Identified opportunity for deeper mastery in ${secondWeak.domain || 'applied concepts'}.`,
+        matchReason: `Diagnostic Need: Score of ${secondWeak.quizPercentage}% indicates key conceptual gaps in ${secondWeak.domain || 'applied concepts'}.`,
         suggestedQuestionCount: 4,
         suggestedTypes: ['multiple_choice' as QuestionType, 'open_explanation' as QuestionType],
         estimatedMinutes: 5,
@@ -1257,7 +1260,9 @@ export async function generateQuizRecommendationsAI(input: QuizRecommendationsIn
     };
   }
 
-  const recentQuizzes = input.recentQuizzes || [];
+  const rawQuizzes = input.recentQuizzes || [];
+  // Sort quizzes so that lowest scoring topics are prioritized first
+  const recentQuizzes = [...rawQuizzes].sort((a, b) => a.percentage - b.percentage);
   const stats = input.stats || { quizzesCompleted: 0, totalCorrect: 0, totalQuestions: 0, xp: 0, level: 1, streak: 1 };
 
   let historySummary = `Total completed quizzes: ${stats.quizzesCompleted}, Overall accuracy: ${
@@ -1265,11 +1270,12 @@ export async function generateQuizRecommendationsAI(input: QuizRecommendationsIn
   }%, Level: ${stats.level}, XP: ${stats.xp}.\n`;
 
   if (recentQuizzes.length > 0) {
-    historySummary += `Recent Assessment Records:\n`;
-    recentQuizzes.slice(0, 6).forEach((quiz, i) => {
-      historySummary += `Assessment #${i + 1}: "${quiz.quizTitle}" (Score: ${quiz.score}/${quiz.total}, ${quiz.percentage}%)\n`;
+    historySummary += `Past Assessment Performance Records from Database (Sorted by Lowest Score First):\n`;
+    recentQuizzes.slice(0, 8).forEach((quiz, i) => {
+      const isLowest = i === 0 || quiz.percentage < 70;
+      historySummary += `Assessment #${i + 1}: "${quiz.quizTitle}" (Score: ${quiz.score}/${quiz.total}, ${quiz.percentage}% accuracy)${isLowest ? ' [CRITICAL: Lowest Scoring Topic - Priority for Remediation]' : ''}\n`;
       if (quiz.weakQuestions && quiz.weakQuestions.length > 0) {
-        historySummary += `  - Missed Questions / Gaps (${quiz.weakQuestions.length}):\n`;
+        historySummary += `  - Missed Questions / Conceptual Gaps (${quiz.weakQuestions.length}):\n`;
         quiz.weakQuestions.forEach((wq) => {
           historySummary += `    * Question: "${wq.questionText}" [Domain: ${wq.domain || 'General'}]\n`;
           historySummary += `      Student answer: "${wq.userAnswer}" | Correct: "${wq.correctAnswer}"\n`;
@@ -1283,21 +1289,21 @@ export async function generateQuizRecommendationsAI(input: QuizRecommendationsIn
       }
     });
   } else {
-    historySummary += `No prior quiz history recorded yet. Suggest high-yield foundational, intermediate, and advanced diagnostic challenges across science, technology, mathematics, and logic.`;
+    historySummary += `No prior quiz history recorded in database yet. Suggest high-yield foundational, intermediate, and advanced diagnostic challenges across science, technology, mathematics, and logic.`;
   }
 
   const prompt = `You are the AI Learning Diagnostician & Adaptive Curriculum Recommender for Quiz Me!.
-Based on the learner's past performance and areas identified as 'needs improvement' by pedagogical analytics, generate exactly 4 highly targeted, personalized quiz topic recommendations.
+Based on the learner's past performance data from Firestore (especially the topics where they scored lowest), generate exactly 4 highly targeted, personalized quiz topic recommendations.
 
 Target Persona: ${input.persona}
-Learner History & Performance Diagnostics:
+Learner History & Performance Diagnostics (Lowest Scores Prioritized):
 ${historySummary}
 
 Recommendation Design Rules:
-1. At least 2 recommendations MUST be 'Remediation' targeting specific concepts the user struggled with or missed in past quizzes (or foundational weak spots if score was <100%).
-2. At least 1 recommendation MUST be 'Progression' (a step up in difficulty or Bloom's Taxonomy cognitive depth for strong topics).
-3. 1 recommendation MUST be 'Reinforcement' (reinforcing core concepts with active recall).
-4. Each recommendation must include a clear, pedagogical 'matchReason' explaining WHY this quiz is recommended based on their diagnostics (e.g. "Identified by pedagogical summary: 50% accuracy on event loop microtasks").
+1. Priority 1: At least 2 recommendations MUST directly target the specific topics where the learner SCORED LOWEST in past quizzes, focusing on the exact concepts they missed.
+2. Priority 2: Include 1 'Progression' recommendation (a step up in cognitive depth or difficulty for topics they already grasp).
+3. Priority 3: Include 1 'Reinforcement' recommendation (reinforcing core principles with active recall).
+4. Each recommendation must include a clear pedagogical 'matchReason' explaining WHY this quiz is recommended based on their lowest scoring past performance (e.g., "Identified from your lowest score (40%) on JavaScript Event Loop: missed microtask priority questions").
 5. Provide a rich 'samplePrompt' with 2-3 sentences of conceptual curriculum notes ready to be fed directly into an AI quiz generation pipeline.
 
 Respond in JSON with this exact structure:

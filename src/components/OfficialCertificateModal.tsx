@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { QuizResponse, PersonaType } from '../types/quiz';
 import { soundFx } from '../utils/audio';
+import { MascotAvatar } from './MascotAvatar';
 
 interface OfficialCertificateModalProps {
   isOpen?: boolean;
@@ -171,6 +172,9 @@ export const OfficialCertificateModal: React.FC<OfficialCertificateModalProps> =
             {/* Content Container */}
             <div className="text-center space-y-6 relative z-10">
               <div className="space-y-1">
+                <div className="flex justify-center mb-2">
+                  <MascotAvatar mood="teacher" size="md" interactive={false} />
+                </div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest text-indigo-700 bg-indigo-50 border border-indigo-200">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Certificate of Achievement</span>

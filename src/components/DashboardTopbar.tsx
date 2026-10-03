@@ -32,6 +32,7 @@ import { useAuth } from '../context/AuthContext';
 import { usePomodoro } from '../context/PomodoroContext';
 import { soundFx } from '../utils/audio';
 import { UserAvatar } from './UserAvatar';
+import { AppLogo } from './AppLogo';
 
 interface DashboardTopbarProps {
   activeTab: DashboardTab;
@@ -184,6 +185,10 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
           >
             <Menu className="w-5 h-5" />
           </button>
+
+          <div className="md:hidden flex items-center shrink-0">
+            <AppLogo size="xs" showSubtitle={false} showBadge={false} onClick={() => onSelectTab('studio')} />
+          </div>
 
           <div className="flex flex-col min-w-0">
             <h1 className="text-sm sm:text-base lg:text-lg font-black text-slate-900 dark:text-white tracking-tight leading-tight truncate">

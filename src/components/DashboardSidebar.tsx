@@ -28,6 +28,8 @@ import { useAuth } from '../context/AuthContext';
 import { soundFx } from '../utils/audio';
 import { UserStats } from './UserStats';
 import { UserAvatar } from './UserAvatar';
+import { MascotAvatar } from './MascotAvatar';
+import { AppLogo } from './AppLogo';
 
 export type DashboardTab = 'studio' | 'notes' | 'gamma' | 'flashcards' | 'curricula' | 'community' | 'live' | 'authoring' | 'achievements' | 'analytics' | 'history' | 'settings' | 'runner' | 'complete';
 
@@ -195,41 +197,13 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         isCollapsed ? 'w-20' : 'w-64 lg:w-72'
       }`}
     >
-      {/* App Brand Header */}
-      <div className="p-4 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between min-h-[68px]">
-        {!isCollapsed ? (
-          <button
-            type="button"
-            onClick={() => handleTabClick('studio')}
-            className="flex items-center gap-3 text-left group cursor-pointer focus:outline-none"
-          >
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-pink-500 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-500/30 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-              ⚡
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-base tracking-tight bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 dark:from-white dark:via-indigo-200 dark:to-white bg-clip-text text-transparent">
-                  Quiz Me!
-                </span>
-                <span className="text-[10px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40 dark:border-indigo-700/40">
-                  Pro
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                AI Learning Platform
-              </p>
-            </div>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => handleTabClick('studio')}
-            className="w-10 h-10 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-pink-500 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-500/30 cursor-pointer hover:scale-110 hover:rotate-6 transition-all duration-300"
-            title="Quiz Me! Studio"
-          >
-            ⚡
-          </button>
-        )}
+      {/* App Brand Header with Mascot as Official Logo */}
+      <div className="p-3.5 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between min-h-[68px]">
+        <AppLogo
+          collapsed={isCollapsed}
+          mood={persona === 'Teacher' ? 'teacher' : stats.streak > 3 ? 'streak' : 'idle'}
+          onClick={() => handleTabClick('studio')}
+        />
 
         <button
           type="button"

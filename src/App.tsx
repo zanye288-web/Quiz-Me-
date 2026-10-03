@@ -28,6 +28,7 @@ import { LiveSessionRoom } from './components/live/LiveSessionRoom';
 import { PomodoroTimerOverlay } from './components/PomodoroTimerOverlay';
 import { LiveSessionData } from './types/liveSession';
 import { IntelligentNotesHubView } from './components/IntelligentNotesHubView';
+import { QuizzieCompanionWidget } from './components/QuizzieCompanionWidget';
 import { GraduationCap, Sparkles, BookOpen, Layers, BarChart3, Menu, Share2, Play, X, FileText } from 'lucide-react';
 import { PersonaType, QuizResponse, Question, UserStats, AssessmentConfig } from './types/quiz';
 import { BadgeDefinition, BADGE_CATALOG } from './types/badges';
@@ -215,6 +216,29 @@ export default function App() {
           e.preventDefault();
           soundFx.playClick();
           setIsShortcutsModalOpen((prev) => !prev);
+          return;
+        }
+
+        // Toggle Sound Mute on 'm' or 'M'
+        if (e.key.toLowerCase() === 'm' && !e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          handleToggleSound();
+          return;
+        }
+
+        // Quick open 1-on-1 AI Tutor on 't' or 'T'
+        if (e.key.toLowerCase() === 't' && !e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          soundFx.playClick();
+          setIsTutorOpen((prev) => !prev);
+          return;
+        }
+
+        // Quick jump to AI Study Notes on 'n' or 'N'
+        if (e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          soundFx.playClick();
+          setActiveTab('notes');
           return;
         }
       }
@@ -729,6 +753,10 @@ export default function App() {
               assessmentConfig={assessmentConfig}
               onOpenRawJsonModal={(q) => handleInspectRawJson(q)}
               onOpenUploadQuiz={() => setIsUploadModalOpen(true)}
+              onOpenTutor={() => {
+                setTutorQuestion(null);
+                setIsTutorOpen(true);
+              }}
               stats={stats}
               historyRecords={historyRecords}
             />
@@ -1261,6 +1289,23 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Quizzie Companion Widget (hidden during focus mode) */}
+      {!isFocusModeActive && (
+        <QuizzieCompanionWidget
+          stats={stats}
+          persona={persona}
+          soundEnabled={soundEnabled}
+          onToggleSound={handleToggleSound}
+          onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
+          onOpenTutor={() => {
+            setTutorQuestion(null);
+            setIsTutorOpen(true);
+          }}
+          onNavigateToNotes={() => setActiveTab('notes')}
+          onNavigateToStudio={() => setActiveTab('studio')}
+        />
       )}
 
       {/* Global Pomodoro Study Overlay */}
