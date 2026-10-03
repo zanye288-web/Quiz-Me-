@@ -636,3 +636,191 @@ apiRouter.post('/analyze-mistakes', searchRateLimiter, async (req: Request, res:
   }
 });
 
+// ============================================================================
+// 13. LIVE MULTIPLAYER BATTLE SERVER STORE & SYNCHRONOUS ROOM ENDPOINTS
+// ============================================================================
+const liveRoomsStore = new Map<string, any>();
+
+// Periodically prune stale rooms older than 4 hours
+setInterval(() => {
+  const cutoff = Date.now() - 4 * 60 * 60 * 1000;
+  for (const [code, room] of liveRoomsStore.entries()) {
+    if ((room.updatedAt || room.createdAt || 0) < cutoff) {
+      liveRoomsStore.delete(code);
+    }
+  }
+}, 15 * 60 * 1000);
+
+// List active lobbies
+apiRouter.get('/live/rooms', (_req: Request, res: Response) => {
+  const activeRooms: any[] = [];
+  for (const room of liveRoomsStore.values()) {
+    if (room.status !== 'finished') {
+      activeRooms.push({
+        roomCode: room.roomCode,
+        hostName: room.hostName,
+        quizTitle: room.quiz?.quiz_title || 'Live Quiz Battle',
+        questionCount: room.quiz?.questions?.length || 5,
+        participantCount: Object.keys(room.participants || {}).length,
+        status: room.status,
+        createdAt: room.createdAt,
+      });
+    }
+  }
+  activeRooms.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  res.json({ success: true, rooms: activeRooms.slice(0, 20) });
+});
+
+// Get room state
+apiRouter.get('/live/room/:roomCode', (req: Request, res: Response) => {
+  const code = String(req.params.roomCode || '').trim().toUpperCase();
+  const room = liveRoomsStore.get(code);
+  if (!room) {
+    return res.status(404).json({ success: false, error: 'Room not found.' });
+  }
+  res.json({ success: true, session: room });
+});
+
+// Create or upsert a live session room
+apiRouter.post('/live/create', (req: Request, res: Response) => {
+  try {
+    const { session } = req.body;
+    if (!session || !session.roomCode) {
+      return res.status(400).json({ success: false, error: 'Invalid session payload.' });
+    }
+    const code = String(session.roomCode).trim().toUpperCase();
+    const cleanSession = JSON.parse(JSON.stringify({
+      ...session,
+      id: code,
+      roomCode: code,
+      updatedAt: Date.now(),
+    }));
+    liveRoomsStore.set(code, cleanSession);
+    res.json({ success: true, session: cleanSession });
+  } catch (err) {
+    res.status(500).json({ success: false, error: sanitizeErrorMessage(err, 'Failed to create room.') });
+  }
+});
+
+// Join an existing live session room
+apiRouter.post('/live/join', (req: Request, res: Response) => {
+  try {
+    const { roomCode, participant, fallbackSession } = req.body;
+    const code = String(roomCode || '').trim().toUpperCase();
+    let room = liveRoomsStore.get(code);
+    if (!room && fallbackSession && fallbackSession.roomCode) {
+      room = JSON.parse(JSON.stringify(fallbackSession));
+      liveRoomsStore.set(code, room);
+    }
+    if (!room) {
+      return res.status(404).json({ success: false, error: 'Room not found. Please check the 6-digit PIN.' });
+    }
+    if (room.status === 'finished') {
+      return res.status(400).json({ success: false, error: 'This live session has already ended.' });
+    }
+    if (!participant || !participant.id) {
+      return res.status(400).json({ success: false, error: 'Invalid participant data.' });
+    }
+    room.participants = room.participants || {};
+    room.participants[participant.id] = {
+      ...participant,
+      score: room.participants[participant.id]?.score ?? 0,
+      streak: room.participants[participant.id]?.streak ?? 0,
+      answers: room.participants[participant.id]?.answers ?? {},
+      hasAnsweredCurrent: room.participants[participant.id]?.hasAnsweredCurrent ?? false,
+      isReady: true,
+      joinedAt: room.participants[participant.id]?.joinedAt ?? Date.now(),
+      lastActive: Date.now(),
+    };
+    room.updatedAt = Date.now();
+    liveRoomsStore.set(code, room);
+    res.json({ success: true, session: room });
+  } catch (err) {
+    res.status(500).json({ success: false, error: sanitizeErrorMessage(err, 'Failed to join room.') });
+  }
+});
+
+// Update room status / advance question / add participants
+apiRouter.post('/live/update', (req: Request, res: Response) => {
+  try {
+    const { roomCode, updates, resetAnsweredFlags, fallbackSession } = req.body;
+    const code = String(roomCode || '').trim().toUpperCase();
+    let room = liveRoomsStore.get(code);
+    if (!room && fallbackSession && fallbackSession.roomCode) {
+      room = JSON.parse(JSON.stringify(fallbackSession));
+      liveRoomsStore.set(code, room);
+    }
+    if (!room) {
+      return res.status(404).json({ success: false, error: 'Room not found.' });
+    }
+    if (updates && typeof updates === 'object') {
+      if (updates.participants && typeof updates.participants === 'object') {
+        room.participants = { ...(room.participants || {}), ...updates.participants };
+        const { participants: _p, ...rest } = updates;
+        Object.assign(room, rest);
+      } else {
+        Object.assign(room, updates);
+      }
+    }
+    if (resetAnsweredFlags && room.participants) {
+      for (const pid of Object.keys(room.participants)) {
+        room.participants[pid].hasAnsweredCurrent = false;
+      }
+    }
+    room.updatedAt = Date.now();
+    liveRoomsStore.set(code, room);
+    res.json({ success: true, session: room });
+  } catch (err) {
+    res.status(500).json({ success: false, error: sanitizeErrorMessage(err, 'Failed to update room.') });
+  }
+});
+
+// Submit participant answer
+apiRouter.post('/live/answer', (req: Request, res: Response) => {
+  try {
+    const { roomCode, participantId, questionIndex, answer, newScore, newStreak, fallbackSession } = req.body;
+    const code = String(roomCode || '').trim().toUpperCase();
+    let room = liveRoomsStore.get(code);
+    if (!room && fallbackSession && fallbackSession.roomCode) {
+      room = JSON.parse(JSON.stringify(fallbackSession));
+      liveRoomsStore.set(code, room);
+    }
+    if (!room) {
+      return res.status(404).json({ success: false, error: 'Room not found.' });
+    }
+    room.participants = room.participants || {};
+    if (!room.participants[participantId]) {
+      room.participants[participantId] = {
+        id: participantId,
+        name: 'Scholar',
+        avatarSeed: 'scholar',
+        avatarColor: 'indigo',
+        role: 'student',
+        score: 0,
+        streak: 0,
+        answers: {},
+        hasAnsweredCurrent: false,
+        isReady: true,
+        joinedAt: Date.now(),
+        lastActive: Date.now(),
+      };
+    }
+    const p = room.participants[participantId];
+    p.answers = p.answers || {};
+    p.answers[questionIndex] = {
+      ...answer,
+      answeredAt: Date.now(),
+    };
+    p.score = typeof newScore === 'number' ? newScore : p.score + (answer?.pointsEarned || 0);
+    p.streak = typeof newStreak === 'number' ? newStreak : p.streak;
+    p.hasAnsweredCurrent = true;
+    p.lastActive = Date.now();
+    room.updatedAt = Date.now();
+    liveRoomsStore.set(code, room);
+    res.json({ success: true, session: room });
+  } catch (err) {
+    res.status(500).json({ success: false, error: sanitizeErrorMessage(err, 'Failed to submit answer.') });
+  }
+});
+
+

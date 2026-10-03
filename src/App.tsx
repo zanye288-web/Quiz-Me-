@@ -857,6 +857,14 @@ export default function App() {
               />
             ) : (
               <LiveSessionHub
+                availableQuizzes={
+                  activeQuiz
+                    ? [
+                        activeQuiz,
+                        ...customQuizzes.filter((q) => q.quiz_title !== activeQuiz.quiz_title),
+                      ]
+                    : customQuizzes
+                }
                 onJoinRoom={(roomCode, data, isHost, participantId) => {
                   setActiveLiveSession({
                     roomCode,

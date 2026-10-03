@@ -5,27 +5,23 @@ import {
   Check,
   Play,
   RotateCcw,
-  Sparkles,
   Trophy,
   Flame,
   Clock,
   ArrowRight,
-  Shield,
   Zap,
-  HelpCircle,
   Award,
   Crown,
   Medal,
   LogOut,
   UserPlus,
-  Volume2,
-  VolumeX,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import {
   LiveSessionData,
   LiveParticipant,
-  LiveSessionStatus,
 } from '../../types/liveSession';
 import {
   subscribeLiveSession,
@@ -34,6 +30,7 @@ import {
   advanceToNextQuestion,
   calculateAnswerPoints,
   addSimulatedParticipants,
+  normalizeQuizForLiveBattle,
 } from '../../services/liveSession';
 import { soundFx } from '../../utils/audio';
 
@@ -52,48 +49,111 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
   currentUserId,
   onLeave,
 }) => {
-  const [session, setSession] = useState<LiveSessionData>(initialData);
+  const [session, setSession] = useState<LiveSessionData>(() => ({
+    ...initialData,
+    quiz: normalizeQuizForLiveBattle(initialData.quiz),
+  }));
   const [copied, setCopied] = useState(false);
   const [countdownNumber, setCountdownNumber] = useState<number>(3);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [hasSubmittedAnswer, setHasSubmittedAnswer] = useState<boolean>(false);
+  const [lastAnswerCorrect, setLastAnswerCorrect] = useState<boolean | null>(null);
   const [earnedPoints, setEarnedPoints] = useState<number>(0);
   const [timeLeftOnQuestion, setTimeLeftOnQuestion] = useState<number>(
-    initialData.settings.timePerQuestion || 20
+    initialData.settings?.timePerQuestion || 20
   );
 
-  // Subscribe to real-time Firestore updates
+  const sessionRef = useRef<LiveSessionData>(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  // Subscribe to real-time updates (BroadcastChannel + Server Store + Firestore)
   useEffect(() => {
     const unsubscribe = subscribeLiveSession(roomCode, (updated) => {
       if (updated) {
-        setSession(updated);
+        setSession({
+          ...updated,
+          quiz: normalizeQuizForLiveBattle(updated.quiz),
+        });
       }
     });
 
     return () => unsubscribe();
   }, [roomCode]);
 
-  // Handle Synchronous Question Timer
-  const questionStartTime = session.questionStartTime;
-  const timeLimit = session.settings.timePerQuestion || 20;
+  const timeLimit = session.settings?.timePerQuestion || 20;
 
+  // Reset local answer selection ONLY when question index changes or returning to lobby/countdown
+  useEffect(() => {
+    if (session.status === 'lobby' || session.status === 'countdown') {
+      setSelectedOption(null);
+      setHasSubmittedAnswer(false);
+      setLastAnswerCorrect(null);
+      setEarnedPoints(0);
+      setTimeLeftOnQuestion(timeLimit);
+      return;
+    }
+
+    if (session.status === 'in_progress') {
+      const existingAns =
+        session.participants?.[currentUserId]?.answers?.[session.currentQuestionIndex];
+      if (existingAns) {
+        setSelectedOption(existingAns.selectedAnswer);
+        setHasSubmittedAnswer(true);
+        setLastAnswerCorrect(existingAns.isCorrect);
+        setEarnedPoints(existingAns.pointsEarned);
+      } else {
+        setSelectedOption(null);
+        setHasSubmittedAnswer(false);
+        setLastAnswerCorrect(null);
+        setEarnedPoints(0);
+        setTimeLeftOnQuestion(timeLimit);
+      }
+    }
+  }, [session.currentQuestionIndex, session.status, currentUserId, timeLimit]);
+
+  // Drive 3-2-1 Countdown across all connected clients
+  useEffect(() => {
+    if (session.status !== 'countdown') return;
+
+    setCountdownNumber(3);
+    let count = 3;
+
+    const interval = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setCountdownNumber(count);
+        soundFx.playClick();
+      } else {
+        clearInterval(interval);
+        setCountdownNumber(0);
+        if (isHost) {
+          updateSessionStatus(roomCode, 'in_progress', {
+            currentQuestionIndex: 0,
+            questionStartTime: Date.now(),
+          });
+        }
+      }
+    }, 900);
+
+    return () => clearInterval(interval);
+  }, [session.status, isHost, roomCode]);
+
+  // Synchronous Question Countdown Timer
   useEffect(() => {
     if (session.status !== 'in_progress') return;
 
-    // Reset local answer selection for current question
-    setSelectedOption(null);
-    setHasSubmittedAnswer(false);
-    setEarnedPoints(0);
+    const startTime = session.questionStartTime || Date.now();
 
     const timer = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - session.questionStartTime) / 1000);
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
       const remaining = Math.max(0, timeLimit - elapsed);
       setTimeLeftOnQuestion(remaining);
 
       if (remaining === 0) {
         clearInterval(timer);
-        // If host and time expired, transition to review
-        if (isHost && session.status === 'in_progress') {
+        if (isHost && sessionRef.current.status === 'in_progress') {
           updateSessionStatus(roomCode, 'question_review');
         }
       }
@@ -101,6 +161,101 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
 
     return () => clearInterval(timer);
   }, [session.status, session.currentQuestionIndex, session.questionStartTime, timeLimit, isHost, roomCode]);
+
+  // Simulate AI Challenger Classmates (`bot_` participants) answering during `in_progress`
+  useEffect(() => {
+    if (!isHost || session.status !== 'in_progress') return;
+
+    const qIdx = session.currentQuestionIndex;
+    const question = session.quiz.questions[qIdx];
+    if (!question) return;
+
+    const options = question.options || [];
+    const correctAns = question.correct_answer || options[0] || '';
+    const bots = Object.values(session.participants || {}).filter(
+      (p) => p.id.startsWith('bot_') && !p.hasAnsweredCurrent
+    );
+
+    if (bots.length === 0) return;
+
+    const timers = bots.map((bot, idx) => {
+      // Staggered realistic thinking time between 1.8s and 5.8s
+      const delayMs = 1800 + idx * 1200 + Math.floor(Math.random() * 1400);
+      return setTimeout(() => {
+        const latestSession = sessionRef.current;
+        if (
+          latestSession.status !== 'in_progress' ||
+          latestSession.currentQuestionIndex !== qIdx
+        ) {
+          return;
+        }
+        const latestBot = latestSession.participants?.[bot.id];
+        if (!latestBot || latestBot.hasAnsweredCurrent) return;
+
+        // 75% accuracy for competitive challenge
+        const isCorrect = Math.random() < 0.75;
+        const wrongOptions = options.filter(
+          (o) => o.trim().toLowerCase() !== correctAns.trim().toLowerCase()
+        );
+        const chosenAnswer =
+          isCorrect || wrongOptions.length === 0
+            ? correctAns
+            : wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
+
+        const points = calculateAnswerPoints(
+          isCorrect,
+          delayMs,
+          timeLimit,
+          latestBot.streak || 0,
+          latestSession.settings?.streakBonusesEnabled ?? true
+        );
+        const newScore = (latestBot.score || 0) + points;
+        const newStreak = isCorrect ? (latestBot.streak || 0) + 1 : 0;
+
+        submitLiveAnswer(
+          roomCode,
+          bot.id,
+          qIdx,
+          {
+            selectedAnswer: chosenAnswer,
+            isCorrect,
+            responseTimeMs: delayMs,
+            pointsEarned: points,
+          },
+          newScore,
+          newStreak
+        );
+      }, delayMs);
+    });
+
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+    };
+  }, [isHost, session.status, session.currentQuestionIndex, roomCode, timeLimit]);
+
+  // Auto-advance to question_review 1.2s after ALL participants have answered
+  const participantsList: LiveParticipant[] = Object.values(session.participants || {});
+  const answeredCount = participantsList.filter((p) => p.hasAnsweredCurrent).length;
+  const totalParticipants = participantsList.length;
+
+  useEffect(() => {
+    if (
+      !isHost ||
+      session.status !== 'in_progress' ||
+      totalParticipants === 0 ||
+      answeredCount < totalParticipants
+    ) {
+      return;
+    }
+
+    const advanceTimer = setTimeout(() => {
+      if (sessionRef.current.status === 'in_progress') {
+        updateSessionStatus(roomCode, 'question_review');
+      }
+    }, 1200);
+
+    return () => clearTimeout(advanceTimer);
+  }, [isHost, session.status, answeredCount, totalParticipants, roomCode]);
 
   // Handle Confetti on Finish
   useEffect(() => {
@@ -120,51 +275,46 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
 
   // Current Question Object
   const currentQuestion = session.quiz.questions[session.currentQuestionIndex];
-  const participantsList: LiveParticipant[] = Object.values(session.participants || {});
-  const currentParticipant = session.participants[currentUserId];
+  const currentParticipant = session.participants?.[currentUserId];
 
   // Leaderboard ranking (sorted by score descending)
   const sortedParticipants = [...participantsList].sort((a, b) => b.score - a.score);
 
   // Copy Room Code
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(roomCode);
+    navigator.clipboard.writeText(roomCode).catch(() => {});
     setCopied(true);
     soundFx.playClick();
     setTimeout(() => setCopied(false), 2500);
   };
 
   // Host starts the live game
-  const handleStartGame = async () => {
+  const handleStartGame = () => {
     soundFx.playLevelUp();
-    // Start with countdown
-    await updateSessionStatus(roomCode, 'countdown');
-
-    let count = 3;
-    setCountdownNumber(3);
-    const interval = setInterval(() => {
-      count -= 1;
-      setCountdownNumber(count);
-      soundFx.playClick();
-      if (count <= 0) {
-        clearInterval(interval);
-        updateSessionStatus(roomCode, 'in_progress', {
-          currentQuestionIndex: 0,
-          questionStartTime: Date.now(),
-        });
-      }
-    }, 1000);
+    updateSessionStatus(roomCode, 'countdown');
   };
 
-  // Student submits answer
+  // Skip countdown directly to Question 1
+  const handleSkipCountdown = () => {
+    soundFx.playClick();
+    updateSessionStatus(roomCode, 'in_progress', {
+      currentQuestionIndex: 0,
+      questionStartTime: Date.now(),
+    });
+  };
+
+  // Participant submits answer
   const handleSubmitAnswer = async (option: string) => {
     if (hasSubmittedAnswer || session.status !== 'in_progress' || !currentQuestion) return;
 
     setSelectedOption(option);
     setHasSubmittedAnswer(true);
 
-    const isCorrect = option.trim().toLowerCase() === currentQuestion.correct_answer.trim().toLowerCase();
-    const responseTimeMs = Date.now() - session.questionStartTime;
+    const isCorrect =
+      option.trim().toLowerCase() === currentQuestion.correct_answer.trim().toLowerCase();
+    setLastAnswerCorrect(isCorrect);
+
+    const responseTimeMs = Math.max(200, Date.now() - (session.questionStartTime || Date.now()));
     const currentStreak = currentParticipant?.streak || 0;
 
     const points = calculateAnswerPoints(
@@ -172,7 +322,7 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
       responseTimeMs,
       timeLimit,
       currentStreak,
-      session.settings.streakBonusesEnabled
+      session.settings?.streakBonusesEnabled ?? true
     );
 
     setEarnedPoints(points);
@@ -209,13 +359,31 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
     } else if (session.status === 'question_review') {
       const nextIdx = session.currentQuestionIndex + 1;
       if (nextIdx >= session.quiz.questions.length) {
-        // Assessment complete
         await updateSessionStatus(roomCode, 'finished');
       } else {
-        // Next question
         await advanceToNextQuestion(roomCode, nextIdx, session.participants);
       }
     }
+  };
+
+  // Host restarts a completed battle from Question 1
+  const handleRematch = async () => {
+    soundFx.playLevelUp();
+    const resetParticipants: Record<string, LiveParticipant> = {};
+    Object.entries(session.participants || {}).forEach(([pid, p]) => {
+      resetParticipants[pid] = {
+        ...p,
+        score: 0,
+        streak: 0,
+        answers: {},
+        hasAnsweredCurrent: false,
+      };
+    });
+    await updateSessionStatus(roomCode, 'in_progress', {
+      currentQuestionIndex: 0,
+      questionStartTime: Date.now(),
+      participants: resetParticipants,
+    });
   };
 
   // Host adds simulated bots for demo testing
@@ -223,10 +391,6 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
     soundFx.playClick();
     await addSimulatedParticipants(roomCode, participantsList.length);
   };
-
-  // Calculate percentage of participants who answered
-  const answeredCount = participantsList.filter((p) => p.hasAnsweredCurrent).length;
-  const totalStudents = participantsList.filter((p) => p.role === 'student').length || participantsList.length;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 animate-in fade-in duration-300">
@@ -294,7 +458,7 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
             </h2>
 
             <p className="text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-              Share this 6-digit code with students. They will appear below in real-time as they join.
+              Share this 6-digit PIN with classmates in another tab or device, or start battling right away!
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
@@ -312,10 +476,10 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                   type="button"
                   onClick={handleAddBots}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold text-xs text-slate-700 dark:text-slate-300 transition-all cursor-pointer"
-                  title="Add simulated classmates to test live multiplayer interactions"
+                  title="Add 3 more AI challenger classmates"
                 >
                   <UserPlus className="w-4 h-4 text-indigo-500" />
-                  <span>Add Classmates (Solo Demo)</span>
+                  <span>+ Add More AI Classmates</span>
                 </button>
               )}
             </div>
@@ -347,7 +511,7 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                       {p.name}
                     </p>
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">
-                      {p.role}
+                      {p.id.startsWith('bot_') ? 'AI Challenger' : p.role}
                     </span>
                   </div>
                 </div>
@@ -364,7 +528,7 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                   className="flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-base shadow-xl shadow-emerald-600/25 hover:shadow-emerald-600/35 transition-all active:scale-98 cursor-pointer"
                 >
                   <Play className="w-5 h-5 fill-white" />
-                  <span>Start Assessment ({session.quiz.questions.length} Questions)</span>
+                  <span>Start Live Battle ({session.quiz.questions.length} Questions)</span>
                 </button>
               ) : (
                 <div className="text-center">
@@ -381,18 +545,27 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
 
       {/* STAGE 2: COUNTDOWN */}
       {session.status === 'countdown' && (
-        <div className="flex flex-col items-center justify-center py-24 animate-in zoom-in-75 duration-300">
+        <div className="flex flex-col items-center justify-center py-20 animate-in zoom-in-75 duration-300">
           <div className="w-36 h-36 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-2xl shadow-indigo-500/40 mb-6 animate-pulse">
             <span className="font-mono font-black text-7xl text-white">
-              {countdownNumber}
+              {countdownNumber > 0 ? countdownNumber : 'GO!'}
             </span>
           </div>
           <h3 className="text-2xl font-black text-slate-900 dark:text-white">
             Get Ready, Scholars!
           </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-6">
             First question starting now...
           </p>
+          {isHost && (
+            <button
+              type="button"
+              onClick={handleSkipCountdown}
+              className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+            >
+              Start Question 1 Immediately →
+            </button>
+          )}
         </div>
       )}
 
@@ -468,13 +641,15 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
 
               return (
                 <button
-                  key={option}
+                  key={`${session.currentQuestionIndex}_${idx}_${option}`}
                   type="button"
                   disabled={hasSubmittedAnswer}
                   onClick={() => handleSubmitAnswer(option)}
                   className={`p-5 rounded-3xl text-left border-2 transition-all cursor-pointer flex items-center gap-4 ${
                     isSelected
-                      ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-600/25 scale-[1.02]'
+                      ? lastAnswerCorrect === false
+                        ? 'border-rose-600 bg-rose-600 text-white shadow-lg shadow-rose-600/25 scale-[1.01]'
+                        : 'border-emerald-600 bg-emerald-600 text-white shadow-lg shadow-emerald-600/25 scale-[1.01]'
                       : `bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 ${optionColorStyles}`
                   } ${hasSubmittedAnswer && !isSelected ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
@@ -497,17 +672,35 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
 
           {/* Feedback & Score Badge upon answering */}
           {hasSubmittedAnswer && (
-            <div className="p-5 rounded-3xl bg-indigo-50/80 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/80 flex items-center justify-between animate-in slide-in-from-bottom-3 duration-200 shadow-sm">
+            <div
+              className={`p-5 rounded-3xl border flex items-center justify-between animate-in slide-in-from-bottom-3 duration-200 shadow-sm ${
+                lastAnswerCorrect
+                  ? 'bg-emerald-50/80 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800/80'
+                  : 'bg-rose-50/80 dark:bg-rose-950/50 border-rose-200 dark:border-rose-800/80'
+              }`}
+            >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-2xl bg-indigo-600 text-white">
-                  <Check className="w-5 h-5" />
+                <div
+                  className={`p-2 rounded-2xl text-white ${
+                    lastAnswerCorrect ? 'bg-emerald-600' : 'bg-rose-600'
+                  }`}
+                >
+                  {lastAnswerCorrect ? (
+                    <CheckCircle2 className="w-5 h-5" />
+                  ) : (
+                    <XCircle className="w-5 h-5" />
+                  )}
                 </div>
                 <div>
                   <h4 className="font-black text-sm text-slate-900 dark:text-white">
-                    Answer Locked In!
+                    {lastAnswerCorrect
+                      ? 'Correct Answer Locked In!'
+                      : `Locked In — Correct answer: ${currentQuestion.correct_answer}`}
                   </h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Waiting for fellow scholars to finish...
+                    {answeredCount < totalParticipants
+                      ? `Waiting for remaining scholars (${answeredCount}/${totalParticipants} answered)...`
+                      : 'All scholars answered! Revealing standings...'}
                   </p>
                 </div>
               </div>
@@ -521,22 +714,25 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
             </div>
           )}
 
-          {/* Host Next Question Override Button */}
-          {isHost && (
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+          {/* Live Response Status Bar & Host Controls */}
+          <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
-                {answeredCount} of {totalStudents} scholars responded
+                {answeredCount} of {totalParticipants} scholars responded
               </span>
+            </div>
+            {isHost && (
               <button
                 type="button"
                 onClick={handleHostNext}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs cursor-pointer shadow-sm"
               >
-                <span>Show Leaderboard</span>
+                <span>Show Standings & Explanation</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
@@ -564,7 +760,7 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                 </h3>
               </div>
               <span className="text-xs font-semibold text-slate-400">
-                After Question {session.currentQuestionIndex + 1}
+                After Question {session.currentQuestionIndex + 1} of {session.quiz.questions.length}
               </span>
             </div>
 
@@ -572,6 +768,7 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
               {sortedParticipants.map((p, index) => {
                 const isCurrentUser = p.id === currentUserId;
                 const isFirst = index === 0;
+                const qAns = p.answers?.[session.currentQuestionIndex];
 
                 return (
                   <div
@@ -601,6 +798,17 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                             <span className="inline-flex items-center gap-0.5 text-[10px] font-black text-amber-500 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">
                               <Flame className="w-3 h-3 fill-amber-500" />
                               {p.streak}
+                            </span>
+                          )}
+                          {qAns && (
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                                qAns.isCorrect
+                                  ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                                  : 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                              }`}
+                            >
+                              {qAns.isCorrect ? `+${qAns.pointsEarned}` : '+0'}
                             </span>
                           )}
                         </div>
@@ -735,13 +943,23 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-center gap-4 pt-4">
+          <div className="flex flex-wrap justify-center gap-4 pt-4">
+            {isHost && (
+              <button
+                type="button"
+                onClick={handleRematch}
+                className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition-all active:scale-98 cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Play Rematch</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onLeave}
               className="px-8 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm shadow-lg shadow-indigo-600/25 transition-all active:scale-98 cursor-pointer"
             >
-              Exit to Dashboard
+              Back to Live Battle Hub
             </button>
           </div>
         </div>
