@@ -58,6 +58,8 @@ function pcmToWavBase64(
   return Buffer.concat([wavHeader, pcmBuffer]).toString('base64');
 }
 
+let geminiTtsCooldownUntil = 0;
+
 /**
  * Attempts Gemini native TTS using gemini-3.1-flash-tts-preview
  */
@@ -67,7 +69,7 @@ async function synthesizeWithGeminiTTS(
   voiceName?: string
 ): Promise<{ success: boolean; audioBase64?: string; contentType?: string }> {
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) {
+  if (!geminiKey || Date.now() < geminiTtsCooldownUntil) {
     return { success: false };
   }
 
@@ -114,6 +116,9 @@ async function synthesizeWithGeminiTTS(
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    if (/429|quota|rate|exceeded|resource_exhausted/i.test(msg)) {
+      geminiTtsCooldownUntil = Date.now() + 60_000;
+    }
     console.info('Gemini TTS synthesis attempt note:', msg);
   }
 

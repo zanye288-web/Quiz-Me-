@@ -100,19 +100,19 @@ export function createRateLimiter(options: {
 // Pre-configured rate limit tiers
 export const aiGenerationRateLimiter = createRateLimiter({
   windowMs: 60_000,
-  maxRequests: 30, // 30 AI generations per minute per client
+  maxRequests: 120, // 120 AI generations per minute per client
   name: 'AI Quiz Generation',
 });
 
 export const searchRateLimiter = createRateLimiter({
   windowMs: 60_000,
-  maxRequests: 60, // 60 visual searches per minute
+  maxRequests: 240, // 240 visual/diagnostic requests per minute
   name: 'Media Search',
 });
 
 export const ttsRateLimiter = createRateLimiter({
   windowMs: 60_000,
-  maxRequests: 40, // 40 voice syntheses per minute
+  maxRequests: 160, // 160 voice syntheses per minute
   name: 'Speech Synthesis',
 });
 

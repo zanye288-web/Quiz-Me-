@@ -486,11 +486,12 @@ apiRouter.post('/quiz-summary', searchRateLimiter, async (req: Request, res: Res
 // 8. Recommended Quizzes
 apiRouter.post('/recommended-quizzes', searchRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { persona, stats, recentQuizzes } = req.body;
+    const { persona, stats, recentQuizzes, forceRefresh } = req.body;
     const result = await generateQuizRecommendationsAI({
       persona: persona === 'Teacher' ? 'Teacher' : 'Student',
       stats,
       recentQuizzes: Array.isArray(recentQuizzes) ? recentQuizzes.slice(0, 10) : [],
+      forceRefresh: Boolean(forceRefresh),
     });
     res.json({ success: true, ...result });
   } catch {

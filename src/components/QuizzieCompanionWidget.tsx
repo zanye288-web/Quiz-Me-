@@ -10,6 +10,8 @@ import {
   ChevronDown,
   X,
   Palette,
+  Compass,
+  Headphones,
 } from 'lucide-react';
 import {
   MascotAvatar,
@@ -18,7 +20,7 @@ import {
   MASCOT_THEME_CATALOG,
   useMascotPreferences,
 } from './MascotAvatar';
-import { soundFx } from '../utils/audio';
+import { soundFx, AmbientSoundscapeMode } from '../utils/audio';
 import { UserStats as UserStatsType, PersonaType } from '../types/quiz';
 
 interface QuizzieCompanionWidgetProps {
@@ -30,6 +32,7 @@ interface QuizzieCompanionWidgetProps {
   onOpenTutor: () => void;
   onNavigateToNotes?: () => void;
   onNavigateToStudio?: () => void;
+  onOpenStarterTutorial?: () => void;
 }
 
 const MOTIVATIONAL_NUGGETS = [
@@ -49,10 +52,13 @@ export const QuizzieCompanionWidget: React.FC<QuizzieCompanionWidgetProps> = ({
   onOpenShortcuts,
   onOpenTutor,
   onNavigateToNotes,
+  onOpenStarterTutorial,
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [tipIndex, setTipIndex] = useState<number>(0);
+  const [isAmbientPlaying, setIsAmbientPlaying] = useState<boolean>(soundFx.isFocusHumming);
+  const [ambientMode, setAmbientMode] = useState<AmbientSoundscapeMode>(soundFx.ambientMode);
 
   const {
     mascotCharacter,
@@ -244,8 +250,74 @@ export const QuizzieCompanionWidget: React.FC<QuizzieCompanionWidgetProps> = ({
               </div>
             </div>
 
+            {/* Ambient Study Soundscape Quick-Mixer */}
+            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">
+                <span className="flex items-center gap-1">
+                  <Headphones className="w-3.5 h-3.5 text-cyan-500" />
+                  Study Soundscape
+                </span>
+                <span className="text-[10px] font-extrabold text-cyan-600 dark:text-cyan-400">
+                  {isAmbientPlaying ? '● Playing' : 'Off'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(
+                  [
+                    { id: 'alpha432' as AmbientSoundscapeMode, label: '432Hz Focus' },
+                    { id: 'rain' as AmbientSoundscapeMode, label: 'Study Rain' },
+                    { id: 'pinknoise' as AmbientSoundscapeMode, label: 'Pink Noise' },
+                  ]
+                ).map((sc) => {
+                  const active = isAmbientPlaying && ambientMode === sc.id;
+                  return (
+                    <button
+                      key={sc.id}
+                      type="button"
+                      onClick={() => {
+                        if (active) {
+                          soundFx.stopFocusHum();
+                          setIsAmbientPlaying(false);
+                        } else {
+                          setAmbientMode(sc.id);
+                          soundFx.startFocusHum(sc.id);
+                          setIsAmbientPlaying(true);
+                        }
+                      }}
+                      className={`py-1.5 px-2 rounded-xl border text-[10px] font-bold transition-all cursor-pointer ${
+                        active
+                          ? 'border-cyan-500 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 ring-1 ring-cyan-500/30'
+                          : 'border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:border-cyan-400'
+                      }`}
+                    >
+                      {sc.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Quick Action Buttons */}
             <div className="space-y-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-800/60">
+              {onOpenStarterTutorial && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick?.();
+                    onOpenStarterTutorial();
+                    setIsOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-xs font-bold transition-colors cursor-pointer border border-amber-200/70 dark:border-amber-800/60"
+                >
+                  <span className="flex items-center gap-2">
+                    <Compass className="w-4 h-4 text-amber-500" />
+                    Interactive Starter Tutorial
+                  </span>
+                  <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded-md font-extrabold">
+                    Guide
+                  </span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {

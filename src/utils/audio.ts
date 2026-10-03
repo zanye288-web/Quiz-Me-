@@ -2,6 +2,74 @@
 // Designed for ultra-clean, warm, zero-latency, high-fidelity UI acoustics
 
 export type SoundProfileType = 'crystal' | 'minimal' | 'arcade' | 'zen';
+export type CustomSoundSlot = 'correct' | 'incorrect' | 'click' | 'complete' | 'streak' | 'badge';
+export type AmbientSoundscapeMode = 'alpha432' | 'rain' | 'pinknoise';
+
+export interface CustomSoundConfig {
+  slot: CustomSoundSlot;
+  name: string;
+  enabled: boolean;
+  sourceType: 'upload' | 'mic' | 'synth';
+  dataUrl?: string;
+  synth?: {
+    waveform: OscillatorType;
+    startFreq: number;
+    endFreq: number;
+    durationMs: number;
+  };
+  updatedAt: string;
+}
+
+export const CUSTOM_SOUND_SLOTS_META: {
+  slot: CustomSoundSlot;
+  label: string;
+  description: string;
+  defaultFreq: number;
+  defaultEndFreq: number;
+}[] = [
+  {
+    slot: 'correct',
+    label: 'Correct Answer Chime',
+    description: 'Plays whenever you answer a quiz question right',
+    defaultFreq: 523.25,
+    defaultEndFreq: 1046.5,
+  },
+  {
+    slot: 'incorrect',
+    label: 'Incorrect Answer Alert',
+    description: 'Plays when an answer misses the mark',
+    defaultFreq: 260,
+    defaultEndFreq: 165,
+  },
+  {
+    slot: 'click',
+    label: 'Button Click / UI Tap',
+    description: 'Plays on interactive buttons and navigation taps',
+    defaultFreq: 600,
+    defaultEndFreq: 300,
+  },
+  {
+    slot: 'streak',
+    label: 'Combo Streak Celebration',
+    description: 'Plays when you hit a 3x+ answer streak',
+    defaultFreq: 440,
+    defaultEndFreq: 1320,
+  },
+  {
+    slot: 'complete',
+    label: 'Quiz Complete Fanfare',
+    description: 'Plays when you finish an entire assessment',
+    defaultFreq: 392,
+    defaultEndFreq: 1174.66,
+  },
+  {
+    slot: 'badge',
+    label: 'Badge & Level-Up Unlock',
+    description: 'Plays when unlocking a new trophy badge or level',
+    defaultFreq: 587.33,
+    defaultEndFreq: 1567.98,
+  },
+];
 
 export interface SoundProfileMeta {
   id: SoundProfileType;
@@ -54,6 +122,11 @@ class SoundEngine {
   private soundStorageKey = 'quizme_sound_effects_enabled';
   private volumeStorageKey = 'quizme_sound_volume';
   private profileStorageKey = 'quizme_sound_profile';
+  private customSoundsStorageKey = 'quizme_custom_sfx_v1';
+
+  public customSounds: Partial<Record<CustomSoundSlot, CustomSoundConfig>> = {};
+  public ambientMode: AmbientSoundscapeMode = 'alpha432';
+  private noiseSource: AudioBufferSourceNode | null = null;
 
   // Ambient Focus Tone Nodes
   private focusOsc1: OscillatorNode | null = null;
@@ -78,6 +151,15 @@ class SoundEngine {
       const savedProfile = localStorage.getItem(this.profileStorageKey) as SoundProfileType | null;
       if (savedProfile && ['crystal', 'minimal', 'arcade', 'zen'].includes(savedProfile)) {
         this.soundProfile = savedProfile;
+      }
+
+      const savedCustom = localStorage.getItem(this.customSoundsStorageKey);
+      if (savedCustom) {
+        try {
+          this.customSounds = JSON.parse(savedCustom) || {};
+        } catch {
+          this.customSounds = {};
+        }
       }
 
       // Auto-unlock AudioContext on first user interaction
@@ -176,10 +258,100 @@ class SoundEngine {
   }
 
   // ==========================================
+  // CUSTOM USER SOUND EFFECTS MANAGER
+  // ==========================================
+  public getCustomSounds(): Partial<Record<CustomSoundSlot, CustomSoundConfig>> {
+    return { ...this.customSounds };
+  }
+
+  public setCustomSound(slot: CustomSoundSlot, config: CustomSoundConfig) {
+    this.customSounds = {
+      ...this.customSounds,
+      [slot]: config,
+    };
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(this.customSoundsStorageKey, JSON.stringify(this.customSounds));
+      } catch (e) {
+        console.warn('Custom sound storage notice (file may be large, keeping in session):', e);
+      }
+    }
+  }
+
+  public removeCustomSound(slot: CustomSoundSlot) {
+    const next = { ...this.customSounds };
+    delete next[slot];
+    this.customSounds = next;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(this.customSoundsStorageKey, JSON.stringify(this.customSounds));
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  public toggleCustomSoundEnabled(slot: CustomSoundSlot, enabled: boolean) {
+    const existing = this.customSounds[slot];
+    if (!existing) return;
+    this.setCustomSound(slot, { ...existing, enabled });
+  }
+
+  public playCustomSoundSlot(slot: CustomSoundSlot, forcePlay = false): boolean {
+    const custom = this.customSounds[slot];
+    if (!custom || (!custom.enabled && !forcePlay)) return false;
+
+    if ((custom.sourceType === 'upload' || custom.sourceType === 'mic') && custom.dataUrl) {
+      try {
+        const audio = new Audio(custom.dataUrl);
+        audio.volume = Math.max(0.05, Math.min(1, this.volume));
+        audio.play().catch(() => {});
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    if (custom.sourceType === 'synth' && custom.synth) {
+      const ctx = this.getContext();
+      const dest = this.getMasterOutput();
+      if (!ctx || !dest) return false;
+      try {
+        const now = ctx.currentTime;
+        const durSec = Math.max(0.04, Math.min(2.5, custom.synth.durationMs / 1000));
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = custom.synth.waveform || 'sine';
+        osc.frequency.setValueAtTime(Math.max(60, custom.synth.startFreq), now);
+        osc.frequency.exponentialRampToValueAtTime(
+          Math.max(60, custom.synth.endFreq),
+          now + durSec * 0.85
+        );
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.2, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
+
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(now);
+        osc.stop(now + durSec + 0.02);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  // ==========================================
   // 1. TACTILE BUTTON CLICK / INTERACTION
   // ==========================================
   public playClick() {
     if (!this.enabled) return;
+    if (this.playCustomSoundSlot('click')) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
     if (!ctx || !dest) return;
@@ -461,6 +633,7 @@ class SoundEngine {
   // ==========================================
   public playCorrect() {
     if (!this.enabled) return;
+    if (this.playCustomSoundSlot('correct')) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
     if (!ctx || !dest) return;
@@ -577,6 +750,7 @@ class SoundEngine {
   // ==========================================
   public playIncorrect() {
     if (!this.enabled) return;
+    if (this.playCustomSoundSlot('incorrect')) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
     if (!ctx || !dest) return;
@@ -637,6 +811,7 @@ class SoundEngine {
   // ==========================================
   public playCombo(combo: number) {
     if (!this.enabled) return;
+    if (this.playCustomSoundSlot('streak')) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
     if (!ctx || !dest) return;
@@ -728,6 +903,7 @@ class SoundEngine {
   // ==========================================
   public playComplete() {
     if (!this.enabled) return;
+    if (this.playCustomSoundSlot('complete')) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
     if (!ctx || !dest) return;
@@ -770,6 +946,7 @@ class SoundEngine {
   // ==========================================
   public playBadgeUnlock() {
     if (!this.enabled) return;
+    if (this.playCustomSoundSlot('badge')) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
     if (!ctx || !dest) return;
@@ -989,19 +1166,26 @@ class SoundEngine {
   }
 
   // ==========================================
-  // 15. AMBIENT ALPHA FOCUS SOUNDSCAPE (432Hz)
+  // 15. AMBIENT STUDY SOUNDSCAPES (432Hz / Rain / Pink Noise)
   // ==========================================
-  public toggleFocusHum(): boolean {
+  public toggleFocusHum(mode?: AmbientSoundscapeMode): boolean {
+    if (mode && mode !== this.ambientMode) {
+      this.ambientMode = mode;
+      if (this.isFocusHumming) {
+        this.startFocusHum(mode);
+        return true;
+      }
+    }
     if (this.isFocusHumming) {
       this.stopFocusHum();
       return false;
     } else {
-      this.startFocusHum();
+      this.startFocusHum(mode || this.ambientMode);
       return true;
     }
   }
 
-  public startFocusHum() {
+  public startFocusHum(mode: AmbientSoundscapeMode = this.ambientMode) {
     if (!this.enabled) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
@@ -1009,38 +1193,78 @@ class SoundEngine {
 
     try {
       this.stopFocusHum();
+      this.ambientMode = mode;
 
-      const osc1 = ctx.createOscillator();
-      const osc2 = ctx.createOscillator();
       const gain = ctx.createGain();
       const filter = ctx.createBiquadFilter();
 
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(320, ctx.currentTime);
+      if (mode === 'rain' || mode === 'pinknoise') {
+        // Synthesize seamless 4-second looping pink/rain noise buffer
+        const bufferSize = ctx.sampleRate * 4;
+        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          b3 = 0.86650 * b3 + white * 0.3104856;
+          b4 = 0.55000 * b4 + white * 0.5329522;
+          b5 = -0.7616 * b5 - white * 0.0168980;
+          output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.04;
+          b6 = white * 0.115926;
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = noiseBuffer;
+        source.loop = true;
 
-      // 432Hz Harmonic with 10Hz Binaural Alpha Wave Beat
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(216, ctx.currentTime); // 432 / 2
+        filter.type = mode === 'rain' ? 'bandpass' : 'lowpass';
+        filter.frequency.setValueAtTime(mode === 'rain' ? 950 : 480, ctx.currentTime);
+        filter.Q.setValueAtTime(mode === 'rain' ? 0.7 : 0.5, ctx.currentTime);
 
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(226, ctx.currentTime); // 216 + 10Hz Alpha differential
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(mode === 'rain' ? 0.18 : 0.12, ctx.currentTime + 0.8);
 
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.035, ctx.currentTime + 1.2);
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(dest);
+        source.start();
 
-      osc1.connect(filter);
-      osc2.connect(filter);
-      filter.connect(gain);
-      gain.connect(dest);
+        this.noiseSource = source;
+        this.focusFilter = filter;
+        this.focusGain = gain;
+        this.isFocusHumming = true;
+      } else {
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(320, ctx.currentTime);
 
-      osc1.start();
-      osc2.start();
+        // 432Hz Harmonic with 10Hz Binaural Alpha Wave Beat
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(216, ctx.currentTime);
 
-      this.focusOsc1 = osc1;
-      this.focusOsc2 = osc2;
-      this.focusFilter = filter;
-      this.focusGain = gain;
-      this.isFocusHumming = true;
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(226, ctx.currentTime);
+
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.035, ctx.currentTime + 1.2);
+
+        osc1.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
+        gain.connect(dest);
+
+        osc1.start();
+        osc2.start();
+
+        this.focusOsc1 = osc1;
+        this.focusOsc2 = osc2;
+        this.focusFilter = filter;
+        this.focusGain = gain;
+        this.isFocusHumming = true;
+      }
     } catch {
       this.isFocusHumming = false;
     }
@@ -1051,24 +1275,27 @@ class SoundEngine {
     try {
       if (this.focusGain && this.ctx) {
         this.focusGain.gain.setValueAtTime(this.focusGain.gain.value, this.ctx.currentTime);
-        this.focusGain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.3);
+        this.focusGain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.25);
       }
       setTimeout(() => {
         try {
           this.focusOsc1?.stop();
           this.focusOsc2?.stop();
+          this.noiseSource?.stop();
           this.focusOsc1?.disconnect();
           this.focusOsc2?.disconnect();
+          this.noiseSource?.disconnect();
           this.focusFilter?.disconnect();
         } catch {
           // ignore cleanup errors
         }
         this.focusOsc1 = null;
         this.focusOsc2 = null;
+        this.noiseSource = null;
         this.focusFilter = null;
         this.focusGain = null;
         this.isFocusHumming = false;
-      }, 300);
+      }, 260);
     } catch {
       this.isFocusHumming = false;
     }

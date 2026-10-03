@@ -36,12 +36,25 @@ import {
   RotateCcw,
   User as UserIcon,
   Edit3,
+  Save,
+  Mic,
+  Square,
+  Music,
+  Compass,
 } from 'lucide-react';
 import { useTheme, THEME_PRESETS, ACCENT_PALETTES, FONT_CATALOG, AccentColor, FontFamilyChoice, CardCornerRadius, UiDensity } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { AssessmentConfig, PersonaType, DifficultyType, UserStats } from '../types/quiz';
 import { QuizHistoryRecord } from './HistoryView';
-import { soundFx, SOUND_PROFILES, SoundProfileType } from '../utils/audio';
+import {
+  soundFx,
+  SOUND_PROFILES,
+  SoundProfileType,
+  CUSTOM_SOUND_SLOTS_META,
+  CustomSoundSlot,
+  CustomSoundConfig,
+  AmbientSoundscapeMode,
+} from '../utils/audio';
 import { speechEngine, SpeechSettings, VOICE_PRESETS, VoicePreset } from '../utils/speech';
 import { UserAvatar } from './UserAvatar';
 import { SCHOLAR_AVATARS, AVATAR_BG_GRADIENTS } from './ProfileCustomizationModal';
@@ -65,6 +78,7 @@ interface SettingsViewProps {
   soundEnabled: boolean;
   onToggleSound: () => void;
   onOpenProfileModal?: () => void;
+  onOpenStarterTutorial?: () => void;
 }
 
 type SettingsSection = 'profile' | 'appearance' | 'audio_voice' | 'assessment' | 'accessibility' | 'data';
@@ -81,6 +95,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   soundEnabled,
   onToggleSound,
   onOpenProfileModal,
+  onOpenStarterTutorial,
 }) => {
   const {
     theme,
@@ -106,6 +121,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setQuestionLayout,
     autoReadQuestions,
     setAutoReadQuestions,
+    spoilerFreeImages,
+    setSpoilerFreeImages,
+    autoNextOnCorrect,
+    setAutoNextOnCorrect,
     currentAccentConfig,
     applyPreset,
     resetAllSettings,
@@ -114,6 +133,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
   const [currentSoundProfile, setCurrentSoundProfile] = useState<SoundProfileType>(() => soundFx.getSoundProfile());
   const [isFocusHummingPreview, setIsFocusHummingPreview] = useState<boolean>(soundFx.isFocusHumming);
+  const [ambientMode, setAmbientMode] = useState<AmbientSoundscapeMode>(soundFx.ambientMode);
   const [previewMascotMood, setPreviewMascotMood] = useState<MascotMood>('idle');
   const {
     mascotCharacter,
@@ -122,6 +142,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setMascotCharacter,
     setMascotTheme,
   } = useMascotPreferences();
+
+  // Custom Sound Effects State
+  const [customSounds, setCustomSounds] = useState<Partial<Record<CustomSoundSlot, CustomSoundConfig>>>(() =>
+    soundFx.getCustomSounds()
+  );
+  const [activeCustomSlotModal, setActiveCustomSlotModal] = useState<CustomSoundSlot | null>(null);
+  const [recordingSlot, setRecordingSlot] = useState<CustomSoundSlot | null>(null);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const customAudioInputRef = React.useRef<HTMLInputElement>(null);
+  const [uploadTargetSlot, setUploadTargetSlot] = useState<CustomSoundSlot>('correct');
+  const [synthWave, setSynthWave] = useState<OscillatorType>('sine');
+  const [synthStartFreq, setSynthStartFreq] = useState<number>(523);
+  const [synthEndFreq, setSynthEndFreq] = useState<number>(1046);
+  const [synthDurationMs, setSynthDurationMs] = useState<number>(280);
+  const [lastSavedTimestamp, setLastSavedTimestamp] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('quizme_settings_last_saved_at');
+    }
+    return null;
+  });
+  const [isSavingAll, setIsSavingAll] = useState<boolean>(false);
 
   // Profile Customization State in Settings
   const { user, userProfile, updateUserProfileInCloud } = useAuth();
@@ -201,6 +242,214 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setTimeout(() => {
       setSaveBannerText(null);
     }, 2800);
+  };
+
+  // Unified Save All Settings (Local Snapshot + Cloud Firestore Sync)
+  const handleSaveAllSettings = async () => {
+    try {
+      setIsSavingAll(true);
+      soundFx.playCorrect();
+      const snapshot = {
+        theme,
+        accent,
+        fontFamily,
+        uiDensity,
+        cardRadius,
+        highContrast,
+        reducedMotion,
+        confettiEnabled,
+        soundVolume,
+        soundEnabled,
+        soundProfile: currentSoundProfile,
+        questionLayout,
+        autoReadQuestions,
+        spoilerFreeImages,
+        autoNextOnCorrect,
+        mascotCharacter,
+        mascotTheme,
+        persona,
+        assessmentConfig,
+        speechSettings,
+      };
+      const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      localStorage.setItem('quizme_saved_settings_snapshot_v1', JSON.stringify(snapshot));
+      localStorage.setItem('quizme_settings_last_saved_at', timeLabel);
+      setLastSavedTimestamp(timeLabel);
+
+      if (user) {
+        await updateUserProfileInCloud({
+          displayName: profileName.trim() || user?.displayName || 'Scholar',
+          headline: profileHeadline.trim() || 'Scholar',
+          bio: profileBio.trim(),
+          learningGoal: profileGoal.trim(),
+          avatarType: profileAvatarType,
+          avatarIcon: profileAvatarIcon,
+          avatarBg: profileAvatarBg,
+          hasCustomizedProfile: true,
+          assessmentConfig,
+          savedSettings: snapshot,
+        });
+      }
+      triggerSaveNotice('All settings & preferences saved locally and synced to cloud!');
+    } catch (err) {
+      console.warn('Settings save notice:', err);
+      triggerSaveNotice('All settings saved to device storage!');
+    } finally {
+      setIsSavingAll(false);
+    }
+  };
+
+  const handleRestoreSavedSnapshot = () => {
+    const raw = localStorage.getItem('quizme_saved_settings_snapshot_v1');
+    if (!raw) {
+      triggerSaveNotice('No saved snapshot found yet — click Save All Changes first!');
+      return;
+    }
+    try {
+      const snap = JSON.parse(raw);
+      if (snap.theme) setTheme(snap.theme);
+      if (snap.accent) setAccent(snap.accent);
+      if (snap.fontFamily) setFontFamily(snap.fontFamily);
+      if (snap.uiDensity) setUiDensity(snap.uiDensity);
+      if (snap.cardRadius) setCardRadius(snap.cardRadius);
+      if (typeof snap.highContrast === 'boolean') setHighContrast(snap.highContrast);
+      if (typeof snap.reducedMotion === 'boolean') setReducedMotion(snap.reducedMotion);
+      if (typeof snap.confettiEnabled === 'boolean') setConfettiEnabled(snap.confettiEnabled);
+      if (typeof snap.soundVolume === 'number') setSoundVolume(snap.soundVolume);
+      if (snap.soundProfile) {
+        setCurrentSoundProfile(snap.soundProfile);
+        soundFx.setSoundProfile(snap.soundProfile);
+      }
+      if (snap.questionLayout) setQuestionLayout(snap.questionLayout);
+      if (typeof snap.autoReadQuestions === 'boolean') setAutoReadQuestions(snap.autoReadQuestions);
+      if (typeof snap.spoilerFreeImages === 'boolean') setSpoilerFreeImages(snap.spoilerFreeImages);
+      if (typeof snap.autoNextOnCorrect === 'boolean') setAutoNextOnCorrect(snap.autoNextOnCorrect);
+      if (snap.mascotCharacter) setMascotCharacter(snap.mascotCharacter);
+      if (snap.mascotTheme) setMascotTheme(snap.mascotTheme);
+      if (snap.persona) onPersonaChange(snap.persona);
+      if (snap.assessmentConfig) onUpdateAssessmentConfig(snap.assessmentConfig);
+      soundFx.playCorrect();
+      triggerSaveNotice('Restored your last saved settings snapshot!');
+    } catch {
+      triggerSaveNotice('Could not restore snapshot.');
+    }
+  };
+
+  // Support Ctrl+S / Cmd+S inside SettingsView
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSaveAllSettings();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
+
+  // Custom Sound File Upload Handler
+  const handleCustomAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2.5 * 1024 * 1024) {
+      triggerSaveNotice('Please choose an audio clip under 2.5 MB for instant playback.');
+      e.target.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const cfg: CustomSoundConfig = {
+        slot: uploadTargetSlot,
+        name: file.name.replace(/\.[^/.]+$/, '').slice(0, 28),
+        enabled: true,
+        sourceType: 'upload',
+        dataUrl,
+        updatedAt: new Date().toISOString(),
+      };
+      soundFx.setCustomSound(uploadTargetSlot, cfg);
+      setCustomSounds(soundFx.getCustomSounds());
+      soundFx.playCustomSoundSlot(uploadTargetSlot, true);
+      triggerSaveNotice(`Uploaded custom sound "${cfg.name}" for ${uploadTargetSlot}!`);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Custom Sound Microphone Recorder (up to 4 seconds)
+  const handleToggleMicRecordSlot = async (slot: CustomSoundSlot) => {
+    if (recordingSlot === slot && mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setRecordingSlot(null);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+      mediaRecorderRef.current = recorder;
+      setRecordingSlot(slot);
+
+      recorder.ondataavailable = (ev) => {
+        if (ev.data.size > 0) chunks.push(ev.data);
+      };
+
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          const cfg: CustomSoundConfig = {
+            slot,
+            name: `Mic Recording (${new Date().toLocaleTimeString([], { minute: '2-digit', second: '2-digit' })})`,
+            enabled: true,
+            sourceType: 'mic',
+            dataUrl,
+            updatedAt: new Date().toISOString(),
+          };
+          soundFx.setCustomSound(slot, cfg);
+          setCustomSounds(soundFx.getCustomSounds());
+          soundFx.playCustomSoundSlot(slot, true);
+          triggerSaveNotice(`Saved microphone sound effect for ${slot}!`);
+        };
+        reader.readAsDataURL(blob);
+        setRecordingSlot(null);
+      };
+
+      recorder.start();
+      setTimeout(() => {
+        if (recorder.state === 'recording') {
+          recorder.stop();
+        }
+      }, 3500);
+    } catch {
+      triggerSaveNotice('Microphone permission is required to record custom sound effects.');
+      setRecordingSlot(null);
+    }
+  };
+
+  // Save Custom Synth Tone to Slot
+  const handleSaveCustomSynthToSlot = (slot: CustomSoundSlot) => {
+    const cfg: CustomSoundConfig = {
+      slot,
+      name: `Custom ${synthWave.toUpperCase()} (${synthStartFreq}Hz→${synthEndFreq}Hz)`,
+      enabled: true,
+      sourceType: 'synth',
+      synth: {
+        waveform: synthWave,
+        startFreq: synthStartFreq,
+        endFreq: synthEndFreq,
+        durationMs: synthDurationMs,
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    soundFx.setCustomSound(slot, cfg);
+    setCustomSounds(soundFx.getCustomSounds());
+    soundFx.playCustomSoundSlot(slot, true);
+    setActiveCustomSlotModal(null);
+    triggerSaveNotice(`Saved custom synth effect for ${slot}!`);
   };
 
   // Export data as JSON
@@ -324,7 +573,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onOpenStarterTutorial && (
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                onOpenStarterTutorial();
+              }}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer"
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Starter Tutorial</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleRestoreSavedSnapshot}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+            title="Revert to your last saved settings snapshot"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Restore Saved</span>
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -333,10 +604,50 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             }}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RefreshCw className="w-3.5 h-3.5" />
             <span>Reset Defaults</span>
           </button>
+          <button
+            type="button"
+            onClick={handleSaveAllSettings}
+            disabled={isSavingAll}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold shadow-md transition-all cursor-pointer ${currentAccentConfig.activeBtn}`}
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>{isSavingAll ? 'Saving...' : 'Save Changes'}</span>
+          </button>
         </div>
+      </div>
+
+      {/* Persistent Settings Save & Cloud Sync Bar */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-emerald-500/10 border border-indigo-200/80 dark:border-indigo-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-xs">
+            <Save className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <span>Settings Persistence & Cloud Profile Sync</span>
+              {lastSavedTimestamp && (
+                <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                  · Last saved at {lastSavedTimestamp}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Changes apply live and auto-save to device storage. Click Save All Changes (or press Ctrl+S) to lock a restore point and sync to your cloud account.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveAllSettings}
+          disabled={isSavingAll}
+          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer shrink-0 flex items-center gap-1.5"
+        >
+          <Save className="w-3.5 h-3.5" />
+          <span>{isSavingAll ? 'Syncing...' : 'Save All Changes'}</span>
+        </button>
       </div>
 
       {/* One-Click Theme Aesthetic Presets Banner */}
@@ -1349,8 +1660,291 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </button>
                   </div>
                 </div>
+
+                {/* Ambient Study Soundscape Mixer */}
+                <div className="space-y-2.5 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                      Ambient Study Soundscape Mixer
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Play continuous calming background audio while studying
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {[
+                      {
+                        id: 'alpha432' as AmbientSoundscapeMode,
+                        title: '432Hz Alpha Binaural',
+                        desc: 'Warm 10Hz alpha focus wave',
+                      },
+                      {
+                        id: 'rain' as AmbientSoundscapeMode,
+                        title: 'Soft Study Rain',
+                        desc: 'Calming acoustic rainfall loop',
+                      },
+                      {
+                        id: 'pinknoise' as AmbientSoundscapeMode,
+                        title: 'Warm Pink Noise',
+                        desc: 'Blocks distractions & chatter',
+                      },
+                    ].map((sc) => {
+                      const isActive = isFocusHummingPreview && ambientMode === sc.id;
+                      return (
+                        <button
+                          key={sc.id}
+                          type="button"
+                          onClick={() => {
+                            if (isFocusHummingPreview && ambientMode === sc.id) {
+                              soundFx.stopFocusHum();
+                              setIsFocusHummingPreview(false);
+                            } else {
+                              setAmbientMode(sc.id);
+                              soundFx.startFocusHum(sc.id);
+                              setIsFocusHummingPreview(true);
+                            }
+                          }}
+                          className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                            isActive
+                              ? 'border-cyan-500 bg-cyan-500/15 text-cyan-800 dark:text-cyan-200 ring-2 ring-cyan-500/20'
+                              : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-extrabold">{sc.title}</span>
+                            <span className="text-[10px] font-bold">
+                              {isActive ? '● Playing' : 'Play'}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">{sc.desc}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
+          </div>
+
+          {/* Custom User Sound Effects Studio */}
+          <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  <Music className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                    Custom Sound Effects Studio
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Upload audio files (.mp3, .wav, .ogg), record your own voice/claps with the mic, or design a custom synth tone for any quiz event!
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <input
+              ref={customAudioInputRef}
+              type="file"
+              accept="audio/*"
+              onChange={handleCustomAudioUpload}
+              className="hidden"
+            />
+
+            <div className="grid grid-cols-1 gap-3">
+              {CUSTOM_SOUND_SLOTS_META.map((slotMeta) => {
+                const customCfg = customSounds[slotMeta.slot];
+                const isRecordingThis = recordingSlot === slotMeta.slot;
+                const isDesigningThis = activeCustomSlotModal === slotMeta.slot;
+
+                return (
+                  <div
+                    key={slotMeta.slot}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      customCfg?.enabled
+                        ? 'border-indigo-500/70 bg-indigo-50/30 dark:bg-indigo-950/30'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40'
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-900 dark:text-white">
+                            {slotMeta.label}
+                          </span>
+                          {customCfg && (
+                            <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                              · Custom: {customCfg.name}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {slotMeta.description}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {/* Upload File Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadTargetSlot(slotMeta.slot);
+                            customAudioInputRef.current?.click();
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-bold cursor-pointer transition-colors"
+                          title="Upload MP3 / WAV / OGG audio file"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>Upload Audio</span>
+                        </button>
+
+                        {/* Record Mic Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleMicRecordSlot(slotMeta.slot)}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold cursor-pointer transition-colors ${
+                            isRecordingThis
+                              ? 'border-rose-500 bg-rose-600 text-white animate-pulse'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
+                          }`}
+                          title="Record up to 3.5 seconds from your microphone"
+                        >
+                          {isRecordingThis ? (
+                            <>
+                              <Square className="w-3 h-3 fill-current" />
+                              <span>Stop Rec</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mic className="w-3.5 h-3.5 text-rose-500" />
+                              <span>Record Mic</span>
+                            </>
+                          )}
+                        </button>
+
+                        {/* Custom Synth Designer Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isDesigningThis) {
+                              setActiveCustomSlotModal(null);
+                            } else {
+                              setSynthStartFreq(
+                                customCfg?.synth?.startFreq || slotMeta.defaultFreq
+                              );
+                              setSynthEndFreq(
+                                customCfg?.synth?.endFreq || slotMeta.defaultEndFreq
+                              );
+                              setSynthWave(customCfg?.synth?.waveform || 'sine');
+                              setSynthDurationMs(customCfg?.synth?.durationMs || 260);
+                              setActiveCustomSlotModal(slotMeta.slot);
+                            }
+                          }}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold cursor-pointer transition-colors ${
+                            isDesigningThis
+                              ? 'border-amber-500 bg-amber-500 text-white'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          <Sliders className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Synth Tone</span>
+                        </button>
+
+                        {/* Test Custom or Default Sound */}
+                        {customCfg && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => soundFx.playCustomSoundSlot(slotMeta.slot, true)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold cursor-pointer"
+                              title="Play custom sound"
+                            >
+                              <Play className="w-3 h-3 fill-current" />
+                              <span>Test</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                soundFx.removeCustomSound(slotMeta.slot);
+                                setCustomSounds(soundFx.getCustomSounds());
+                                triggerSaveNotice(`Restored default sound for ${slotMeta.label}`);
+                              }}
+                              className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-500 hover:border-rose-300 transition-colors cursor-pointer"
+                              title="Remove custom sound and restore default"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Inline Custom Synth Designer Drawer */}
+                    {isDesigningThis && (
+                      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                            Waveform
+                          </label>
+                          <select
+                            value={synthWave}
+                            onChange={(e) => setSynthWave(e.target.value as OscillatorType)}
+                            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-bold"
+                          >
+                            <option value="sine">Sine (Pure)</option>
+                            <option value="triangle">Triangle (Warm)</option>
+                            <option value="square">Square (Retro 8-Bit)</option>
+                            <option value="sawtooth">Sawtooth (Bright)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                            Start Pitch: {Math.round(synthStartFreq)} Hz
+                          </label>
+                          <input
+                            type="range"
+                            min="120"
+                            max="1600"
+                            step="10"
+                            value={synthStartFreq}
+                            onChange={(e) => setSynthStartFreq(Number(e.target.value))}
+                            className="w-full accent-indigo-600"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                            End Pitch: {Math.round(synthEndFreq)} Hz
+                          </label>
+                          <input
+                            type="range"
+                            min="120"
+                            max="2000"
+                            step="10"
+                            value={synthEndFreq}
+                            onChange={(e) => setSynthEndFreq(Number(e.target.value))}
+                            className="w-full accent-indigo-600"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveCustomSynthToSlot(slotMeta.slot)}
+                            className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold cursor-pointer"
+                          >
+                            Save Tone
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Voice Narration & TTS Settings */}

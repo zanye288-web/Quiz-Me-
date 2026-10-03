@@ -24,6 +24,7 @@ import {
   Users,
   FileText,
   Lightbulb,
+  Compass,
 } from 'lucide-react';
 import { DashboardTab } from './DashboardSidebar';
 import { PRESET_TOPICS, PresetTopic } from '../data/presets';
@@ -45,6 +46,7 @@ interface CommandPaletteProps {
   onPersonaChange?: (p: PersonaType) => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  onOpenStarterTutorial?: () => void;
 }
 
 interface CommandItem {
@@ -71,6 +73,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onPersonaChange,
   soundEnabled,
   onToggleSound,
+  onOpenStarterTutorial,
 }) => {
   const { resolvedTheme, toggleTheme } = useTheme();
   const [query, setQuery] = useState('');
@@ -249,6 +252,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         onClose();
       },
     },
+    ...(onOpenStarterTutorial
+      ? [
+          {
+            id: 'act_starter_tutorial',
+            title: 'Interactive Starter Tutorial & Guide',
+            subtitle: 'Explore features, choose your mascot companion & claim +50 Starter XP',
+            category: 'Tools' as const,
+            icon: <Compass className="w-4 h-4 text-amber-500" />,
+            action: () => {
+              onOpenStarterTutorial();
+              onClose();
+            },
+          },
+        ]
+      : []),
     {
       id: 'act_raw_json',
       title: 'View Raw Assessment JSON',

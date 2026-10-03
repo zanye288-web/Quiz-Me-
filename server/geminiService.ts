@@ -55,10 +55,10 @@ async function callGeminiWithFallback(params: {
   }
 
   // Multi-tier model hierarchy prioritizing high-availability models with generous quotas.
-  // 'gemini-3.8-flash' and 'gemini-3.1-flash-lite' provide rapid multimodal responses without quota errors.
+  // 'gemini-3.8-flash', 'gemini-3.1-flash-lite', and 'gemini-flash-latest' provide rapid multimodal responses without quota errors.
   const baseModels = params.models && params.models.length > 0
     ? params.models
-    : ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+    : ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
   // Sort candidates so active (non-cooling down) models run first
   const sortedQueue = [...baseModels].sort((a, b) => {
@@ -77,7 +77,7 @@ async function callGeminiWithFallback(params: {
       continue;
     }
 
-    // Attempt generation with up to 2 retries on transient errors (like 503 high demand)
+    // Attempt generation with up to 2 retries on transient errors (like 503 high demand or brief rate spike)
     const maxRetries = 2;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -94,13 +94,24 @@ async function callGeminiWithFallback(params: {
       } catch (err: unknown) {
         lastError = err;
         const errMsg = err instanceof Error ? err.message : String(err);
-        const isQuotaExceeded = errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED');
-        const isTransient503 = errMsg.includes('503') || errMsg.includes('high demand') || errMsg.includes('UNAVAILABLE');
+        const lowerErr = errMsg.toLowerCase();
+        const isQuotaExceeded =
+          lowerErr.includes('429') ||
+          lowerErr.includes('quota') ||
+          lowerErr.includes('rate') ||
+          lowerErr.includes('exceeded') ||
+          lowerErr.includes('resource_exhausted') ||
+          lowerErr.includes('too many requests');
+        const isTransient503 =
+          lowerErr.includes('503') ||
+          lowerErr.includes('high demand') ||
+          lowerErr.includes('unavailable') ||
+          lowerErr.includes('overloaded');
 
         if (isQuotaExceeded) {
-          // Put this model on a 60-second cooldown so subsequent queries route smoothly to alternate models
-          setModelCooldown(model, 60_000);
-          console.info(`[Gemini Engine] Model ${model} quota temporarily reached. Switching to next candidate...`);
+          // Put this model on a 45-second cooldown so subsequent queries route smoothly to alternate models
+          setModelCooldown(model, 45_000);
+          console.info(`[Gemini Engine] Model ${model} rate/quota temporarily reached. Switching to next candidate...`);
           break; // Move to next model immediately without wasting retries
         }
 
@@ -120,7 +131,7 @@ async function callGeminiWithFallback(params: {
 
     // Brief inter-model pause if moving to next model
     if (i < sortedQueue.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 350));
     }
   }
 
@@ -386,7 +397,7 @@ export async function generateQuizFromAI(params: GenerateQuizParams): Promise<Qu
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured in server environment.');
+    return generateFallbackQuizFromInput(params);
   }
 
   const {
@@ -798,8 +809,8 @@ Ensure difficulty matches: "${difficulty}" and total number of questions is: ${q
     return parsed;
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error('[Gemini Engine] Primary AI quiz generation error:', errorMsg);
-    throw new Error(`AI Quiz Generation failed: ${errorMsg}`);
+    console.warn('[Gemini Engine] Primary AI quiz generation falling back to topic curriculum generator:', errorMsg);
+    return generateFallbackQuizFromInput(params);
   }
 }
 
@@ -1255,9 +1266,9 @@ function buildAdaptiveHeuristicRecommendations(input: QuizRecommendationsInput) 
   return recs;
 }
 
-export async function generateQuizRecommendationsAI(input: QuizRecommendationsInput) {
+export async function generateQuizRecommendationsAI(input: QuizRecommendationsInput & { forceRefresh?: boolean }) {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!apiKey || !input.forceRefresh || modelCooldownMap.size > 0) {
     return {
       recommendations: buildAdaptiveHeuristicRecommendations(input),
       source: 'adaptive_diagnostics',

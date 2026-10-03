@@ -88,7 +88,9 @@ export interface UserProfileDocument {
   avatarBg?: string;
   learningGoal?: string;
   hasCustomizedProfile?: boolean;
+  hasCompletedStarterTutorial?: boolean;
   assessmentConfig?: AssessmentConfig;
+  savedSettings?: Record<string, any>;
   streak: number;
   hearts: number;
   maxHearts: number;

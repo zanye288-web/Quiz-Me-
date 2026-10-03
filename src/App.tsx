@@ -30,6 +30,7 @@ import { LiveSessionData } from './types/liveSession';
 import { IntelligentNotesHubView } from './components/IntelligentNotesHubView';
 import { SuggestionsHubView } from './components/SuggestionsHubView';
 import { QuizzieCompanionWidget } from './components/QuizzieCompanionWidget';
+import { StarterTutorialModal, STARTER_TUTORIAL_STORAGE_KEY } from './components/StarterTutorialModal';
 import { GraduationCap, Sparkles, BookOpen, Layers, BarChart3, Menu, Share2, Play, X, FileText } from 'lucide-react';
 import { PersonaType, QuizResponse, Question, UserStats, AssessmentConfig } from './types/quiz';
 import { BadgeDefinition, BADGE_CATALOG } from './types/badges';
@@ -73,6 +74,12 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [isOptionalOnboarding, setIsOptionalOnboarding] = useState<boolean>(false);
   const [hasPromptedProfile, setHasPromptedProfile] = useState<boolean>(false);
+  const [isStarterTutorialOpen, setIsStarterTutorialOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(STARTER_TUTORIAL_STORAGE_KEY) !== 'true';
+    }
+    return false;
+  });
 
   // Optional profile prompt on first login
   useEffect(() => {
@@ -981,6 +988,7 @@ export default function App() {
                 setIsOptionalOnboarding(false);
                 setIsProfileModalOpen(true);
               }}
+              onOpenStarterTutorial={() => setIsStarterTutorialOpen(true)}
             />
           )}
 
@@ -1190,6 +1198,7 @@ export default function App() {
         onStartQuiz={handleStartQuiz}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
+        onOpenStarterTutorial={() => setIsStarterTutorialOpen(true)}
         onToggleSound={handleToggleSound}
         soundEnabled={soundEnabled}
         persona={persona}
@@ -1230,6 +1239,30 @@ export default function App() {
         onClose={() => setIsProfileModalOpen(false)}
         isOptionalOnboarding={isOptionalOnboarding}
         stats={stats}
+      />
+
+      {/* Interactive Starter Tutorial for New & Returning Scholars */}
+      <StarterTutorialModal
+        isOpen={isStarterTutorialOpen && !isProfileModalOpen}
+        onClose={() => setIsStarterTutorialOpen(false)}
+        persona={persona}
+        onPersonaChange={(p) => {
+          setPersona(p);
+          if (activeQuiz) {
+            setActiveQuiz({ ...activeQuiz, persona: p });
+          }
+        }}
+        stats={stats}
+        onUpdateStats={(updater) => {
+          setStats((prev) => {
+            const next = updater(prev);
+            if (user) {
+              syncStatsToCloud(next);
+            }
+            return next;
+          });
+        }}
+        onNavigateToTab={(tab) => setActiveTab(tab)}
       />
 
       {/* Received Peer Shared Quiz Dialog */}
@@ -1325,6 +1358,7 @@ export default function App() {
           }}
           onNavigateToNotes={() => setActiveTab('notes')}
           onNavigateToStudio={() => setActiveTab('studio')}
+          onOpenStarterTutorial={() => setIsStarterTutorialOpen(true)}
         />
       )}
 

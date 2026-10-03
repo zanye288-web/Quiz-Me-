@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Sun, Moon, Monitor, Sliders, Volume2, VolumeX, ShieldCheck, Check, Clock, Sparkles, Zap, Timer, Flame, Headphones, ChevronRight } from 'lucide-react';
+import { X, Sun, Moon, Monitor, Sliders, Volume2, VolumeX, ShieldCheck, Check, Clock, Sparkles, Zap, Timer, Flame, Headphones, ChevronRight, Save, Music } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { AssessmentConfig } from '../types/quiz';
 import { soundFx, SOUND_PROFILES, SoundProfileType } from '../utils/audio';
@@ -32,6 +32,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const { theme, setTheme, toggleTheme } = useTheme();
   const [showVoiceSettings, setShowVoiceSettings] = useState<boolean>(false);
+  const [savedNotice, setSavedNotice] = useState<boolean>(false);
   const {
     mascotCharacter,
     mascotTheme,
@@ -398,6 +399,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <ChevronRight className="w-4 h-4 text-indigo-400 group-hover:translate-x-0.5 transition-transform" />
             </button>
+
+            {onOpenFullSettings && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  onClose();
+                  onOpenFullSettings();
+                }}
+                className="w-full p-3.5 rounded-2xl border border-amber-200 dark:border-amber-800/80 bg-amber-50/50 dark:bg-amber-950/30 hover:bg-amber-50 dark:hover:bg-amber-950/50 flex items-center justify-between transition-all cursor-pointer text-left group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-amber-500 text-white shadow-2xs">
+                    <Music className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-amber-950 dark:text-amber-200">
+                      Custom Sound Effects Studio
+                    </div>
+                    <div className="text-[11px] text-amber-700/80 dark:text-amber-300/70">
+                      Upload MP3/WAV, record from mic, or build custom synth chimes
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            )}
           </div>
 
           {/* Quiz Timer Preferences */}
@@ -428,17 +456,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex justify-end">
-          <button
-            type="button"
-            onClick={() => {
-              soundFx.playClick();
-              onClose();
-            }}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
-          >
-            Done
-          </button>
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+            {savedNotice ? '✓ Changes saved to profile & device!' : 'Auto-saves locally as you adjust'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playCorrect();
+                const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                localStorage.setItem('quizme_settings_last_saved_at', timeLabel);
+                setSavedNotice(true);
+                setTimeout(() => {
+                  setSavedNotice(false);
+                  onClose();
+                }, 650);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{savedNotice ? 'Saved!' : 'Save & Close'}</span>
+            </button>
+          </div>
         </div>
       </div>
 

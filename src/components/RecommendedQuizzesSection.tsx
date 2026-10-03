@@ -254,6 +254,7 @@ export const RecommendedQuizzesSection: React.FC<RecommendedQuizzesSectionProps>
             streak: stats.streak,
           },
           recentQuizzes: payloadQuizzes,
+          forceRefresh: refresh,
         }),
       });
 
@@ -351,8 +352,12 @@ export const RecommendedQuizzesSection: React.FC<RecommendedQuizzesSectionProps>
     }
   }, [persona, stats, historyRecords, weakTopicsAnalysis]);
 
+  const hasInitialFetchedRef = React.useRef(false);
   useEffect(() => {
-    fetchRecommendations();
+    if (!hasInitialFetchedRef.current) {
+      hasInitialFetchedRef.current = true;
+      fetchRecommendations(false);
+    }
   }, [fetchRecommendations]);
 
   // Launch a recommendation
