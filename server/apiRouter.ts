@@ -649,7 +649,7 @@ setInterval(() => {
       liveRoomsStore.delete(code);
     }
   }
-}, 15 * 60 * 1000);
+}, 15 * 60 * 1000).unref();
 
 // List active lobbies
 apiRouter.get('/live/rooms', (_req: Request, res: Response) => {

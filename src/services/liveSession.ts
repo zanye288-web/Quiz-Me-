@@ -819,7 +819,11 @@ export async function advanceToNextQuestion(
   let updatedSession: LiveSessionData | null = null;
   if (cached) {
     const resetParticipants: Record<string, LiveParticipant> = {};
-    Object.entries(cached.participants || participants || {}).forEach(([pid, p]) => {
+    const entries = Object.entries(cached.participants || participants || {}) as [
+      string,
+      LiveParticipant,
+    ][];
+    entries.forEach(([pid, p]) => {
       resetParticipants[pid] = {
         ...p,
         hasAnsweredCurrent: false,

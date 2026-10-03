@@ -172,7 +172,8 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
 
     const options = question.options || [];
     const correctAns = question.correct_answer || options[0] || '';
-    const bots = Object.values(session.participants || {}).filter(
+    const allParticipants = Object.values(session.participants || {}) as LiveParticipant[];
+    const bots = allParticipants.filter(
       (p) => p.id.startsWith('bot_') && !p.hasAnsweredCurrent
     );
 
@@ -370,7 +371,8 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
   const handleRematch = async () => {
     soundFx.playLevelUp();
     const resetParticipants: Record<string, LiveParticipant> = {};
-    Object.entries(session.participants || {}).forEach(([pid, p]) => {
+    const entries = Object.entries(session.participants || {}) as [string, LiveParticipant][];
+    entries.forEach(([pid, p]) => {
       resetParticipants[pid] = {
         ...p,
         score: 0,
