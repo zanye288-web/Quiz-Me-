@@ -412,7 +412,7 @@ export const RecommendedQuizzesSection: React.FC<RecommendedQuizzesSectionProps>
   const mascotAdvice = useMemo(() => {
     if (weakTopicsAnalysis.hasLowScores && weakTopicsAnalysis.lowestTopics[0]) {
       const lowest = weakTopicsAnalysis.lowestTopics[0];
-      return `Hoot hoot! I analyzed your Firestore history. You scored lowest on "${lowest.topic}" (${lowest.lowestScore}%). Let's review it now to turn this weak spot into mastery!`;
+      return `Spark on! I analyzed your Firestore history. You scored lowest on "${lowest.topic}" (${lowest.lowestScore}%). Let's review it now to turn this weak spot into mastery!`;
     }
     if (historyRecords.length > 0 && weakTopicsAnalysis.overallAverage >= 90) {
       return `Phenomenal performance! You have a ${weakTopicsAnalysis.overallAverage}% average in Firestore. Here are next-level challenge quizzes to test your limits!`;

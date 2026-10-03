@@ -23,7 +23,7 @@ export const AppLogo: React.FC<AppLogoProps> = ({
   showSubtitle = true,
   subtitleText = 'AI Learning Platform',
   mood = 'idle',
-  theme = 'emerald',
+  theme,
   interactive = true,
   className = '',
   onClick,

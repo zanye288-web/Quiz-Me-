@@ -48,14 +48,14 @@ export const COMMUNITY_SEED_QUIZZES: SavedQuizDocument[] = [
         correct_answer: 'Saturn',
         explanation: 'Saturn has spectacular rings stretching thousands of miles wide, made of sparkling water ice, dust, and rocky boulders!',
         gamified_feedback: {
-          success_quote: 'Hoot hoot! Spectacular cosmic intuition, astronaut!',
+          success_quote: 'Spark on! Spectacular cosmic intuition, astronaut!',
           hint: 'This is the 6th planet from the Sun and is known as the Ringed Jewel of our solar system!',
         },
         points: 10,
         bloom_level: 'Remember',
         domain: 'Foundations',
         image_search_query: 'saturn rings planet photography',
-        image_caption: 'Saturn and its dazzling ice rings captured in space.',
+        image_caption: 'A giant gas planet and its dazzling ice rings captured in deep space.',
       },
       {
         id: 2,

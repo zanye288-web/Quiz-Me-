@@ -296,7 +296,7 @@ export function generateFallbackQuizFromInput(params: GenerateQuizParams): QuizR
   questions.forEach((q, idx) => {
     const visual = resolveThematicVisual(`${derivedTitle} ${q.correct_answer || ''} ${q.question}`, idx, usedFallbackUrls);
     (q as any).image_url = visual.url;
-    (q as any).image_caption = visual.caption;
+    (q as any).image_caption = sanitizeCaptionSpoiler(visual.caption, q.correct_answer, derivedTitle);
     (q as any).image_layout = visual.layout;
     (q as any).image_search_query = extractCoreSubject(q.question, q.correct_answer) || derivedTitle;
     (q as any).image_source = 'Unsplash';
@@ -477,7 +477,7 @@ For every question, you MUST provide an "image_search_query" and an "image_capti
   - "Photosynthesis light reaction Calvin cycle diagram"
   - "action potential voltage-gated ion channels graph"
   NEVER use generic placeholder terms like "quiz question", "educational concept", "study overview", "general biology", or "test item".
-- "image_caption": a concise, informative educational caption explaining what the visual illustrates for the learner.
+- "image_caption": a concise, SPOILER-FREE educational caption explaining the visual context or phenomenon WITHOUT revealing or naming the exact "correct_answer". Never include the answer word or phrase inside "image_caption" so the image description does not give away the answer before the student responds.
 
 Pedagogical Categorization Directive (CRITICAL):
 You MUST automatically categorize and tag every quiz with its primary standard pedagogical topic:
@@ -550,7 +550,7 @@ Ensure difficulty matches: "${difficulty}" and total number of questions is: ${q
         type: Type.STRING,
         description: '2 to 5 words hyper-specific query for Google & Web Images naming the exact concrete entity, labeled diagram, or artifact',
       },
-      image_caption: { type: Type.STRING, description: 'Educational title or caption for the image' },
+      image_caption: { type: Type.STRING, description: 'Spoiler-free educational caption for the image that NEVER reveals or contains the correct_answer' },
       image_layout: {
         type: Type.STRING,
         enum: ['top', 'left', 'split', 'background', 'none'],
@@ -757,7 +757,11 @@ Ensure difficulty matches: "${difficulty}" and total number of questions is: ${q
                   q.correct_answer
                 );
                 q.image_url = visual.url;
-                q.image_caption = q.image_caption || visual.caption;
+                q.image_caption = sanitizeCaptionSpoiler(
+                  q.image_caption || visual.caption,
+                  q.correct_answer,
+                  parsed.quiz_title
+                );
                 q.image_layout = q.image_layout || visual.layout;
                 q.image_search_query = queryToSearch;
                 q.image_source = visual.source;
@@ -2718,6 +2722,106 @@ Identify:
     };
   } catch {
     return getDeterministicAnalysis();
+  }
+}
+
+/**
+ * Ensures image_caption never directly leaks or spoils the correct_answer prior to answering.
+ */
+export function sanitizeCaptionSpoiler(
+  caption: string | undefined | null,
+  correctAnswer: string | undefined | null,
+  quizTitle?: string
+): string {
+  const rawCaption = (caption || '').trim();
+  if (!rawCaption) {
+    return quizTitle ? `Visual study reference for ${quizTitle}` : 'Educational visual reference';
+  }
+  const cleanAns = (correctAnswer || '').trim();
+  if (!cleanAns || cleanAns.length < 2) return rawCaption;
+
+  const escapedFull = cleanAns.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const fullRegex = new RegExp(`\\b${escapedFull}\\b`, 'gi');
+  let sanitized = rawCaption.replace(fullRegex, 'this concept');
+
+  // Also check significant multi-character tokens from the correct answer (length >= 4)
+  const stopWords = new Set(['that', 'this', 'with', 'from', 'have', 'what', 'when', 'where', 'which', 'both', 'none', 'above', 'below', 'into', 'over', 'under', 'between', 'through', 'during', 'before', 'after']);
+  const tokens = cleanAns
+    .split(/[\s,;/()-]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 4 && !stopWords.has(t.toLowerCase()));
+
+  for (const token of tokens) {
+    const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const tokenRegex = new RegExp(`\\b${escapedToken}\\b`, 'gi');
+    sanitized = sanitized.replace(tokenRegex, 'the target subject');
+  }
+
+  // Clean up repeated replacements
+  sanitized = sanitized.replace(/(the target subject[\s,]*){2,}/gi, 'the target subject ');
+  return sanitized.trim();
+}
+
+/**
+ * Transcribes spoken audio from the user's microphone to answer a quiz question.
+ */
+export async function transcribeSpokenAnswerAI(input: {
+  audioBase64: string;
+  mimeType?: string;
+  language?: string;
+  options?: string[];
+  question?: string;
+}): Promise<{ transcript: string; matchedOption?: string }> {
+  const cleanBase64 = (input.audioBase64 || '').replace(/^data:[^;]+;base64,/, '').trim();
+  if (!cleanBase64) {
+    return { transcript: '' };
+  }
+
+  const cleanMime = (input.mimeType || 'audio/webm').split(';')[0].trim() || 'audio/webm';
+  const optionsContext =
+    Array.isArray(input.options) && input.options.length > 0
+      ? `\nAvailable answer choices:\n${input.options.map((o, idx) => `${String.fromCharCode(65 + idx)}: ${o}`).join('\n')}`
+      : '';
+
+  const prompt = `Listen to the spoken audio answer for the quiz question${input.question ? `: "${input.question}"` : ''}.${optionsContext}
+Return JSON with:
+- "transcript": the exact words spoken by the user (concise, no extra commentary).
+- "matchedOption": if available answer choices are listed above and the spoken audio clearly refers to one of them (either by saying "Option A/B/C/D", "1/2/3/4", or speaking the choice text), set this to the exact string of that matching choice; otherwise empty string.`;
+
+  try {
+    const response: any = await callGeminiWithFallback({
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: cleanMime,
+              data: cleanBase64,
+            },
+          },
+          { text: prompt },
+        ],
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            transcript: { type: Type.STRING },
+            matchedOption: { type: Type.STRING },
+          },
+          required: ['transcript'],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    return {
+      transcript: String(parsed.transcript || '').trim(),
+      matchedOption: parsed.matchedOption ? String(parsed.matchedOption).trim() : undefined,
+    };
+  } catch (err) {
+    console.warn('[Gemini Transcribe] Fallback warning:', err);
+    return { transcript: '' };
   }
 }
 

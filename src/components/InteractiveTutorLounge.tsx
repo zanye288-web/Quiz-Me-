@@ -85,11 +85,11 @@ export const InteractiveTutorLounge: React.FC<InteractiveTutorLoungeProps> = ({
 
     if (failedQuestions.length > 0) {
       const firstFail = failedQuestions[0];
-      welcomeText = `Hoot hoot! Welcome to your 1-on-1 Study Lounge! I'm Quizzie the Owl, your personalized learning companion. 
+      welcomeText = `Spark on! Welcome to your 1-on-1 Study Lounge! I'm your personalized AI learning companion. 
 I noticed you had some great answers, and a few tricky spots like Question #${firstFail.id} ("${firstFail.questionText.slice(0, 50)}..."). 
 Whenever you are ready, ask me anything—we can break it down with fun analogies, practice with a quick mini-challenge, or explore why your answer differed!`;
     } else {
-      welcomeText = `Hoot hoot! Spectacular job scoring 100% on "${quiz.quiz_title}"! 🌟 
+      welcomeText = `Spark on! Spectacular job scoring 100% on "${quiz.quiz_title}"! 🌟 
 You've mastered all the core questions. In this tutor session, we can explore advanced applications, deep real-world mysteries, or test your skills with an expert puzzle. What would you like to explore?`;
     }
 
@@ -259,7 +259,7 @@ You've mastered all the core questions. In this tutor session, we can explore ad
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            <span>🦉 Quizzie (Analogies)</span>
+            <span>✨ Companion (Analogies)</span>
           </button>
 
           <button

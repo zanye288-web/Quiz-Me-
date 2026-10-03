@@ -50,6 +50,7 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
         { keys: ['H'], description: 'Toggle pedagogical Hint' },
         { keys: ['T'], description: 'Ask Socratic AI Tutor about current question' },
         { keys: ['V'], description: 'Voice Read Question out loud (TTS)' },
+        { keys: ['M'], description: 'Microphone: Speak your answer out loud' },
         { keys: ['S'], description: 'Toggle Scratchpad working canvas' },
         { keys: ['Z'], description: 'Toggle Zen palette minimization' },
         { keys: ['Esc'], description: 'Exit Focus Mode / Close active modal' },

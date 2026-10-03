@@ -33,6 +33,12 @@ import {
   Minimize2,
   Type,
   Target,
+  Mic,
+  MicOff,
+  Eye,
+  EyeOff,
+  Scissors,
+  ZoomIn,
 } from 'lucide-react';
 import {
   Question,
@@ -44,6 +50,7 @@ import {
 import { soundFx } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
 import { usePomodoro } from '../context/PomodoroContext';
+import { useTheme, FONT_CATALOG } from '../context/ThemeContext';
 import { VoiceSettingsModal } from './VoiceSettingsModal';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { ExamWorksheetModal } from './ExamWorksheetModal';
@@ -116,6 +123,24 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
   // QoL: Font Size Scaling & Zen Mode
   const [fontSizeScale, setFontSizeScale] = useState<'normal' | 'large' | 'xlarge'>('normal');
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
+  const [showFontPopover, setShowFontPopover] = useState<boolean>(false);
+  const { fontFamily, setFontFamily } = useTheme();
+
+  // QoL: Auto-Next on Correct, Option Elimination, Matrix Filter, Spoiler Shield & Image Zoom
+  const [autoNextOnCorrect, setAutoNextOnCorrect] = useState<boolean>(false);
+  const [eliminatedOptions, setEliminatedOptions] = useState<Record<number, string[]>>({});
+  const [matrixFilter, setMatrixFilter] = useState<'all' | 'todo' | 'flagged'>('all');
+  const [peekImageClue, setPeekImageClue] = useState<boolean>(false);
+  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+
+  // Microphone Voice Answer States
+  const [isListeningVoice, setIsListeningVoice] = useState<boolean>(false);
+  const [voiceTranscript, setVoiceTranscript] = useState<string>('');
+  const [voiceFeedbackMsg, setVoiceFeedbackMsg] = useState<string | null>(null);
+  const [autoCheckVoice, setAutoCheckVoice] = useState<boolean>(true);
+  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   // Voice & Narration Settings Modal
   const [showVoiceSettings, setShowVoiceSettings] = useState<boolean>(false);
@@ -305,8 +330,401 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
       setOpenTextAnswer('');
     }
     setShowHint(false);
+    setPeekImageClue(false);
+    setVoiceTranscript('');
+    setVoiceFeedbackMsg(null);
     setLastSpeedMultiplier(speedMultipliers[currentQuestion.id] || null);
   }, [currentIndex, currentQuestion]);
+
+  // Stop active voice recognition when switching questions or unmounting
+  const stopVoiceRecognition = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {
+        // ignore
+      }
+    }
+    setIsListeningVoice(false);
+  };
+
+  useEffect(() => {
+    stopVoiceRecognition();
+  }, [currentIndex]);
+
+  // Redacts the correct answer from image captions prior to answering so images never spoil the answer
+  const getSpoilerSafeCaption = (rawCaption?: string | null): string => {
+    if (!rawCaption) return 'Visual reference for this question';
+    const ans = (currentQuestion.correct_answer || '').trim();
+    if (!ans) return rawCaption;
+
+    let safe = rawCaption;
+    const escapedAns = ans.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    safe = safe.replace(new RegExp(escapedAns, 'gi'), '[•••]');
+
+    const stopWords = new Set(['that', 'this', 'with', 'from', 'have', 'what', 'when', 'where', 'which', 'both', 'none', 'above', 'below', 'into', 'over', 'under']);
+    const ansTokens = ans
+      .split(/[\s,;/()-]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 3 && !stopWords.has(t.toLowerCase()));
+
+    for (const tok of ansTokens) {
+      const escapedTok = tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      safe = safe.replace(new RegExp(`\\b${escapedTok}\\b`, 'gi'), '[•••]');
+    }
+    return safe;
+  };
+
+  // Matches spoken microphone transcript to the current question's options or text input
+  const applySpokenAnswer = (rawText: string, serverMatchedOption?: string) => {
+    const clean = rawText.trim();
+    if (!clean) return;
+    setVoiceTranscript(clean);
+
+    const lower = clean.toLowerCase().replace(/[.,!?]/g, '').trim();
+    const wantsImmediateSubmit =
+      autoCheckVoice ||
+      /\b(submit|check answer|final answer|lock in)\b/i.test(lower);
+
+    const strippedSpeech = lower
+      .replace(/\b(submit|check answer|final answer|lock in|my answer is|the answer is|i choose|i pick|select)\b/gi, '')
+      .trim();
+
+    if (
+      currentQuestion.type === 'multiple_choice' ||
+      (currentQuestion.type === 'code_media_challenge' &&
+        currentQuestion.options &&
+        currentQuestion.options.length > 0)
+    ) {
+      const opts = currentQuestion.options || [];
+      let matchedOpt: string | null = null;
+      let matchedIdx = -1;
+
+      if (serverMatchedOption && opts.includes(serverMatchedOption)) {
+        matchedOpt = serverMatchedOption;
+        matchedIdx = opts.indexOf(serverMatchedOption);
+      }
+
+      // 1. Check explicit letter / number commands ("Option A", "A", "1", "First", etc.)
+      if (!matchedOpt) {
+        const letterMatch =
+          strippedSpeech.match(/^(?:option|choice|letter|answer)?\s*([abcd])$/i) ||
+          lower.match(/\b(?:option|choice|letter)\s+([abcd])\b/i);
+        if (letterMatch) {
+          const idx = ['a', 'b', 'c', 'd'].indexOf(letterMatch[1].toLowerCase());
+          if (idx >= 0 && idx < opts.length) {
+            matchedOpt = opts[idx];
+            matchedIdx = idx;
+          }
+        }
+      }
+
+      if (!matchedOpt) {
+        const numMap: Record<string, number> = {
+          '1': 0, 'one': 0, 'first': 0, 'first one': 0,
+          '2': 1, 'two': 1, 'second': 1, 'second one': 1,
+          '3': 2, 'three': 2, 'third': 2, 'third one': 2,
+          '4': 3, 'four': 3, 'fourth': 3, 'fourth one': 3, 'last': opts.length - 1,
+        };
+        const cleanedNum = strippedSpeech.replace(/^(?:number|option|choice)\s+/i, '').trim();
+        if (cleanedNum in numMap && numMap[cleanedNum] < opts.length) {
+          matchedIdx = numMap[cleanedNum];
+          matchedOpt = opts[matchedIdx];
+        }
+      }
+
+      // 2. Fuzzy text similarity match against each option
+      if (!matchedOpt && opts.length > 0) {
+        let bestScore = 0;
+        const speechTokens = strippedSpeech.split(/\s+/).filter((w) => w.length > 1);
+
+        opts.forEach((opt, idx) => {
+          const optLower = opt.toLowerCase().replace(/[.,!?]/g, '').trim();
+          let score = 0;
+          if (optLower === strippedSpeech || optLower === lower) {
+            score = 100;
+          } else if (optLower.includes(strippedSpeech) && strippedSpeech.length >= 3) {
+            score = 80;
+          } else if (strippedSpeech.includes(optLower) && optLower.length >= 2) {
+            score = 75;
+          } else {
+            const optTokens = optLower.split(/\s+/).filter((w) => w.length > 1);
+            let hits = 0;
+            for (const st of speechTokens) {
+              if (optTokens.some((ot) => ot.includes(st) || st.includes(ot))) {
+                hits++;
+              }
+            }
+            if (optTokens.length > 0 && hits > 0) {
+              score = (hits / Math.max(optTokens.length, speechTokens.length)) * 65 + hits * 10;
+            }
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            matchedOpt = opt;
+            matchedIdx = idx;
+          }
+        });
+
+        if (bestScore < 15) {
+          matchedOpt = null;
+          matchedIdx = -1;
+        }
+      }
+
+      if (matchedOpt && matchedIdx >= 0) {
+        soundFx.playSelect();
+        setSelectedOption(matchedOpt);
+        const letter = ['A', 'B', 'C', 'D'][matchedIdx] || `${matchedIdx + 1}`;
+        setVoiceFeedbackMsg(`Heard "${clean}" → Selected Option ${letter}: ${matchedOpt}`);
+        if (wantsImmediateSubmit) {
+          setTimeout(() => {
+            handleVoiceDirectCheck(matchedOpt!);
+          }, 350);
+        }
+      } else {
+        soundFx.playClick();
+        setVoiceFeedbackMsg(
+          `Heard "${clean}" — Say "Option A/B/C/D" or speak the exact choice text to select.`
+        );
+      }
+      return;
+    }
+
+    if (currentQuestion.type === 'fill_in_blank' || currentQuestion.type === 'code_media_challenge') {
+      const cleanTerm = clean.replace(/[.!?]+$/, '').trim();
+      const bank = currentQuestion.blank_context?.word_bank || [];
+      const bankMatch = bank.find(
+        (w) =>
+          w.toLowerCase() === cleanTerm.toLowerCase() ||
+          cleanTerm.toLowerCase().includes(w.toLowerCase())
+      );
+      const chosen = bankMatch || cleanTerm;
+      soundFx.playSelect();
+      setFillBlankAnswer(chosen);
+      setVoiceFeedbackMsg(`Heard "${clean}" → Filled blank with "${chosen}"`);
+      if (wantsImmediateSubmit && chosen.length > 0) {
+        setTimeout(() => {
+          handleVoiceDirectCheck(chosen);
+        }, 350);
+      }
+      return;
+    }
+
+    if (currentQuestion.type === 'open_explanation') {
+      soundFx.playSelect();
+      setOpenTextAnswer((prev) => {
+        const next = prev ? `${prev.trim()} ${clean}` : clean;
+        return next;
+      });
+      setVoiceFeedbackMsg(`Dictated to answer: "${clean}"`);
+    }
+  };
+
+  // Helper to check a voice-supplied answer immediately
+  const handleVoiceDirectCheck = (directAnswer: string) => {
+    if (isAnswerChecked || !directAnswer.trim()) return;
+    if (
+      currentQuestion.type === 'multiple_choice' ||
+      currentQuestion.type === 'fill_in_blank' ||
+      (currentQuestion.type === 'code_media_challenge' && currentQuestion.options?.length)
+    ) {
+      const isCorrect =
+        directAnswer.trim().toLowerCase() ===
+        currentQuestion.correct_answer.trim().toLowerCase();
+
+      if (isCorrect) {
+        soundFx.playCorrect();
+        if (autoNextOnCorrect) {
+          setTimeout(() => {
+            if (currentIndex + 1 < quiz.questions.length) {
+              setCurrentIndex((prev) => prev + 1);
+            }
+          }, 1450);
+        }
+      } else {
+        soundFx.playIncorrect();
+      }
+
+      setUserAnswers((prev) => ({
+        ...prev,
+        [currentQuestion.id]: {
+          userAnswer: directAnswer.trim(),
+          isCorrect,
+          checked: true,
+        },
+      }));
+    }
+  };
+
+  // Starts or stops Microphone Voice Answering (Web Speech API + MediaRecorder Server Fallback)
+  const handleToggleVoiceAnswer = async () => {
+    if (isAnswerChecked) return;
+    soundFx.playClick();
+    speechEngine.stop();
+
+    if (isListeningVoice) {
+      stopVoiceRecognition();
+      return;
+    }
+
+    setVoiceFeedbackMsg('Listening... Speak your answer or say "Option A, B, C, or D"');
+    setIsListeningVoice(true);
+
+    const SpeechRecognitionAPI =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognitionAPI) {
+      try {
+        const recognition = new SpeechRecognitionAPI();
+        recognitionRef.current = recognition;
+        recognition.lang = quiz.language || speechEngine.getSettings().currentLanguage || 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 3;
+
+        let finalTranscript = '';
+
+        recognition.onresult = (event: any) => {
+          let interim = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const tr = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += tr;
+            } else {
+              interim += tr;
+            }
+          }
+          const currentSpoken = (finalTranscript || interim).trim();
+          if (currentSpoken) {
+            setVoiceTranscript(currentSpoken);
+          }
+          if (finalTranscript.trim()) {
+            applySpokenAnswer(finalTranscript.trim());
+          }
+        };
+
+        recognition.onerror = () => {
+          setIsListeningVoice(false);
+        };
+
+        recognition.onend = () => {
+          setIsListeningVoice(false);
+        };
+
+        recognition.start();
+        return;
+      } catch {
+        // Fall through to MediaRecorder fallback
+      }
+    }
+
+    // Fallback: Record microphone via MediaRecorder and transcribe via /api/transcribe-answer
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        audioChunksRef.current = [];
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop());
+          setIsListeningVoice(false);
+          const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+          if (audioBlob.size === 0) return;
+
+          setVoiceFeedbackMsg('Transcribing spoken answer...');
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            try {
+              const base64Audio = String(reader.result || '');
+              const res = await fetch('/api/transcribe-answer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  audioBase64: base64Audio,
+                  mimeType: recorder.mimeType || 'audio/webm',
+                  language: quiz.language || 'en-US',
+                  options: currentQuestion.options,
+                  question: currentQuestion.question,
+                }),
+              });
+              const data = await res.json();
+              if (data.success && data.transcript) {
+                applySpokenAnswer(data.transcript, data.matchedOption);
+              } else {
+                setVoiceFeedbackMsg('Could not hear clearly. Please try speaking again.');
+              }
+            } catch {
+              setVoiceFeedbackMsg('Voice transcription unavailable. Please try again.');
+            }
+          };
+          reader.readAsDataURL(audioBlob);
+        };
+
+        recorder.start();
+        setTimeout(() => {
+          if (recorder.state !== 'inactive') {
+            recorder.stop();
+          }
+        }, 4000);
+      } catch {
+        setIsListeningVoice(false);
+        setVoiceFeedbackMsg('Microphone permission is needed to speak answers.');
+      }
+    } else {
+      setIsListeningVoice(false);
+      setVoiceFeedbackMsg('Voice input is not supported in this browser.');
+    }
+  };
+
+  // Toggle strike-through elimination on a Multiple Choice option
+  const toggleEliminateOption = (optionText: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isAnswerChecked) return;
+    soundFx.playClick();
+    setEliminatedOptions((prev) => {
+      const currentList = prev[currentQuestion.id] || [];
+      const exists = currentList.includes(optionText);
+      const nextList = exists
+        ? currentList.filter((o) => o !== optionText)
+        : [...currentList, optionText];
+      return { ...prev, [currentQuestion.id]: nextList };
+    });
+    if (selectedOption === optionText) {
+      setSelectedOption(null);
+    }
+  };
+
+  // 50/50 Smart Narrow: Eliminate 2 wrong distractors on MCQ questions
+  const handleFiftyFiftyNarrow = () => {
+    if (isAnswerChecked || !currentQuestion.options || currentQuestion.options.length < 3) return;
+    soundFx.playHint();
+    const wrongOptions = currentQuestion.options.filter(
+      (o) => o.trim().toLowerCase() !== currentQuestion.correct_answer.trim().toLowerCase()
+    );
+    const toEliminate = wrongOptions.slice(0, 2);
+    setEliminatedOptions((prev) => ({
+      ...prev,
+      [currentQuestion.id]: toEliminate,
+    }));
+    if (selectedOption && toEliminate.includes(selectedOption)) {
+      setSelectedOption(null);
+    }
+  };
 
   // Enhanced Keyboard hotkeys & navigation
   useEffect(() => {
@@ -415,10 +833,16 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
         setShowScratchpad((prev) => !prev);
       }
 
-      // Hotkey V: Voice
+      // Hotkey V: Voice Read Question
       if (e.key === 'v' || e.key === 'V') {
         e.preventDefault();
         handleSpeakQuestion();
+      }
+
+      // Hotkey M: Microphone Speak Answer
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        handleToggleVoiceAnswer();
       }
 
       // Hotkey Z: Zen Mode
@@ -571,6 +995,14 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
         checked: true,
       },
     }));
+
+    if (isCorrect && autoNextOnCorrect) {
+      setTimeout(() => {
+        if (currentIndex + 1 < quiz.questions.length) {
+          setCurrentIndex((prev) => prev + 1);
+        }
+      }, 1450);
+    }
   };
 
   const handleJumpToQuestion = (index: number) => {
@@ -829,8 +1261,8 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
             <span className="font-mono">{isPomodoroRunning ? formatPomodoroTime(pomodoroTimeLeft) : 'Pomodoro'}</span>
           </button>
 
-          {/* Font Size Adjuster */}
-          <div className="flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-0.5">
+          {/* Font Size Adjuster + Quick Font Switcher */}
+          <div className="relative flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-0.5">
             <button
               type="button"
               onClick={() => {
@@ -856,7 +1288,84 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
             >
               A+
             </button>
+            <div className="h-3.5 w-[1px] bg-slate-200 dark:bg-slate-700 mx-0.5" />
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                setShowFontPopover((prev) => !prev);
+              }}
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-white dark:hover:bg-slate-700 rounded-lg cursor-pointer"
+              title="Switch Font Family (12 Curated Study Fonts)"
+            >
+              <Type className="w-3 h-3" />
+              <span className="hidden xl:inline capitalize">{fontFamily}</span>
+            </button>
+
+            {showFontPopover && (
+              <div className="absolute right-0 top-10 z-50 w-64 p-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl space-y-1.5 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between px-2 py-1 border-b border-slate-100 dark:border-slate-800">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Study Font ({FONT_CATALOG.length} Styles)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowFontPopover(false)}
+                    className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
+                  {FONT_CATALOG.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playSelect();
+                        setFontFamily(f.id);
+                        setShowFontPopover(false);
+                      }}
+                      style={{ fontFamily: f.cssFamily }}
+                      className={`w-full px-2.5 py-1.5 rounded-xl text-left text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                        fontFamily === f.id
+                          ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800'
+                          : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      <div className="truncate">
+                        <span className="block font-bold">{f.name}</span>
+                        <span className="block text-[10px] text-slate-400">{f.style}</span>
+                      </div>
+                      {f.badge && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold shrink-0">
+                          {f.badge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Auto-Next on Correct QoL Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              soundFx.playClick();
+              setAutoNextOnCorrect((prev) => !prev);
+            }}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              autoNextOnCorrect
+                ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 shadow-2xs'
+                : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+            }`}
+            title="Auto-Next on Correct Answer (Flow State Mode)"
+          >
+            <Zap className={`w-3.5 h-3.5 shrink-0 ${autoNextOnCorrect ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`} />
+            <span className="hidden md:inline">Auto-Next</span>
+          </button>
 
           {/* Zen Mode Toggle */}
           <button
@@ -984,12 +1493,42 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                 />
               </div>
 
+              {/* Matrix Filter Pills (All / Unanswered / Flagged) */}
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 text-[10px] font-bold">
+                {(
+                  [
+                    { id: 'all', label: `All (${quiz.questions.length})` },
+                    { id: 'todo', label: `Todo (${quiz.questions.length - answeredCount})` },
+                    { id: 'flagged', label: `Flag (${flaggedIds.size})` },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setMatrixFilter(tab.id);
+                    }}
+                    className={`py-1 px-1.5 rounded-lg transition-colors cursor-pointer truncate ${
+                      matrixFilter === tab.id
+                        ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs font-extrabold'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
               {/* Question Quick Palette Grid */}
               <div className="grid grid-cols-5 sm:grid-cols-5 lg:grid-cols-5 gap-1.5 pt-1 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
                 {quiz.questions.map((q, idx) => {
                   const isCurrent = idx === currentIndex;
                   const ans = userAnswers[q.id];
                   const isFlagged = flaggedIds.has(q.id);
+
+                  if (matrixFilter === 'todo' && ans?.checked) return null;
+                  if (matrixFilter === 'flagged' && !isFlagged) return null;
 
                   let btnClass = 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700';
 
@@ -1182,8 +1721,37 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                   <Flag className="w-4 h-4" />
                 </button>
 
-                {/* Voice Narration & Settings Group */}
+                {/* Voice Narration, Microphone Answer & Settings Group */}
                 <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700">
+                  {!isAnswerChecked && (
+                    <button
+                      type="button"
+                      onClick={handleToggleVoiceAnswer}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isListeningVoice
+                          ? 'bg-rose-600 text-white shadow-xs animate-pulse ring-2 ring-rose-400'
+                          : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/80 dark:border-emerald-800/80'
+                      }`}
+                      title={
+                        isListeningVoice
+                          ? 'Listening for your spoken answer... Click to stop [M]'
+                          : 'Speak your answer with Microphone [M]'
+                      }
+                    >
+                      {isListeningVoice ? (
+                        <>
+                          <MicOff className="w-3.5 h-3.5 animate-bounce" />
+                          <span className="text-[11px] font-black uppercase tracking-wider">Listening...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline text-[11px]">Speak Answer</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleSpeakQuestion}
@@ -1192,7 +1760,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         ? 'bg-indigo-600 text-white shadow-xs animate-pulse ring-2 ring-indigo-400'
                         : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700'
                     }`}
-                    title={isSpeakingCurrent ? 'Reading question aloud... Click to stop' : 'Read question aloud'}
+                    title={isSpeakingCurrent ? 'Reading question aloud... Click to stop [V]' : 'Read question aloud [V]'}
                   >
                     {isSpeakingCurrent ? (
                       <>
@@ -1236,13 +1804,18 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                 {currentQuestion.question}
               </h3>
 
-              {/* Question Contextual Image */}
+              {/* Question Contextual Image (with Spoiler Shield before answering & Zoom Lightbox) */}
               {currentQuestion.image_url && (
                 <div className="relative rounded-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800 shadow-xs bg-slate-950/5 dark:bg-slate-950/40 group/media">
                   <img
                     src={currentQuestion.image_url}
-                    alt={currentQuestion.image_caption || 'Question visual reference'}
+                    alt={
+                      isAnswerChecked
+                        ? currentQuestion.image_caption || 'Question visual reference'
+                        : 'Question visual reference'
+                    }
                     referrerPolicy="no-referrer"
+                    onClick={() => setZoomedImageUrl(currentQuestion.image_url || null)}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       if (!target.dataset.hasFallenBack) {
@@ -1253,39 +1826,72 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         target.src = fallback.url;
                       }
                     }}
-                    className="w-full max-h-80 object-cover object-center rounded-2xl transition-transform hover:scale-[1.01] duration-300"
+                    className="w-full max-h-80 object-cover object-center rounded-t-2xl transition-transform hover:scale-[1.01] duration-300 cursor-zoom-in"
                     loading="lazy"
                   />
 
-                  {/* Top-Right Floating Attribution Badge (when no caption bar is present) */}
-                  {!currentQuestion.image_caption && (
-                    <div className="absolute top-2.5 right-2.5 z-10">
-                      <MediaAttributionBadge
-                        imageUrl={currentQuestion.image_url}
-                        source={currentQuestion.image_source}
-                        sourceUrl={currentQuestion.image_source_url}
-                        attribution={currentQuestion.image_attribution}
-                        variant="badge"
-                      />
-                    </div>
-                  )}
+                  {/* Top-Right Zoom Lightbox Button */}
+                  <button
+                    type="button"
+                    onClick={() => setZoomedImageUrl(currentQuestion.image_url || null)}
+                    className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900/75 hover:bg-slate-900 text-white text-[10px] font-bold backdrop-blur-xs border border-white/15 transition-all cursor-pointer"
+                    title="Zoom visual diagram"
+                  >
+                    <ZoomIn className="w-3 h-3" />
+                    <span>Zoom</span>
+                  </button>
 
-                  {/* Caption & Unobtrusive Attribution Credit Bar */}
-                  {currentQuestion.image_caption && (
-                    <div className="px-3.5 py-2 bg-slate-900/90 backdrop-blur-xs text-xs font-medium text-slate-200 flex items-center justify-between gap-3 border-t border-slate-800/60">
+                  {/* Caption & Unobtrusive Attribution Credit Bar (Spoiler-Protected until answered!) */}
+                  <div className="px-3.5 py-2 bg-slate-900/95 backdrop-blur-xs text-xs font-medium text-slate-200 flex items-center justify-between gap-3 border-t border-slate-800/60">
+                    {isAnswerChecked ? (
                       <div className="flex items-center gap-2 min-w-0">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        <span className="truncate">{currentQuestion.image_caption}</span>
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="truncate">
+                          {currentQuestion.image_caption || 'Educational visual reference'}
+                        </span>
                       </div>
-                      <MediaAttributionBadge
-                        imageUrl={currentQuestion.image_url}
-                        source={currentQuestion.image_source}
-                        sourceUrl={currentQuestion.image_source_url}
-                        attribution={currentQuestion.image_attribution}
-                        variant="caption"
-                      />
-                    </div>
-                  )}
+                    ) : peekImageClue ? (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Eye className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate text-amber-200">
+                          {getSpoilerSafeCaption(currentQuestion.image_caption)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPeekImageClue(false)}
+                          className="text-[10px] font-bold text-slate-400 hover:text-white underline shrink-0 cursor-pointer"
+                        >
+                          Hide
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <EyeOff className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span className="truncate text-slate-300 text-[11px]">
+                          Image description hidden until answered to prevent spoilers
+                        </span>
+                        {currentQuestion.image_caption && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundFx.playClick();
+                              setPeekImageClue(true);
+                            }}
+                            className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-indigo-300 text-[10px] font-bold border border-slate-700 shrink-0 cursor-pointer"
+                          >
+                            Peek Safe Clue
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <MediaAttributionBadge
+                      imageUrl={currentQuestion.image_url}
+                      source={currentQuestion.image_source}
+                      sourceUrl={currentQuestion.image_source_url}
+                      attribution={currentQuestion.image_attribution}
+                      variant="caption"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -1317,16 +1923,95 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
               )}
             </div>
 
+            {/* Interactive Voice Answer & QoL Bar */}
+            {!isAnswerChecked && (
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/70">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={handleToggleVoiceAnswer}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer shrink-0 ${
+                      isListeningVoice
+                        ? 'bg-rose-600 text-white shadow-md shadow-rose-600/25 animate-pulse'
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'
+                    }`}
+                  >
+                    {isListeningVoice ? (
+                      <>
+                        <MicOff className="w-4 h-4 animate-bounce" />
+                        <span>Stop Mic</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-4 h-4" />
+                        <span>Speak Answer</span>
+                        <kbd className="hidden sm:inline px-1.5 py-0.5 text-[10px] bg-indigo-700 text-indigo-100 rounded font-mono">
+                          M
+                        </kbd>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="min-w-0 flex-1">
+                    {isListeningVoice ? (
+                      <p className="text-xs font-bold text-rose-600 dark:text-rose-400 truncate">
+                        🎙️ {voiceTranscript ? `Hearing: "${voiceTranscript}"` : 'Listening... Speak the answer or say "Option A / B / C / D"'}
+                      </p>
+                    ) : voiceFeedbackMsg ? (
+                      <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300 truncate">
+                        🎙️ {voiceFeedbackMsg}
+                      </p>
+                    ) : (
+                      <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">
+                        Use your microphone to speak the answer out loud, or press <strong className="font-bold">M</strong> anytime.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoCheckVoice}
+                      onChange={(e) => setAutoCheckVoice(e.target.checked)}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>Auto-Submit Voice</span>
+                  </label>
+
+                  {currentQuestion.type === 'multiple_choice' &&
+                    currentQuestion.options &&
+                    currentQuestion.options.length >= 3 &&
+                    assessmentConfig.mode !== 'exam' && (
+                      <button
+                        type="button"
+                        onClick={handleFiftyFiftyNarrow}
+                        disabled={(eliminatedOptions[currentQuestion.id]?.length || 0) >= 2}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-[11px] font-extrabold hover:bg-purple-100 transition-colors cursor-pointer disabled:opacity-40"
+                        title="Eliminate 2 wrong distractors (50/50 Narrow)"
+                      >
+                        <Scissors className="w-3 h-3" />
+                        <span>50/50 Narrow</span>
+                      </button>
+                    )}
+                </div>
+              </div>
+            )}
+
             {/* QUESTION INPUT FORMAT: MULTIPLE CHOICE */}
             {currentQuestion.type === 'multiple_choice' && currentQuestion.options && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 {currentQuestion.options.map((option, idx) => {
                   const letter = ['A', 'B', 'C', 'D'][idx] || `${idx + 1}`;
                   const isSelected = selectedOption === option;
+                  const isEliminated = (eliminatedOptions[currentQuestion.id] || []).includes(option);
 
                   let optionStyle = 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-emerald-400 text-slate-900 dark:text-slate-100';
 
-                  if (isSelected) {
+                  if (isEliminated && !isAnswerChecked) {
+                    optionStyle = 'opacity-45 border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/40 text-slate-400 line-through';
+                  } else if (isSelected) {
                     optionStyle = 'border-emerald-500 dark:border-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 ring-2 ring-emerald-500/20 font-bold';
                   }
 
@@ -1351,11 +2036,10 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                       : 'text-xs sm:text-sm';
 
                   return (
-                    <button
+                    <div
                       key={idx}
-                      type="button"
-                      disabled={isAnswerChecked}
                       onClick={() => {
+                        if (isAnswerChecked || isEliminated) return;
                         soundFx.playClick();
                         setSelectedOption(option);
                       }}
@@ -1367,10 +2051,24 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                       <span className={`${optSizeClass} font-semibold flex-1 leading-snug`}>
                         {option}
                       </span>
+                      {!isAnswerChecked && (
+                        <button
+                          type="button"
+                          onClick={(e) => toggleEliminateOption(option, e)}
+                          className={`p-1 rounded-lg border text-[10px] font-bold transition-colors cursor-pointer shrink-0 ${
+                            isEliminated
+                              ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-800'
+                              : 'bg-white/80 dark:bg-slate-800/80 text-slate-400 hover:text-rose-500 border-slate-200/60 dark:border-slate-700/60'
+                          }`}
+                          title={isEliminated ? 'Restore option' : 'Cross out / Eliminate distractor'}
+                        >
+                          <Scissors className="w-3 h-3" />
+                        </button>
+                      )}
                       <span className="hidden sm:inline-block text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-slate-700/60">
                         [{idx + 1}]
                       </span>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1562,7 +2260,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                       )}
                       <h4 className="font-extrabold text-sm sm:text-base tracking-tight">
                         {isCurrentCorrect
-                          ? currentQuestion.gamified_feedback?.success_quote || 'Hoot hoot! Correct! Nicely done.'
+                          ? currentQuestion.gamified_feedback?.success_quote || 'Spark on! Correct! Nicely done.'
                           : `Keep going! Correct Answer: ${currentQuestion.correct_answer}`}
                       </h4>
                     </div>
@@ -1683,6 +2381,31 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
         onClose={() => setShowVoiceSettings(false)}
         initialLanguage={quiz.language}
       />
+
+      {/* Fullscreen Image Zoom Lightbox Modal */}
+      {zoomedImageUrl && (
+        <div
+          onClick={() => setZoomedImageUrl(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-150 cursor-zoom-out"
+        >
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => setZoomedImageUrl(null)}
+              className="absolute -top-10 right-0 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+              <span>Close Zoom</span>
+            </button>
+            <img
+              src={zoomedImageUrl}
+              alt="Zoomed question visual"
+              referrerPolicy="no-referrer"
+              className="max-h-[82vh] w-auto object-contain rounded-2xl border border-white/15 shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

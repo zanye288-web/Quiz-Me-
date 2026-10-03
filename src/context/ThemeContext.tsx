@@ -3,10 +3,126 @@ import { soundFx } from '../utils/audio';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type AccentColor = 'indigo' | 'emerald' | 'amber' | 'rose' | 'cyan' | 'violet' | 'slate';
-export type FontFamilyChoice = 'sans' | 'serif' | 'mono' | 'rounded' | 'outfit';
+export type FontFamilyChoice =
+  | 'sans'
+  | 'serif'
+  | 'mono'
+  | 'rounded'
+  | 'outfit'
+  | 'lexend'
+  | 'space'
+  | 'lora'
+  | 'fredoka'
+  | 'sora'
+  | 'caveat'
+  | 'atkinson';
 export type CardCornerRadius = '3xl' | '2xl' | 'xl' | 'md';
 export type UiDensity = 'comfortable' | 'compact';
 export type QuestionLayoutStyle = 'stacked' | 'split' | 'focus';
+
+export interface FontCatalogItem {
+  id: FontFamilyChoice;
+  name: string;
+  style: string;
+  sample: string;
+  cssFamily: string;
+  badge?: string;
+}
+
+export const FONT_CATALOG: FontCatalogItem[] = [
+  {
+    id: 'sans',
+    name: 'Plus Jakarta Sans',
+    style: 'Modern Clean Sans',
+    sample: 'The quick brown fox jumps over the lazy dog',
+    cssFamily: "'Plus Jakarta Sans', sans-serif",
+    badge: 'Default',
+  },
+  {
+    id: 'lexend',
+    name: 'Lexend Reading',
+    style: 'Dyslexia-Friendly & Hyper-Smooth',
+    sample: 'Designed to reduce visual stress & boost reading speed',
+    cssFamily: "'Lexend', sans-serif",
+    badge: 'Reading Aid',
+  },
+  {
+    id: 'fredoka',
+    name: 'Fredoka Gamified',
+    style: 'Bubbly Duolingo-Style Rounded',
+    sample: 'Streak unlocked! +50 Bonus XP earned!',
+    cssFamily: "'Fredoka', sans-serif",
+    badge: 'Playful',
+  },
+  {
+    id: 'space',
+    name: 'Space Grotesk',
+    style: 'Futuristic STEM & Tech Sans',
+    sample: 'Quantum entanglement & algorithmic complexity',
+    cssFamily: "'Space Grotesk', sans-serif",
+    badge: 'STEM',
+  },
+  {
+    id: 'outfit',
+    name: 'Outfit Geometric',
+    style: 'Modern Display Geometric',
+    sample: 'Crisp geometric proportions for modern screens',
+    cssFamily: "'Outfit', sans-serif",
+  },
+  {
+    id: 'sora',
+    name: 'Sora Precision',
+    style: 'Contemporary UI & Sharp Clarity',
+    sample: 'High-velocity active recall & conceptual mastery',
+    cssFamily: "'Sora', sans-serif",
+    badge: 'New',
+  },
+  {
+    id: 'rounded',
+    name: 'Quicksand Rounded',
+    style: 'Friendly & Soft Geometric',
+    sample: 'Warm and welcoming typography for relaxed study',
+    cssFamily: "'Quicksand', sans-serif",
+  },
+  {
+    id: 'serif',
+    name: 'Playfair Display',
+    style: 'Academic Editorial Serif',
+    sample: 'Classical inquiry, history & literary analysis',
+    cssFamily: "'Playfair Display', serif",
+  },
+  {
+    id: 'lora',
+    name: 'Lora Textbook',
+    style: 'Classic Book & Essay Serif',
+    sample: 'Long-form scholarly reading with warm brush curves',
+    cssFamily: "'Lora', serif",
+    badge: 'Bookish',
+  },
+  {
+    id: 'mono',
+    name: 'JetBrains Mono',
+    style: 'Developer & Code Monospace',
+    sample: 'const mastery = await evaluate(answer);',
+    cssFamily: "'JetBrains Mono', monospace",
+  },
+  {
+    id: 'atkinson',
+    name: 'Atkinson Hyperlegible',
+    style: 'Low-Vision High-Clarity Accessibility',
+    sample: 'Distinct letterforms: 0O, 1lI, 8B for zero ambiguity',
+    cssFamily: "'Atkinson Hyperlegible', sans-serif",
+    badge: 'Accessible',
+  },
+  {
+    id: 'caveat',
+    name: 'Patrick Hand',
+    style: 'Handwritten Study Notebook',
+    sample: 'Feels like your favorite handwritten study flashcards!',
+    cssFamily: "'Patrick Hand', cursive",
+    badge: 'Notebook',
+  },
+];
 
 export interface AccentConfigItem {
   id: AccentColor;
@@ -288,7 +404,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [fontFamily, setFontFamilyState] = useState<FontFamilyChoice>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(FONT_KEY) as FontFamilyChoice;
-      if (['sans', 'serif', 'mono', 'rounded', 'outfit'].includes(saved)) return saved;
+      if (FONT_CATALOG.some((f) => f.id === saved)) return saved;
     }
     return 'sans';
   });

@@ -28,6 +28,7 @@ import { LiveSessionRoom } from './components/live/LiveSessionRoom';
 import { PomodoroTimerOverlay } from './components/PomodoroTimerOverlay';
 import { LiveSessionData } from './types/liveSession';
 import { IntelligentNotesHubView } from './components/IntelligentNotesHubView';
+import { SuggestionsHubView } from './components/SuggestionsHubView';
 import { QuizzieCompanionWidget } from './components/QuizzieCompanionWidget';
 import { GraduationCap, Sparkles, BookOpen, Layers, BarChart3, Menu, Share2, Play, X, FileText } from 'lucide-react';
 import { PersonaType, QuizResponse, Question, UserStats, AssessmentConfig } from './types/quiz';
@@ -891,6 +892,17 @@ export default function App() {
                 handleSaveQuizToLibrary(customQuiz);
                 handleInspectRawJson(customQuiz);
               }}
+            />
+          )}
+
+          {activeTab === 'suggestions' && (
+            <SuggestionsHubView
+              stats={stats}
+              persona={persona}
+              historyRecords={historyRecords}
+              onStartQuiz={handleStartQuiz}
+              onNavigateToTab={(tab) => setActiveTab(tab)}
+              onUpdateStats={updateStats}
             />
           )}
 

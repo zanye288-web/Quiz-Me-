@@ -125,6 +125,11 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
           title: 'Custom Quiz Builder',
           subtitle: 'Create and structure custom questions, code snippets & rubrics',
         };
+      case 'suggestions':
+        return {
+          title: 'Suggestions & Ideas Hub',
+          subtitle: 'Personalized AI study recommendations, topic sparks, QoL upgrades & community feedback',
+        };
       case 'analytics':
         return {
           title: 'Performance & XP Analytics',

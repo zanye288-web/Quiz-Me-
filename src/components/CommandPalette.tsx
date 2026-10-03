@@ -23,6 +23,7 @@ import {
   FileCode,
   Users,
   FileText,
+  Lightbulb,
 } from 'lucide-react';
 import { DashboardTab } from './DashboardSidebar';
 import { PRESET_TOPICS, PresetTopic } from '../data/presets';
@@ -140,6 +141,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       icon: <Code2 className="w-4 h-4 text-emerald-500" />,
       action: () => {
         onSelectTab('authoring');
+        onClose();
+      },
+    },
+    {
+      id: 'nav_suggestions',
+      title: 'Suggestions & Ideas Hub',
+      subtitle: 'Personalized AI study recommendations, topic sparks, QoL upgrades & feedback',
+      category: 'Navigation',
+      icon: <Lightbulb className="w-4 h-4 text-amber-500" />,
+      action: () => {
+        onSelectTab('suggestions');
         onClose();
       },
     },

@@ -37,7 +37,7 @@ import {
   User as UserIcon,
   Edit3,
 } from 'lucide-react';
-import { useTheme, THEME_PRESETS, ACCENT_PALETTES, AccentColor, FontFamilyChoice, CardCornerRadius, UiDensity } from '../context/ThemeContext';
+import { useTheme, THEME_PRESETS, ACCENT_PALETTES, FONT_CATALOG, AccentColor, FontFamilyChoice, CardCornerRadius, UiDensity } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { AssessmentConfig, PersonaType, DifficultyType, UserStats } from '../types/quiz';
 import { QuizHistoryRecord } from './HistoryView';
@@ -45,6 +45,13 @@ import { soundFx, SOUND_PROFILES, SoundProfileType } from '../utils/audio';
 import { speechEngine, SpeechSettings, VOICE_PRESETS, VoicePreset } from '../utils/speech';
 import { UserAvatar } from './UserAvatar';
 import { SCHOLAR_AVATARS, AVATAR_BG_GRADIENTS } from './ProfileCustomizationModal';
+import {
+  MascotAvatar,
+  MASCOT_CATALOG,
+  MASCOT_THEME_CATALOG,
+  MascotMood,
+  useMascotPreferences,
+} from './MascotAvatar';
 
 interface SettingsViewProps {
   assessmentConfig: AssessmentConfig;
@@ -107,6 +114,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
   const [currentSoundProfile, setCurrentSoundProfile] = useState<SoundProfileType>(() => soundFx.getSoundProfile());
   const [isFocusHummingPreview, setIsFocusHummingPreview] = useState<boolean>(soundFx.isFocusHumming);
+  const [previewMascotMood, setPreviewMascotMood] = useState<MascotMood>('idle');
+  const {
+    mascotCharacter,
+    mascotTheme,
+    currentMascotMeta,
+    setMascotCharacter,
+    setMascotTheme,
+  } = useMascotPreferences();
 
   // Profile Customization State in Settings
   const { user, userProfile, updateUserProfileInCloud } = useAuth();
@@ -711,6 +726,136 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Controls Column */}
           <div className="lg:col-span-7 space-y-6">
+            {/* Mascot Companion Character & Aura Studio */}
+            <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-500" />
+                  <span>Mascot Companion Studio (5 Original Characters)</span>
+                </label>
+                <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
+                  Active: {currentMascotMeta.title}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Choose your personal study companion. Your selected mascot appears in the top branding bar, quiz rationales, 1-on-1 AI Tutor, diplomas, and floating companion widget.
+              </p>
+
+              {/* 5 Mascot Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+                {MASCOT_CATALOG.map((m) => {
+                  const isSelected = mascotCharacter === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setMascotCharacter(m.id, true);
+                        triggerSaveNotice(`Switched companion to ${m.title}`);
+                      }}
+                      className={`p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-2 ${
+                        isSelected
+                          ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/50 ring-2 ring-indigo-500/20 shadow-xs'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/70 dark:bg-slate-850'
+                      }`}
+                    >
+                      <MascotAvatar
+                        character={m.id}
+                        theme={isSelected ? mascotTheme : m.defaultTheme}
+                        mood={isSelected ? previewMascotMood : 'idle'}
+                        size="sm"
+                        interactive={false}
+                      />
+                      <div>
+                        <div className="text-xs font-extrabold text-slate-900 dark:text-white">
+                          {m.name}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                          {m.species}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Active Mascot Details + Color Aura + Mood Tester */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex flex-col sm:flex-row items-center gap-4">
+                <div className="shrink-0">
+                  <MascotAvatar
+                    character={mascotCharacter}
+                    theme={mascotTheme}
+                    mood={previewMascotMood}
+                    size="md"
+                  />
+                </div>
+                <div className="flex-1 space-y-3 text-center sm:text-left w-full">
+                  <div>
+                    <div className="text-sm font-black text-slate-900 dark:text-white">
+                      {currentMascotMeta.title}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {currentMascotMeta.tagline}
+                    </p>
+                  </div>
+
+                  {/* Color Aura Swatches */}
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1">
+                      Color Aura:
+                    </span>
+                    {MASCOT_THEME_CATALOG.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          setMascotTheme(t.id);
+                          triggerSaveNotice(`Mascot aura set to ${t.label}`);
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
+                          mascotTheme === t.id
+                            ? 'border-indigo-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-2xs ring-1 ring-indigo-500/30'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className={`w-2.5 h-2.5 rounded-full ${t.swatchClass}`} />
+                        <span>{t.label.split(' ')[1]}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Mood Tester */}
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1">
+                      Preview Mood:
+                    </span>
+                    {(['idle', 'happy', 'streak', 'thinking', 'teacher', 'comforting'] as MascotMood[]).map(
+                      (mMood) => (
+                        <button
+                          key={mMood}
+                          type="button"
+                          onClick={() => {
+                            soundFx.playClick();
+                            setPreviewMascotMood(mMood);
+                          }}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold capitalize transition-colors cursor-pointer ${
+                            previewMascotMood === mMood
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-300/70'
+                          }`}
+                        >
+                          {mMood}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Theme Mode Card */}
             <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
               <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
@@ -803,19 +948,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
             {/* Typography Font Pairing */}
             <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-              <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                <Type className="w-4 h-4 text-emerald-500" />
-                <span>Typography & Font Pairing</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                  <Type className="w-4 h-4 text-emerald-500" />
+                  <span>Typography & Font Pairing ({FONT_CATALOG.length} Styles)</span>
+                </label>
+                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                  Includes Dyslexia & Low-Vision Fonts
+                </span>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {[
-                  { id: 'sans' as FontFamilyChoice, name: 'Plus Jakarta Sans', style: 'Modern Clean Sans', sample: 'The quick brown fox jumps' },
-                  { id: 'serif' as FontFamilyChoice, name: 'Playfair Display', style: 'Academic Editorial Serif', sample: 'The quick brown fox jumps' },
-                  { id: 'mono' as FontFamilyChoice, name: 'JetBrains Mono', style: 'Code & Technical Mono', sample: 'const recall = fn();' },
-                  { id: 'rounded' as FontFamilyChoice, name: 'Quicksand Rounded', style: 'Friendly & Playful', sample: 'The quick brown fox jumps' },
-                  { id: 'outfit' as FontFamilyChoice, name: 'Outfit Geometric', style: 'Modern Display Geometric', sample: 'The quick brown fox jumps' },
-                ].map((font) => {
+                {FONT_CATALOG.map((font) => {
                   const isSelected = fontFamily === font.id;
                   return (
                     <button
@@ -825,18 +969,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         soundFx.playSelect();
                         setFontFamily(font.id);
                       }}
+                      style={{ fontFamily: font.cssFamily }}
                       className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
                         isSelected
                           ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/40 ring-2 ring-indigo-500/20'
                           : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-850'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-slate-900 dark:text-white">{font.name}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-black text-slate-900 dark:text-white truncate">
+                            {font.name}
+                          </span>
+                          {font.badge && (
+                            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 shrink-0">
+                              {font.badge}
+                            </span>
+                          )}
+                        </div>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
                       </div>
                       <div className="text-[10px] text-slate-400">{font.style}</div>
-                      <div className="text-xs text-slate-600 dark:text-slate-300 italic opacity-80 mt-1 truncate">
+                      <div className="text-xs text-slate-600 dark:text-slate-300 italic opacity-85 mt-1 truncate">
                         "{font.sample}"
                       </div>
                     </button>

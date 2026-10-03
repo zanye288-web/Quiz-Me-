@@ -46,8 +46,9 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errMsg = error instanceof Error ? error.message : String(error);
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMsg,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -63,8 +64,15 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  if (
+    errMsg.includes('unavailable') ||
+    errMsg.includes('offline') ||
+    errMsg.includes('Could not reach Cloud Firestore')
+  ) {
+    console.warn('Firestore operating in offline/cached mode:', path);
+    return;
+  }
+  console.warn('Firestore Notice: ', JSON.stringify(errInfo));
 }
 
 export interface UserProfileDocument {
@@ -153,6 +161,7 @@ export interface LeaderboardEntry {
 
 // 1. User Profile Operations
 export async function fetchUserProfile(userId: string): Promise<UserProfileDocument | null> {
+  if (!auth.currentUser) return null;
   try {
     const userDocRef = doc(db, 'users', userId);
     const snap = await getDoc(userDocRef);
@@ -161,7 +170,7 @@ export async function fetchUserProfile(userId: string): Promise<UserProfileDocum
     }
     return null;
   } catch (err) {
-    console.error('Error fetching user profile from Firestore:', err);
+    console.warn('Notice fetching user profile from Firestore:', err);
     return null;
   }
 }
@@ -170,6 +179,9 @@ export function subscribeUserProfile(
   userId: string,
   onUpdate: (data: UserProfileDocument | null) => void
 ) {
+  if (!auth.currentUser) {
+    return () => {};
+  }
   const userDocRef = doc(db, 'users', userId);
   return onSnapshot(
     userDocRef,
@@ -181,7 +193,7 @@ export function subscribeUserProfile(
       }
     },
     (err) => {
-      console.error('Error listening to user profile:', err);
+      console.warn('Notice listening to user profile:', err?.message || err);
     }
   );
 }
@@ -190,6 +202,7 @@ export async function upsertUserProfile(
   userId: string,
   data: Partial<UserProfileDocument>
 ): Promise<void> {
+  if (!auth.currentUser) return;
   try {
     const userDocRef = doc(db, 'users', userId);
     const snap = await getDoc(userDocRef);
@@ -223,7 +236,7 @@ export async function upsertUserProfile(
       });
     }
   } catch (err) {
-    console.error('Error saving user profile to Firestore:', err);
+    console.warn('Notice saving user profile to Firestore:', err);
   }
 }
 
@@ -232,6 +245,7 @@ export async function saveQuizHistoryToFirestore(
   userId: string,
   record: QuizHistoryRecord
 ): Promise<void> {
+  if (!auth.currentUser) return;
   try {
     const recordDocRef = doc(db, 'users', userId, 'history', record.id);
     await setDoc(recordDocRef, {
@@ -239,7 +253,7 @@ export async function saveQuizHistoryToFirestore(
       createdAt: serverTimestamp(),
     });
   } catch (err) {
-    console.error('Error saving quiz history to Firestore:', err);
+    console.warn('Notice saving quiz history to Firestore:', err);
   }
 }
 
@@ -247,6 +261,9 @@ export function subscribeQuizHistory(
   userId: string,
   onUpdate: (records: QuizHistoryRecord[]) => void
 ) {
+  if (!auth.currentUser) {
+    return () => {};
+  }
   const historyColRef = collection(db, 'users', userId, 'history');
   const historyQuery = query(historyColRef, orderBy('createdAt', 'desc'), limit(100));
 
@@ -260,7 +277,7 @@ export function subscribeQuizHistory(
       onUpdate(records);
     },
     (err) => {
-      console.warn('Fallback: listening to history without ordering if index is building:', err);
+      console.warn('Fallback: listening to history without ordering if index is building:', err?.message || err);
       // Fallback without ordering in case index is pending
       return onSnapshot(
         historyColRef,
@@ -273,7 +290,7 @@ export function subscribeQuizHistory(
           onUpdate(records);
         },
         (fallbackErr) => {
-          console.error('History fallback subscription error:', fallbackErr);
+          console.warn('History fallback subscription notice:', fallbackErr?.message || fallbackErr);
         }
       );
     }
@@ -284,22 +301,24 @@ export async function deleteQuizHistoryFromFirestore(
   userId: string,
   recordId: string
 ): Promise<void> {
+  if (!auth.currentUser) return;
   try {
     const recordDocRef = doc(db, 'users', userId, 'history', recordId);
     await deleteDoc(recordDocRef);
   } catch (err) {
-    console.error('Error deleting quiz history record:', err);
+    console.warn('Notice deleting quiz history record:', err);
   }
 }
 
 export async function clearAllQuizHistoryFromFirestore(userId: string): Promise<void> {
+  if (!auth.currentUser) return;
   try {
     const historyColRef = collection(db, 'users', userId, 'history');
     const snap = await getDocs(historyColRef);
     const deletePromises = snap.docs.map((docSnap) => deleteDoc(docSnap.ref));
     await Promise.all(deletePromises);
   } catch (err) {
-    console.error('Error clearing all history from Firestore:', err);
+    console.warn('Notice clearing all history from Firestore:', err);
   }
 }
 
@@ -309,6 +328,7 @@ export async function toggleFavoriteInFirestore(
   presetId: string,
   isFavorite: boolean
 ): Promise<void> {
+  if (!auth.currentUser) return;
   try {
     const favDocRef = doc(db, 'users', userId, 'favorites', presetId);
     if (isFavorite) {
@@ -320,7 +340,7 @@ export async function toggleFavoriteInFirestore(
       await deleteDoc(favDocRef);
     }
   } catch (err) {
-    console.error('Error toggling favorite in Firestore:', err);
+    console.warn('Notice toggling favorite in Firestore:', err);
   }
 }
 
@@ -328,6 +348,9 @@ export function subscribeFavorites(
   userId: string,
   onUpdate: (favorites: Set<string>) => void
 ) {
+  if (!auth.currentUser) {
+    return () => {};
+  }
   const favColRef = collection(db, 'users', userId, 'favorites');
   return onSnapshot(
     favColRef,
@@ -341,7 +364,7 @@ export function subscribeFavorites(
       onUpdate(favs);
     },
     (err) => {
-      console.error('Error subscribing to favorites:', err);
+      console.warn('Notice subscribing to favorites:', err?.message || err);
     }
   );
 }
@@ -435,7 +458,7 @@ export async function getQuizFromFirestore(quizId: string): Promise<SavedQuizDoc
     }
     return null;
   } catch (err) {
-    console.error('Error fetching quiz from Firestore:', err);
+    console.warn('Notice fetching quiz from Firestore:', err);
     return null;
   }
 }
@@ -716,7 +739,7 @@ export async function fetchLeaderboardUsers(currentUserId?: string): Promise<Lea
 
     return results;
   } catch (err) {
-    console.error('Error fetching leaderboard users from Firestore:', err);
+    console.warn('Notice fetching leaderboard users from Firestore:', err);
     return [];
   }
 }

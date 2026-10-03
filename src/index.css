@@ -41,6 +41,43 @@
     font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   }
 
+  html[data-font="lexend"],
+  html[data-font="lexend"] * {
+    font-family: 'Lexend', system-ui, -apple-system, sans-serif;
+    letter-spacing: 0.01em;
+  }
+
+  html[data-font="space"],
+  html[data-font="space"] * {
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  }
+
+  html[data-font="lora"],
+  html[data-font="lora"] * {
+    font-family: 'Lora', Georgia, Cambria, serif;
+  }
+
+  html[data-font="fredoka"],
+  html[data-font="fredoka"] * {
+    font-family: 'Fredoka', 'Quicksand', system-ui, sans-serif;
+  }
+
+  html[data-font="sora"],
+  html[data-font="sora"] * {
+    font-family: 'Sora', system-ui, -apple-system, sans-serif;
+  }
+
+  html[data-font="caveat"],
+  html[data-font="caveat"] * {
+    font-family: 'Patrick Hand', 'Comic Sans MS', cursive, sans-serif;
+    letter-spacing: 0.015em;
+  }
+
+  html[data-font="atkinson"],
+  html[data-font="atkinson"] * {
+    font-family: 'Atkinson Hyperlegible', system-ui, -apple-system, sans-serif;
+  }
+
   /* High Contrast Accessibility Mode */
   html[data-contrast="high"] .border,
   html[data-contrast="high"] [class*="border-slate-"],

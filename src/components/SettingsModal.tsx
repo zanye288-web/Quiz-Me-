@@ -4,6 +4,12 @@ import { useTheme } from '../context/ThemeContext';
 import { AssessmentConfig } from '../types/quiz';
 import { soundFx, SOUND_PROFILES, SoundProfileType } from '../utils/audio';
 import { VoiceSettingsModal } from './VoiceSettingsModal';
+import {
+  MascotAvatar,
+  MASCOT_CATALOG,
+  MASCOT_THEME_CATALOG,
+  useMascotPreferences,
+} from './MascotAvatar';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -26,6 +32,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const { theme, setTheme, toggleTheme } = useTheme();
   const [showVoiceSettings, setShowVoiceSettings] = useState<boolean>(false);
+  const {
+    mascotCharacter,
+    mascotTheme,
+    currentMascotMeta,
+    setMascotCharacter,
+    setMascotTheme,
+  } = useMascotPreferences();
 
   if (!isOpen) return null;
 
@@ -217,6 +230,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <Moon className="w-4 h-4 text-indigo-400" />
                 <span>Dark Mode</span>
               </button>
+            </div>
+          </div>
+
+          {/* Mascot Companion Character & Aura Switcher */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Mascot Companion
+              </label>
+              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                {currentMascotMeta.title}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 space-y-3.5">
+              <div className="grid grid-cols-5 gap-2">
+                {MASCOT_CATALOG.map((m) => {
+                  const isSelected = mascotCharacter === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setMascotCharacter(m.id, true);
+                      }}
+                      className={`flex flex-col items-center p-2 rounded-2xl border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-indigo-500 bg-white dark:bg-slate-900 ring-2 ring-indigo-500/20 scale-105 shadow-xs'
+                          : 'border-slate-200/80 dark:border-slate-700/80 hover:bg-white dark:hover:bg-slate-800 opacity-80 hover:opacity-100'
+                      }`}
+                      title={`${m.title} — ${m.species}`}
+                    >
+                      <MascotAvatar
+                        character={m.id}
+                        theme={isSelected ? mascotTheme : m.defaultTheme}
+                        size="xs"
+                        interactive={false}
+                      />
+                      <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 mt-1.5 truncate max-w-full">
+                        {m.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="pt-2.5 border-t border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                  Color Aura:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {MASCOT_THEME_CATALOG.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setMascotTheme(t.id);
+                      }}
+                      className={`w-6 h-6 rounded-full ${t.swatchClass} transition-transform cursor-pointer ${
+                        mascotTheme === t.id
+                          ? 'ring-2 ring-offset-2 ring-indigo-500 scale-110'
+                          : 'opacity-70 hover:opacity-100'
+                      }`}
+                      title={t.label}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 

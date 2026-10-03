@@ -13,8 +13,20 @@ import {
   User,
   updateProfile,
 } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import {
+  getFirestore,
+  initializeFirestore,
+  setLogLevel,
+  Firestore,
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
+
+// Suppress noisy internal @firebase/firestore offline/WebChannel retry console.error logs
+try {
+  setLogLevel('silent');
+} catch {
+  // Ignore if setLogLevel is unavailable
+}
 
 // Initialize Firebase App instance
 const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -33,7 +45,7 @@ export const discordProvider = new OAuthProvider('oidc.discord');
 export const instagramProvider = new OAuthProvider('oidc.instagram');
 export const tiktokProvider = new OAuthProvider('oidc.tiktok');
 
-// Initialize Cloud Firestore with provisioned named database
+// Initialize Cloud Firestore with provisioned named database & long-polling for iframe/proxy resilience
 const dbName =
   firebaseConfig.firestoreDatabaseId &&
   firebaseConfig.firestoreDatabaseId !== '(default)' &&
@@ -41,7 +53,27 @@ const dbName =
     ? firebaseConfig.firestoreDatabaseId
     : undefined;
 
-export const db: Firestore = dbName ? getFirestore(app, dbName) : getFirestore(app);
+function createResilientFirestore(): Firestore {
+  try {
+    return dbName
+      ? initializeFirestore(
+          app,
+          {
+            experimentalForceLongPolling: true,
+            ignoreUndefinedProperties: true,
+          },
+          dbName
+        )
+      : initializeFirestore(app, {
+          experimentalForceLongPolling: true,
+          ignoreUndefinedProperties: true,
+        });
+  } catch {
+    return dbName ? getFirestore(app, dbName) : getFirestore(app);
+  }
+}
+
+export const db: Firestore = createResilientFirestore();
 
 export {
   app,

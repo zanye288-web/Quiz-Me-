@@ -21,6 +21,7 @@ import {
   Layout,
   Users,
   FileText,
+  Lightbulb,
 } from 'lucide-react';
 import { PersonaType, UserStats as UserStatsType, QuizResponse } from '../types/quiz';
 import { useTheme } from '../context/ThemeContext';
@@ -31,7 +32,7 @@ import { UserAvatar } from './UserAvatar';
 import { MascotAvatar } from './MascotAvatar';
 import { AppLogo } from './AppLogo';
 
-export type DashboardTab = 'studio' | 'notes' | 'gamma' | 'flashcards' | 'curricula' | 'community' | 'live' | 'authoring' | 'achievements' | 'analytics' | 'history' | 'settings' | 'runner' | 'complete';
+export type DashboardTab = 'studio' | 'notes' | 'gamma' | 'flashcards' | 'curricula' | 'community' | 'live' | 'authoring' | 'suggestions' | 'achievements' | 'analytics' | 'history' | 'settings' | 'runner' | 'complete';
 
 interface DashboardSidebarProps {
   activeTab: DashboardTab;
@@ -134,6 +135,14 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           icon: PlusCircle,
           badge: 'Manual',
           description: 'Write custom questions & rubrics',
+        },
+        {
+          id: 'suggestions' as DashboardTab,
+          label: 'Suggestions Hub',
+          shortLabel: 'Suggest',
+          icon: Lightbulb,
+          badge: 'AI & Ideas',
+          description: 'Smart topic recommendations & feature feedback',
         },
       ],
     },

@@ -12,6 +12,7 @@ import {
   generateIntelligentNotesAI,
   tutorInteractiveSessionAI,
   analyzeQuizMistakesAI,
+  transcribeSpokenAnswerAI,
 } from './geminiService';
 import { searchAllImages, searchWebImages, searchWikimediaImages } from './imageService';
 import { resolveThematicVisual, THEMATIC_VISUAL_ASSETS } from '../src/utils/thematicImages';
@@ -632,6 +633,29 @@ apiRouter.post('/analyze-mistakes', searchRateLimiter, async (req: Request, res:
     res.status(500).json({
       success: false,
       error: sanitizeErrorMessage(error, 'Mistake analysis error.'),
+    });
+  }
+});
+
+// 12b. Spoken Quiz Answer Transcription (Microphone Voice Answer fallback)
+apiRouter.post('/transcribe-answer', searchRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { audioBase64, mimeType, language, options, question } = req.body;
+    if (!audioBase64 || typeof audioBase64 !== 'string') {
+      return res.status(400).json({ success: false, error: 'Audio data is required.' });
+    }
+    const result = await transcribeSpokenAnswerAI({
+      audioBase64,
+      mimeType: mimeType ? sanitizeString(mimeType, 60) : 'audio/webm',
+      language: language ? sanitizeString(language, 20) : 'en-US',
+      options: Array.isArray(options) ? options.slice(0, 8).map((o: any) => sanitizeString(o, 300)) : undefined,
+      question: question ? sanitizeString(question, 500) : undefined,
+    });
+    res.json({ success: true, ...result });
+  } catch (error: unknown) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(error, 'Failed to transcribe voice answer.'),
     });
   }
 });
