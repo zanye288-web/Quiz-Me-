@@ -325,7 +325,19 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
       </div>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#46178f] to-[#25076b] border border-purple-500/40 shadow-sm text-center space-y-1 text-white">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-purple-200">
+            Kahoot! Podium
+          </span>
+          <div className="text-2xl font-black text-amber-300 flex items-center justify-center gap-1.5">
+            <span>{accuracy >= 90 ? '🥇 1st' : accuracy >= 75 ? '🥈 2nd' : accuracy >= 55 ? '🥉 3rd' : '🏅 Finisher'}</span>
+          </div>
+          <p className="text-xs font-bold text-purple-200 font-mono">
+            {(results.score * 850 + (isPerfectScore ? 1500 : 0)).toLocaleString()} pts
+          </p>
+        </div>
+
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center space-y-1">
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
             Questions Correct

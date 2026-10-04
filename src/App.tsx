@@ -29,6 +29,7 @@ import { PomodoroTimerOverlay } from './components/PomodoroTimerOverlay';
 import { LiveSessionData } from './types/liveSession';
 import { IntelligentNotesHubView } from './components/IntelligentNotesHubView';
 import { SuggestionsHubView } from './components/SuggestionsHubView';
+import { MusicStudioView } from './components/MusicStudioView';
 import { QuizzieCompanionWidget } from './components/QuizzieCompanionWidget';
 import { StarterTutorialModal, STARTER_TUTORIAL_STORAGE_KEY } from './components/StarterTutorialModal';
 import { GraduationCap, Sparkles, BookOpen, Layers, BarChart3, Menu, Share2, Play, X, FileText } from 'lucide-react';
@@ -822,6 +823,8 @@ export default function App() {
                   gems: stats.gems + 5,
                 });
               }}
+              onSelectTab={(tab) => setActiveTab(tab)}
+              onUpdateStats={updateStats}
             />
           )}
 
@@ -862,6 +865,28 @@ export default function App() {
                 isHost={activeLiveSession.isHost}
                 currentUserId={activeLiveSession.currentUserId}
                 onLeave={() => setActiveLiveSession(null)}
+                onAwardLiveRewards={(xpEarned, gemsEarned) => {
+                  const preUnlockedIds = new Set(
+                    BADGE_CATALOG.filter((b) => b.checkUnlocked(stats)).map((b) => b.id)
+                  );
+                  const nextStats: UserStats = {
+                    ...stats,
+                    quizzesCompleted: stats.quizzesCompleted + 1,
+                    xp: stats.xp + xpEarned,
+                    gems: stats.gems + gemsEarned,
+                    level: Math.max(1, Math.floor((stats.xp + xpEarned) / 150) + 1),
+                  };
+                  setStats(nextStats);
+                  if (user) {
+                    syncStatsToCloud(nextStats);
+                  }
+                  const newlyUnlocked = BADGE_CATALOG.find(
+                    (b) => !preUnlockedIds.has(b.id) && b.checkUnlocked(nextStats)
+                  );
+                  if (newlyUnlocked) {
+                    setTimeout(() => setCelebratingBadge(newlyUnlocked), 600);
+                  }
+                }}
               />
             ) : (
               <LiveSessionHub
@@ -910,6 +935,14 @@ export default function App() {
               onStartQuiz={handleStartQuiz}
               onNavigateToTab={(tab) => setActiveTab(tab)}
               onUpdateStats={updateStats}
+            />
+          )}
+
+          {activeTab === 'music' && (
+            <MusicStudioView
+              stats={stats}
+              onUpdateStats={updateStats}
+              onOpenSettings={() => setIsSettingsOpen(true)}
             />
           )}
 

@@ -1,529 +1,624 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
-  Radio,
-  Trophy,
-  Zap,
   Play,
-  Check,
-  AlertCircle,
-  RefreshCw,
-  Bot,
   Sparkles,
+  Trophy,
+  Clock,
+  Flame,
+  ArrowRight,
+  Radio,
+  Layers,
+  CheckCircle2,
+  AlertCircle,
+  UserCheck,
+  RefreshCw,
+  Dices,
+  Zap,
+  Crown,
+  Volume2,
 } from 'lucide-react';
 import { QuizResponse } from '../../types/quiz';
-import { PRESET_TOPICS } from '../../data/presets';
-import { useAuth } from '../../context/AuthContext';
+import { LiveSessionData } from '../../types/liveSession';
 import {
   createLiveSession,
   joinLiveSession,
   fetchActiveLiveRooms,
   ActiveLiveRoomSummary,
 } from '../../services/liveSession';
-import { LiveSessionData } from '../../types/liveSession';
+import { PRESET_TOPICS } from '../../data/presets';
+import { useAuth } from '../../context/AuthContext';
 import { soundFx } from '../../utils/audio';
 
 interface LiveSessionHubProps {
+  availableQuizzes: QuizResponse[];
   onJoinRoom: (
     roomCode: string,
     sessionData: LiveSessionData,
     isHost: boolean,
     participantId: string
   ) => void;
-  availableQuizzes?: QuizResponse[];
-  onCancel?: () => void;
+  onCancel: () => void;
 }
 
 const AVATAR_COLORS = [
-  { name: 'Indigo', class: 'bg-indigo-600', text: 'text-indigo-400', border: 'border-indigo-500' },
-  { name: 'Emerald', class: 'bg-emerald-600', text: 'text-emerald-400', border: 'border-emerald-500' },
-  { name: 'Rose', class: 'bg-rose-600', text: 'text-rose-400', border: 'border-rose-500' },
-  { name: 'Amber', class: 'bg-amber-600', text: 'text-amber-400', border: 'border-amber-500' },
-  { name: 'Purple', class: 'bg-purple-600', text: 'text-purple-400', border: 'border-purple-500' },
-  { name: 'Cyan', class: 'bg-cyan-600', text: 'text-cyan-400', border: 'border-cyan-500' },
+  { id: 'rose', label: 'Triangle Red', bg: 'bg-[#e21b3c]', shape: '▲' },
+  { id: 'indigo', label: 'Diamond Blue', bg: 'bg-[#1368ce]', shape: '◆' },
+  { id: 'amber', label: 'Circle Gold', bg: 'bg-[#d89e00]', shape: '●' },
+  { id: 'emerald', label: 'Square Green', bg: 'bg-[#26890c]', shape: '■' },
+  { id: 'violet', label: 'Kahoot Purple', bg: 'bg-[#46178f]', shape: '★' },
+  { id: 'cyan', label: 'Cyber Cyan', bg: 'bg-[#0891b2]', shape: '✦' },
+];
+
+const KAHOOT_FUN_NICKNAMES = [
+  'TurboOwl',
+  'CosmicTiger',
+  'QuantumFox',
+  'BlazingPanda',
+  'ApexDragon',
+  'HyperFalcon',
+  'NeonDolphin',
+  'VelvetRaven',
+  'SolarPhoenix',
+  'AstroLeopard',
+  'ThunderBadger',
+  'CrystalLynx',
+  'ShadowGriffin',
+  'PixelCheetah',
+  'GoldenNarwhal',
+  'SonicOtter',
 ];
 
 export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
+  availableQuizzes,
   onJoinRoom,
-  availableQuizzes = [],
 }) => {
   const { user, userProfile } = useAuth();
+  const [mode, setMode] = useState<'join' | 'host'>('join');
 
-  // Tab: 'host' or 'join'
-  const [activeTab, setActiveTab] = useState<'host' | 'join'>('host');
-
-  // Join form state
+  // Join State
   const [roomCodeInput, setRoomCodeInput] = useState('');
-  const [studentName, setStudentName] = useState(
-    userProfile?.displayName || user?.displayName || 'Scholar'
+  const [displayName, setDisplayName] = useState(
+    userProfile?.displayName || user?.displayName || ''
   );
-  const [selectedColor, setSelectedColor] = useState('Indigo');
-  const [isJoining, setIsJoining] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
+  const [selectedColor, setSelectedColor] = useState('rose');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeRooms, setActiveRooms] = useState<ActiveLiveRoomSummary[]>([]);
+  const [isRefreshingRooms, setIsRefreshingRooms] = useState(false);
 
-  // Active rooms list
-  const [openRooms, setOpenRooms] = useState<ActiveLiveRoomSummary[]>([]);
-  const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+  // Host State
+  const allQuizzes = React.useMemo(() => {
+    const presetList = PRESET_TOPICS.map((p) => p.prebuiltStudentQuiz);
+    const combined = [...availableQuizzes, ...presetList];
+    const seen = new Set<string>();
+    return combined.filter((q) => {
+      if (!q || !q.quiz_title || seen.has(q.quiz_title)) return false;
+      seen.add(q.quiz_title);
+      return true;
+    });
+  }, [availableQuizzes]);
 
-  // Combine curriculum presets with user custom quizzes
-  const allHostableQuizzes = [
-    ...availableQuizzes.map((q, idx) => ({
-      id: `custom_${idx}`,
-      title: q.quiz_title,
-      category: 'Your Active / Saved Quiz',
-      questionCount: q.questions?.length || 5,
-      quiz: q,
-    })),
-    ...PRESET_TOPICS.map((p) => ({
-      id: p.id,
-      title: p.title,
-      category: p.category,
-      questionCount: p.prebuiltStudentQuiz?.questions?.length || 5,
-      quiz: p.prebuiltStudentQuiz,
-    })),
-  ];
+  const [selectedQuizIndex, setSelectedQuizIndex] = useState(0);
+  const [timePerQuestion, setTimePerQuestion] = useState(20);
+  const [streakBonuses, setStreakBonuses] = useState(true);
+  const [includeAiClassmates, setIncludeAiClassmates] = useState(true);
 
-  // Host form state
-  const [selectedQuizId, setSelectedQuizId] = useState<string>(
-    allHostableQuizzes[0]?.id || PRESET_TOPICS[0]?.id || ''
-  );
-  const [timePerQuestion, setTimePerQuestion] = useState<number>(20);
-  const [streakBonuses, setStreakBonuses] = useState<boolean>(true);
-  const [showLeaderboard, setShowLeaderboard] = useState<boolean>(true);
-  const [includeAiClassmates, setIncludeAiClassmates] = useState<boolean>(true);
-  const [isHosting, setIsHosting] = useState(false);
-  const [hostError, setHostError] = useState<string | null>(null);
-
-  // Synchronize student name when userProfile changes
   useEffect(() => {
-    if (userProfile?.displayName) {
-      setStudentName(userProfile.displayName);
+    if (!displayName && (userProfile?.displayName || user?.displayName)) {
+      setDisplayName(userProfile?.displayName || user?.displayName || '');
     }
-  }, [userProfile]);
+  }, [userProfile, user, displayName]);
 
-  const loadActiveRooms = useCallback(async () => {
-    setIsLoadingRooms(true);
+  const loadActiveRooms = async () => {
+    setIsRefreshingRooms(true);
     try {
       const rooms = await fetchActiveLiveRooms();
-      setOpenRooms(rooms);
-    } catch {
-      // ignore
+      setActiveRooms(rooms);
     } finally {
-      setIsLoadingRooms(false);
+      setIsRefreshingRooms(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     loadActiveRooms();
-    const timer = setInterval(loadActiveRooms, 4000);
-    return () => clearInterval(timer);
-  }, [loadActiveRooms]);
+    const interval = setInterval(loadActiveRooms, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const executeJoinRoom = async (codeToJoin: string) => {
-    setJoinError(null);
-    const cleanCode = codeToJoin.trim().toUpperCase();
-    if (!cleanCode) {
-      setJoinError('Please enter a 6-digit room code.');
+  const handleSpinNickname = () => {
+    soundFx.playPop();
+    const pick = KAHOOT_FUN_NICKNAMES[Math.floor(Math.random() * KAHOOT_FUN_NICKNAMES.length)];
+    const num = Math.floor(10 + Math.random() * 89);
+    setDisplayName(`${pick}${num}`);
+  };
+
+  const handleCreateRoom = async (customPin?: string, autoStartInstant = false) => {
+    const targetQuiz = allQuizzes[selectedQuizIndex] || PRESET_TOPICS[0].prebuiltStudentQuiz;
+    if (!targetQuiz) {
+      setErrorMsg('Please select a quiz to host.');
       return;
     }
 
-    const effectiveName = studentName.trim() || 'Scholar';
+    setIsLoading(true);
+    setErrorMsg(null);
+    soundFx.playClick();
 
     try {
-      setIsJoining(true);
-      soundFx.playClick();
-
-      // Use a unique session participant ID per tab so the same user can test across multiple tabs
-      const tabSessionSuffix =
-        sessionStorage.getItem('quizme_live_tab_id') ||
-        (() => {
-          const id = Math.random().toString(36).substring(2, 7);
-          sessionStorage.setItem('quizme_live_tab_id', id);
-          return id;
-        })();
-
-      const studentId = user?.uid
-        ? `${user.uid}_${tabSessionSuffix}`
-        : `guest_${tabSessionSuffix}`;
-
-      const result = await joinLiveSession(cleanCode, {
-        id: studentId,
-        name: effectiveName,
-        avatarSeed: effectiveName.toLowerCase().replace(/\s+/g, '-'),
-        avatarColor: selectedColor.toLowerCase(),
-        role: 'student',
-      });
-
-      if (result.success && result.session) {
-        soundFx.playCorrect();
-        onJoinRoom(cleanCode, result.session, false, studentId);
-      } else {
-        setJoinError(result.error || 'Failed to join session. Please check the code.');
-      }
-    } catch (err: any) {
-      console.error('Error joining live session:', err);
-      setJoinError('Could not connect to live room. Please try again.');
-    } finally {
-      setIsJoining(false);
-    }
-  };
-
-  // Handle Joining Room with Code
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await executeJoinRoom(roomCodeInput);
-  };
-
-  // Handle Hosting a Live Room (or instant launching with optional custom code)
-  const handleHost = async (customCode?: string, forceAiClassmates?: boolean) => {
-    setHostError(null);
-    setJoinError(null);
-    const selected =
-      allHostableQuizzes.find((q) => q.id === selectedQuizId) || allHostableQuizzes[0];
-    if (!selected || !selected.quiz) {
-      setHostError('Please select a valid quiz to host.');
-      return;
-    }
-
-    try {
-      setIsHosting(true);
-      soundFx.playClick();
-
-      const hostId = user?.uid || `host_${Math.random().toString(36).substring(2, 9)}`;
+      const hostId = user?.uid || `host_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
       const hostName =
-        studentName.trim() || userProfile?.displayName || user?.displayName || 'Quiz Host';
+        displayName.trim() || userProfile?.displayName || user?.displayName || 'Quiz Master';
 
       const { roomCode, session } = await createLiveSession(
-        selected.quiz,
+        targetQuiz,
         {
           id: hostId,
           name: hostName,
+          avatar: userProfile?.photoURL || user?.photoURL || undefined,
         },
         {
           timePerQuestion,
+          showLeaderboardAfterEach: true,
           streakBonusesEnabled: streakBonuses,
-          showLeaderboardAfterEach: showLeaderboard,
+          allowLateJoin: true,
         },
         {
-          customRoomCode: customCode,
-          includeAiClassmates:
-            forceAiClassmates !== undefined ? forceAiClassmates : includeAiClassmates,
+          customRoomCode: customPin,
+          includeAiClassmates: includeAiClassmates || autoStartInstant,
         }
       );
 
-      soundFx.playLevelUp();
+      soundFx.playComplete();
       onJoinRoom(roomCode, session, true, hostId);
     } catch (err: any) {
-      console.error('Error creating live session:', err);
-      setHostError('Could not initialize room. Please try again.');
+      setErrorMsg(err?.message || 'Failed to create live room. Please try again.');
     } finally {
-      setIsHosting(false);
+      setIsLoading(false);
+    }
+  };
+
+  const handleJoinRoom = async (e?: React.FormEvent, overridePin?: string) => {
+    if (e) e.preventDefault();
+    const targetPin = (overridePin || roomCodeInput).trim();
+    if (targetPin.length < 4) {
+      setErrorMsg('Please enter a valid 6-digit Game PIN.');
+      return;
+    }
+    const cleanName = displayName.trim() || 'TurboScholar';
+
+    setIsLoading(true);
+    setErrorMsg(null);
+    soundFx.playClick();
+
+    try {
+      const participantId =
+        user?.uid || `student_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+      const result = await joinLiveSession(targetPin, {
+        id: participantId,
+        name: cleanName,
+        avatarColor: selectedColor,
+        role: 'student',
+      });
+
+      if (!result.success || !result.session) {
+        setErrorMsg(result.error || 'Could not join room.');
+        setIsLoading(false);
+        return;
+      }
+
+      soundFx.playComplete();
+      onJoinRoom(targetPin.toUpperCase(), result.session, false, participantId);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Error joining room.');
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-in fade-in duration-300">
-      {/* Hero Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold mb-3 shadow-2xs">
-          <Radio className="w-3.5 h-3.5 animate-pulse text-rose-500" />
-          <span>Synchronous Competitive Assessment Rooms</span>
-        </div>
-        <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-          Live Shared Quiz Battles
-        </h1>
-        <p className="mt-2 text-sm sm:text-base text-slate-600 dark:text-slate-400 max-w-xl mx-auto">
-          Compete in real time with classmates across tabs or devices, or challenge AI classmates immediately. Answer fast, build streaks, and climb the live podium!
-        </p>
+    <div className="max-w-6xl mx-auto space-y-6 pb-12 animate-spring-pop">
+      {/* Iconic Kahoot!-Style Purple Stage Banner */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#46178f] via-[#311068] to-[#1f0947] text-white p-6 sm:p-10 shadow-2xl border-2 border-purple-400/30">
+        {/* Floating Kahoot Geometric Shapes Backdrop */}
+        <div className="absolute -top-10 -left-10 w-44 h-44 bg-[#e21b3c]/25 rotate-12 rounded-3xl blur-xl pointer-events-none animate-float-slow" />
+        <div className="absolute top-6 right-12 w-36 h-36 bg-[#1368ce]/30 rotate-45 rounded-2xl blur-xl pointer-events-none animate-pulse-glow" />
+        <div className="absolute -bottom-12 right-1/3 w-52 h-52 bg-[#d89e00]/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute bottom-6 left-1/4 w-32 h-32 bg-[#26890c]/25 rounded-2xl blur-xl pointer-events-none" />
 
-        {/* Tab Switcher: Host vs Join */}
-        <div className="inline-flex p-1.5 mt-6 rounded-2xl bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300/50 dark:border-slate-700/50 shadow-inner">
-          <button
-            type="button"
-            id="tab-host-live-room"
-            onClick={() => {
-              setActiveTab('host');
-              soundFx.playClick();
-            }}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
-              activeTab === 'host'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Radio className="w-4 h-4 text-indigo-500" />
-            <span>Host / Launch Battle</span>
-          </button>
-          <button
-            type="button"
-            id="tab-join-live-room"
-            onClick={() => {
-              setActiveTab('join');
-              soundFx.playClick();
-            }}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer ${
-              activeTab === 'join'
-                ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Join with Room PIN</span>
-            {openRooms.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500 text-white">
-                {openRooms.length}
-              </span>
-            )}
-          </button>
+        {/* Decorative Geometric Shape Watermarks */}
+        <div className="hidden lg:flex items-center gap-3 absolute top-6 right-8 opacity-90">
+          <div className="w-10 h-10 rounded-xl bg-[#e21b3c] flex items-center justify-center text-white font-black text-lg shadow-lg rotate-[-8deg]">
+            ▲
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-[#1368ce] flex items-center justify-center text-white font-black text-lg shadow-lg rotate-[6deg]">
+            ◆
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-[#d89e00] flex items-center justify-center text-white font-black text-lg shadow-lg rotate-[-4deg]">
+            ●
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-[#26890c] flex items-center justify-center text-white font-black text-lg shadow-lg rotate-[8deg]">
+            ■
+          </div>
+        </div>
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          <div className="space-y-3 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-amber-300 text-xs font-black uppercase tracking-widest">
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>Kahoot! Style Live Arena • Real-Time Showdown</span>
+            </div>
+
+            <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight drop-shadow-md">
+              QuizMe! <span className="text-amber-400">LIVE!</span> Arena
+            </h1>
+
+            <p className="text-purple-100/90 text-sm sm:text-base leading-relaxed font-medium">
+              Lock in your answers with the iconic <span className="font-black text-white">▲ ◆ ● ■</span> geometric controller, trigger <span className="font-black text-amber-300">2x Double Points &amp; 50/50 Power-Ups</span>, build blazing answer streaks, and climb the 3-2-1 Spotlight Podium!
+            </p>
+          </div>
+
+          {/* Mode Switcher Tabs (Join via PIN vs Host Arena) */}
+          <div className="flex bg-black/35 backdrop-blur-md p-1.5 rounded-2xl border border-white/20 self-start shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playPop();
+                setMode('join');
+                setErrorMsg(null);
+              }}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                mode === 'join'
+                  ? 'bg-white text-[#46178f] shadow-lg'
+                  : 'text-purple-200 hover:text-white'
+              }`}
+            >
+              <Play className="w-4 h-4 fill-current" />
+              <span>Enter Game PIN</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playPop();
+                setMode('host');
+                setErrorMsg(null);
+              }}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                mode === 'host'
+                  ? 'bg-[#26890c] text-white shadow-lg'
+                  : 'text-purple-200 hover:text-white'
+              }`}
+            >
+              <Crown className="w-4 h-4" />
+              <span>Host Live Game</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Active Public Lobbies Banner (Always visible if rooms exist) */}
-      {openRooms.length > 0 && (
-        <div className="max-w-2xl mx-auto mb-6 rounded-3xl bg-white dark:bg-slate-900 border border-emerald-300/70 dark:border-emerald-800/70 p-5 shadow-md space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                Active Battle Rooms Available ({openRooms.length})
-              </h3>
-            </div>
+      {/* Error Alert Banner */}
+      {errorMsg && (
+        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border-2 border-rose-300 dark:border-rose-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-800 dark:text-rose-200 text-sm font-bold animate-spring-pop">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          {mode === 'join' && roomCodeInput.trim().length >= 4 && (
             <button
               type="button"
-              onClick={loadActiveRooms}
-              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              title="Refresh Active Rooms"
+              onClick={() => handleCreateRoom(roomCodeInput.trim(), true)}
+              className="px-4 py-2 rounded-xl bg-[#46178f] hover:bg-[#35116d] text-white text-xs font-black shrink-0 cursor-pointer shadow-md"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRooms ? 'animate-spin' : ''}`} />
+              Launch PIN #{roomCodeInput.trim()} Instantly →
             </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {openRooms.map((room) => (
-              <div
-                key={room.roomCode}
-                className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/70 dark:border-slate-800/70 hover:border-indigo-400 transition-all"
-              >
-                <div className="min-w-0 pr-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-black text-xs px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                      {room.roomCode}
-                    </span>
-                    <span className="font-bold text-xs text-slate-900 dark:text-white truncate">
-                      {room.quizTitle}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Host: {room.hostName} • {room.participantCount} joined
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={isJoining}
-                  onClick={() => {
-                    setRoomCodeInput(room.roomCode);
-                    executeJoinRoom(room.roomCode);
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shrink-0 cursor-pointer transition-colors"
-                >
-                  Join
-                </button>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
       )}
 
-      {/* Main Action Panels */}
-      {activeTab === 'join' ? (
-        <div className="space-y-6 max-w-md mx-auto">
-          {/* JOIN WITH CODE PANEL */}
-          <div className="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 p-6 sm:p-8 shadow-xl">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                Enter Room PIN
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Enter a 6-digit session code from your host, or launch a new room below.
-              </p>
-            </div>
-
-            {joinError && (
-              <div className="mb-5 p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs space-y-2.5">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{joinError}</span>
+      {mode === 'join' ? (
+        /* ================= KAHOOT! PIN ENTRY & INSTANT ARENA VIEW ================= */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left 7 Cols: Iconic Kahoot! Game PIN Card */}
+          <form
+            onSubmit={(e) => handleJoinRoom(e)}
+            className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border-2 border-slate-200 dark:border-slate-800 shadow-xl space-y-6"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-[#46178f] text-white flex items-center justify-center font-black text-xl shadow-md">
+                  #
                 </div>
-                {roomCodeInput.trim().length >= 4 && (
-                  <button
-                    type="button"
-                    onClick={() => handleHost(roomCodeInput.trim(), true)}
-                    className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-white" />
-                    <span>Create & Launch Room #{roomCodeInput.trim().toUpperCase()} Now</span>
-                  </button>
-                )}
-              </div>
-            )}
-
-            <form onSubmit={handleJoin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 text-center">
-                  6-Digit Room Code
-                </label>
-                <input
-                  type="text"
-                  id="live-room-code-input"
-                  maxLength={6}
-                  value={roomCodeInput}
-                  onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-                  placeholder="123456"
-                  className="w-full text-center tracking-widest font-mono text-3xl font-black py-4 px-4 rounded-2xl border-2 border-indigo-300 dark:border-indigo-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white focus:border-indigo-600 focus:outline-hidden focus:ring-4 focus:ring-indigo-500/20 transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
-                  Your Scholar Display Name
-                </label>
-                <input
-                  type="text"
-                  value={studentName}
-                  onChange={(e) => setStudentName(e.target.value)}
-                  maxLength={24}
-                  placeholder="e.g. Marie Curie"
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-sm font-medium text-slate-900 dark:text-white focus:border-indigo-600 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">
-                  Scholar Avatar Color
-                </label>
-                <div className="flex items-center justify-between gap-2">
-                  {AVATAR_COLORS.map((col) => (
-                    <button
-                      key={col.name}
-                      type="button"
-                      onClick={() => setSelectedColor(col.name)}
-                      className={`w-9 h-9 rounded-full ${col.class} transition-transform flex items-center justify-center cursor-pointer ${
-                        selectedColor === col.name
-                          ? 'ring-4 ring-indigo-500/30 scale-110'
-                          : 'opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      {selectedColor === col.name && <Check className="w-4 h-4 text-white" />}
-                    </button>
-                  ))}
+                <div>
+                  <h2 className="text-xl font-black text-slate-900 dark:text-white">
+                    Enter Game PIN
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Type the 6-digit PIN from the host screen or launch a solo arena below
+                  </p>
                 </div>
               </div>
 
-              <button
-                type="submit"
-                id="join-live-session-submit-btn"
-                disabled={isJoining}
-                className="w-full mt-2 flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-base shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/35 transition-all active:scale-98 cursor-pointer disabled:opacity-50"
-              >
-                {isJoining ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span>Connecting to Room...</span>
-                  </div>
-                ) : (
-                  <>
-                    <Zap className="w-5 h-5 fill-amber-300 text-amber-300" />
-                    <span>Enter Live Battle</span>
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Quick Instant Battle Trigger */}
-            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-center space-y-2.5">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Don&apos;t have a room code yet? Start a room immediately:
-              </p>
               <button
                 type="button"
-                onClick={() => handleHost(undefined, true)}
-                disabled={isHosting}
-                className="w-full py-2.5 px-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                onClick={() => handleCreateRoom(undefined, true)}
+                disabled={isLoading}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black shadow-sm cursor-pointer flex items-center gap-1.5"
+                title="Jump straight into a Kahoot! battle with AI challengers!"
               >
-                <Sparkles className="w-4 h-4 text-emerald-500" />
-                <span>Instant Battle vs. AI Classmates (1-Click)</span>
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span>Instant Solo Arena</span>
               </button>
+            </div>
+
+            {/* Giant Kahoot-style PIN Box */}
+            <div className="p-5 rounded-3xl bg-slate-100 dark:bg-slate-800/90 border-2 border-slate-300 dark:border-slate-700 space-y-3">
+              <label className="block text-center text-[11px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                6-Digit Game PIN
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={roomCodeInput}
+                onChange={(e) =>
+                  setRoomCodeInput(e.target.value.replace(/[^0-9a-zA-Z]/g, '').toUpperCase())
+                }
+                placeholder="123456"
+                className="w-full text-center text-4xl sm:text-5xl font-black tracking-[0.28em] py-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 focus:border-[#46178f] dark:focus:border-purple-400 focus:outline-none text-slate-900 dark:text-white font-mono shadow-inner"
+              />
+            </div>
+
+            {/* Player Nickname + Kahoot! Randomizer Spinner */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Player Nickname
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSpinNickname}
+                  className="inline-flex items-center gap-1.5 text-xs font-black text-[#46178f] dark:text-purple-400 hover:underline cursor-pointer"
+                >
+                  <Dices className="w-3.5 h-3.5" />
+                  <span>Spin Fun Nickname</span>
+                </button>
+              </div>
+              <input
+                type="text"
+                maxLength={24}
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Enter nickname or spin..."
+                className="w-full px-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 font-extrabold text-sm text-slate-900 dark:text-white focus:border-[#46178f] focus:outline-none"
+              />
+            </div>
+
+            {/* Kahoot! Shape Team Badge Color Picker */}
+            <div className="space-y-2">
+              <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Select Your Arena Emblem
+              </label>
+              <div className="grid grid-cols-6 gap-2.5">
+                {AVATAR_COLORS.map((c) => {
+                  const active = selectedColor === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setSelectedColor(c.id);
+                      }}
+                      className={`h-12 rounded-2xl ${c.bg} text-white font-black text-lg flex items-center justify-center transition-all cursor-pointer shadow-md ${
+                        active
+                          ? 'ring-4 ring-offset-2 ring-[#46178f] dark:ring-offset-slate-900 scale-105'
+                          : 'opacity-75 hover:opacity-100'
+                      }`}
+                      title={c.label}
+                    >
+                      {c.shape}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading || roomCodeInput.trim().length < 4}
+              className="w-full py-4 px-6 rounded-2xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-950 font-black text-base shadow-[0_6px_0_#0f172a] dark:shadow-[0_6px_0_#94a3b8] active:translate-y-1 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <span>{isLoading ? 'Entering Arena...' : 'Enter Kahoot! Lobby'}</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </form>
+
+          {/* Right 5 Cols: Open Live Arenas Radar + Kahoot! Features Card */}
+          <div className="lg:col-span-5 space-y-5">
+            {/* Active Live Rooms List */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border-2 border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                    Open Live Arenas ({activeRooms.length})
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    loadActiveRooms();
+                  }}
+                  className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isRefreshingRooms ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+              </div>
+
+              {activeRooms.length === 0 ? (
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-dashed border-slate-200 dark:border-slate-700 text-center space-y-3">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    No public PIN lobbies waiting right now. Start an instant Kahoot! match with AI Challengers or host a room!
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateRoom(undefined, true)}
+                    className="w-full py-3 px-4 rounded-xl bg-[#46178f] hover:bg-[#35116d] text-white text-xs font-black shadow-md cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                    <span>Launch Quick Battle vs AI Squad</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                  {activeRooms.map((room) => (
+                    <div
+                      key={room.roomCode}
+                      className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 hover:border-purple-400 transition-all"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-lg bg-[#46178f] text-white font-mono font-black text-xs">
+                            PIN: {room.roomCode}
+                          </span>
+                          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                            • {room.participantCount} Players
+                          </span>
+                        </div>
+                        <p className="text-xs font-extrabold text-slate-800 dark:text-slate-200 truncate mt-1">
+                          {room.quizTitle}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRoomCodeInput(room.roomCode);
+                          handleJoinRoom(undefined, room.roomCode);
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-[#26890c] hover:bg-[#1f7009] text-white text-xs font-black shrink-0 cursor-pointer shadow-xs"
+                      >
+                        Join →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Kahoot! Arena Rules & Power-Ups Guide */}
+            <div className="bg-gradient-to-br from-[#46178f]/10 via-indigo-500/5 to-amber-500/10 rounded-3xl p-6 border border-purple-200/80 dark:border-purple-800/50 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <Trophy className="w-5 h-5 text-amber-500" />
+                <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                  What&apos;s New in Kahoot! Live Battle
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 text-xs">
+                <div className="p-3 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/70 dark:border-slate-800">
+                  <div className="font-black text-[#e21b3c] flex items-center gap-1">
+                    <span>▲ ◆ ● ■</span>
+                    <span>Shape Pad</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    3D tactile color tiles with keys 1-4
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/70 dark:border-slate-800">
+                  <div className="font-black text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <span>⚡ 2x &amp; 50/50</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Strategic in-round power-ups
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/70 dark:border-slate-800">
+                  <div className="font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>Groove Synth</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Live lobby &amp; countdown music
+                  </p>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/70 dark:border-slate-800">
+                  <div className="font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span>🏆 3-2-1 Podium</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Bar-chart reveals &amp; spotlight finale
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       ) : (
-        /* HOST LIVE BATTLE PANEL */
-        <div className="max-w-2xl mx-auto rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                Configure Live Quiz Room
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Select a quiz topic and launch a real-time room for classmates or solo competitive play.
-              </p>
+        /* ================= HOST KAHOOT! ROOM CONFIGURATION ================= */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Quiz Selector (7 cols) */}
+          <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 border-2 border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Layers className="w-5 h-5 text-[#46178f] dark:text-purple-400" />
+                <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                  1. Choose Kahoot! Question Deck
+                </h2>
+              </div>
+              <span className="text-xs font-bold text-slate-400">
+                {allQuizzes.length} Decks Ready
+              </span>
             </div>
-            <button
-              type="button"
-              onClick={() => setActiveTab('join')}
-              className="self-start sm:self-auto px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer shrink-0"
-            >
-              Have a PIN? Join Room →
-            </button>
-          </div>
 
-          {hostError && (
-            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{hostError}</span>
-            </div>
-          )}
-
-          {/* Select Assessment Track */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-              1. Choose Quiz Track
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
-              {allHostableQuizzes.map((item) => {
-                const isSelected = selectedQuizId === item.id;
+            <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+              {allQuizzes.map((quiz, idx) => {
+                const isSelected = selectedQuizIndex === idx;
                 return (
                   <button
-                    key={item.id}
+                    key={`${quiz.quiz_title}_${idx}`}
                     type="button"
                     onClick={() => {
-                      setSelectedQuizId(item.id);
-                      soundFx.playClick();
+                      soundFx.playPop();
+                      setSelectedQuizIndex(idx);
                     }}
-                    className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                    className={`w-full text-left p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-4 ${
                       isSelected
-                        ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 ring-2 ring-indigo-500/20'
-                        : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-950/50'
+                        ? 'border-[#46178f] bg-purple-50/70 dark:bg-purple-950/40 shadow-sm'
+                        : 'border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40'
                     }`}
                   >
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400">
-                        {item.category}
-                      </span>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1 mt-0.5">
-                        {item.title}
-                      </h4>
-                    </div>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-800/50 text-xs">
-                      <span className="text-slate-500 dark:text-slate-400 font-medium">
-                        {item.questionCount} Questions
-                      </span>
-                      {isSelected && (
-                        <span className="inline-flex items-center gap-1 font-bold text-indigo-600 dark:text-indigo-400">
-                          <Check className="w-3.5 h-3.5" /> Selected
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-sm text-slate-900 dark:text-white truncate">
+                          {quiz.quiz_title}
                         </span>
-                      )}
+                        {idx === 0 && availableQuizzes.length > 0 && (
+                          <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-md bg-[#46178f] text-white">
+                            Active Studio Quiz
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
+                        {quiz.summary}
+                      </p>
+                      <div className="flex items-center gap-2 pt-1 text-[11px] font-bold text-slate-400">
+                        <span>{quiz.questions?.length || 5} Questions</span>
+                        <span>•</span>
+                        <span>{quiz.difficulty || 'Intermediate'}</span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                        isSelected
+                          ? 'bg-[#46178f] text-white'
+                          : 'border-2 border-slate-300 dark:border-slate-600'
+                      }`}
+                    >
+                      {isSelected && <CheckCircle2 className="w-4 h-4" />}
                     </div>
                   </button>
                 );
@@ -531,116 +626,108 @@ export const LiveSessionHub: React.FC<LiveSessionHubProps> = ({
             </div>
           </div>
 
-          {/* Room Settings */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-4">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              2. Timing & Rules
-            </label>
+          {/* Game Rules & Launch Button (5 cols) */}
+          <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-7 border-2 border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-6">
+            <div className="space-y-5">
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="w-5 h-5 text-amber-500" />
+                <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                  2. Arena Rules &amp; Modifiers
+                </h2>
+              </div>
 
-            {/* Time per question */}
-            <div>
-              <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Time Limit per Question
-              </span>
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { label: '10 sec', val: 10 },
-                  { label: '15 sec', val: 15 },
-                  { label: '20 sec', val: 20 },
-                  { label: '30 sec', val: 30 },
-                ].map((t) => (
-                  <button
-                    key={t.val}
-                    type="button"
-                    onClick={() => setTimePerQuestion(t.val)}
-                    className={`py-2 px-3 rounded-xl font-bold text-xs border transition-all cursor-pointer ${
-                      timePerQuestion === t.val
-                        ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
-                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+              {/* Time Per Question */}
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Countdown Timer per Question</span>
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[10, 15, 20, 30].map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setTimePerQuestion(sec);
+                      }}
+                      className={`py-2.5 rounded-xl text-xs font-black border-2 transition-all cursor-pointer ${
+                        timePerQuestion === sec
+                          ? 'bg-[#46178f] text-white border-[#46178f] shadow-md'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {sec}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Answer Streak Bonus Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-3">
+                  <Flame className="w-5 h-5 text-orange-500 shrink-0" />
+                  <div>
+                    <div className="text-xs font-black text-slate-900 dark:text-white">
+                      Kahoot! Answer Streak Fire
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Awards +100 to +500 bonus points for consecutive correct answers
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playPop();
+                    setStreakBonuses(!streakBonuses);
+                  }}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                    streakBonuses ? 'bg-[#26890c] justify-end' : 'bg-slate-300 dark:bg-slate-600 justify-start'
+                  }`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md" />
+                </button>
+              </div>
+
+              {/* AI Classmates Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60">
+                <div className="flex items-center gap-3">
+                  <Users className="w-5 h-5 text-[#46178f] dark:text-purple-400 shrink-0" />
+                  <div>
+                    <div className="text-xs font-black text-slate-900 dark:text-white">
+                      Include AI Challenger Squad
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Populates the lobby with competitive AI scholars so you can play immediately
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playPop();
+                    setIncludeAiClassmates(!includeAiClassmates);
+                  }}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                    includeAiClassmates ? 'bg-[#46178f] justify-end' : 'bg-slate-300 dark:bg-slate-600 justify-start'
+                  }`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md" />
+                </button>
               </div>
             </div>
 
-            {/* Toggles */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-              <label className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeAiClassmates}
-                  onChange={(e) => setIncludeAiClassmates(e.target.checked)}
-                  className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-                />
-                <div>
-                  <span className="flex items-center gap-1 text-xs font-bold text-slate-800 dark:text-slate-200">
-                    <Bot className="w-3.5 h-3.5 text-indigo-500" />
-                    AI Challengers
-                  </span>
-                  <span className="block text-[11px] text-slate-500 dark:text-slate-400">
-                    Include 3 active AI classmates
-                  </span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={streakBonuses}
-                  onChange={(e) => setStreakBonuses(e.target.checked)}
-                  className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-                />
-                <div>
-                  <span className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                    Streak Bonuses
-                  </span>
-                  <span className="block text-[11px] text-slate-500 dark:text-slate-400">
-                    Extra XP for answer streaks
-                  </span>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showLeaderboard}
-                  onChange={(e) => setShowLeaderboard(e.target.checked)}
-                  className="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-                />
-                <div>
-                  <span className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                    Live Standings
-                  </span>
-                  <span className="block text-[11px] text-slate-500 dark:text-slate-400">
-                    Podium after each question
-                  </span>
-                </div>
-              </label>
-            </div>
+            <button
+              type="button"
+              onClick={() => handleCreateRoom()}
+              disabled={isLoading}
+              className="w-full py-4 px-6 rounded-2xl bg-[#26890c] hover:bg-[#1f7009] text-white font-black text-base shadow-[0_6px_0_#154d06] active:translate-y-1 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <Play className="w-5 h-5 fill-current" />
+              <span>{isLoading ? 'Creating Kahoot! Lobby...' : 'Create Game PIN & Open Lobby'}</span>
+            </button>
           </div>
-
-          {/* Launch Room Button */}
-          <button
-            type="button"
-            id="launch-live-room-btn"
-            onClick={() => handleHost()}
-            disabled={isHosting}
-            className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-base shadow-xl shadow-indigo-600/25 hover:shadow-indigo-600/35 transition-all active:scale-98 cursor-pointer disabled:opacity-50"
-          >
-            {isHosting ? (
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Launching Live Battle Room...</span>
-              </div>
-            ) : (
-              <>
-                <Radio className="w-5 h-5 text-amber-300" />
-                <span>Create & Enter Live Battle Room</span>
-              </>
-            )}
-          </button>
         </div>
       )}
     </div>

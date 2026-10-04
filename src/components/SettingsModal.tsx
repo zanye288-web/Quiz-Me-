@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Sun, Moon, Monitor, Sliders, Volume2, VolumeX, ShieldCheck, Check, Clock, Sparkles, Zap, Timer, Flame, Headphones, ChevronRight, Save, Music } from 'lucide-react';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme, ANIMATION_STYLE_CATALOG } from '../context/ThemeContext';
 import { AssessmentConfig } from '../types/quiz';
 import { soundFx, SOUND_PROFILES, SoundProfileType } from '../utils/audio';
 import { VoiceSettingsModal } from './VoiceSettingsModal';
@@ -30,7 +30,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateAssessmentConfig,
   onOpenFullSettings,
 }) => {
-  const { theme, setTheme, toggleTheme } = useTheme();
+  const { theme, setTheme, animationStyle, setAnimationStyle } = useTheme();
   const [showVoiceSettings, setShowVoiceSettings] = useState<boolean>(false);
   const [savedNotice, setSavedNotice] = useState<boolean>(false);
   const {
@@ -234,6 +234,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
+          {/* Animation Physics Quick Switcher */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Animation Physics
+              </label>
+              <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 capitalize">
+                {animationStyle}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {ANIMATION_STYLE_CATALOG.map((anim) => {
+                const isSelected = animationStyle === anim.id;
+                return (
+                  <button
+                    key={anim.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playPop();
+                      setAnimationStyle(anim.id);
+                    }}
+                    className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 font-black ring-2 ring-indigo-500/20'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
+                    title={anim.tagline}
+                  >
+                    <span className="text-base">{anim.icon}</span>
+                    <span className="text-[10px] font-bold capitalize">{anim.id}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Mascot Companion Character & Aura Switcher */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -369,6 +405,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
                 )}
+
+                {/* Minimal Gamified Background Music (Removable in Settings) */}
+                <div className="pt-3 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-2 rounded-xl bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-2xs shrink-0">
+                        <Music className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          Minimal Gamified Background Music
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          Gentle Kahoot! & study groove (can be removed anytime)
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !soundFx.bgMusicEnabled;
+                        soundFx.setBgMusicEnabled(next);
+                        if (next) {
+                          soundFx.startBgMusic();
+                        } else {
+                          soundFx.stopBgMusic();
+                        }
+                        soundFx.playClick();
+                      }}
+                      className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
+                        soundFx.bgMusicEnabled
+                          ? 'bg-emerald-600 justify-end'
+                          : 'bg-slate-300 dark:bg-slate-600 justify-start'
+                      }`}
+                      title={
+                        soundFx.bgMusicEnabled
+                          ? 'Remove / Disable Background Music'
+                          : 'Enable Minimal Gamified Background Music'
+                      }
+                    >
+                      <div className="bg-white w-4 h-4 rounded-full shadow-md transition-transform" />
+                    </button>
+                  </div>
+
+                  {soundFx.bgMusicEnabled && (
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.toggleBgMusic();
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-extrabold cursor-pointer transition-colors"
+                      >
+                        {soundFx.isBgMusicPlaying ? 'Pause Background Music' : 'Play Minimal Groove Now'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.setBgMusicEnabled(false);
+                          soundFx.stopBgMusic();
+                          soundFx.playClick();
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 text-[11px] font-bold hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                      >
+                        Remove Music
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
             {/* Voice & TTS Narration Configuration Button */}

@@ -1300,6 +1300,556 @@ class SoundEngine {
       this.isFocusHumming = false;
     }
   }
+
+  // ==========================================
+  // 16. KAHOOT! ARENA GROOVE MUSIC & SFX ENGINE
+  // ==========================================
+  private kahootInterval: ReturnType<typeof setInterval> | null = null;
+  public isKahootMusicPlaying: boolean = false;
+  public kahootMusicMode: 'lobby' | 'question' | 'podium' = 'lobby';
+  private kahootStep: number = 0;
+
+  public startKahootMusic(mode: 'lobby' | 'question' | 'podium' = 'lobby') {
+    this.kahootMusicMode = mode;
+    if (!this.enabled) return;
+    if (this.kahootInterval) {
+      clearInterval(this.kahootInterval);
+      this.kahootInterval = null;
+    }
+    this.isKahootMusicPlaying = true;
+    this.kahootStep = 0;
+
+    // Lobby groove: 240ms per 8th note (~125 BPM); Question tension: 200ms (~150 BPM)
+    const stepMs = mode === 'question' ? 200 : mode === 'podium' ? 260 : 240;
+
+    // Catchy pentatonic / funk marimba patterns inspired by Kahoot! lobby & countdown grooves
+    const lobbyBass = [220, 0, 220, 261.63, 293.66, 0, 329.63, 261.63]; // A3, C4, D4, E4
+    const lobbyLead = [440, 523.25, 659.25, 587.33, 440, 659.25, 587.33, 523.25];
+    const questionPulse = [293.66, 293.66, 349.23, 293.66, 440, 392, 349.23, 329.63];
+    const podiumChords = [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25, 880, 1046.5];
+
+    this.kahootInterval = setInterval(() => {
+      if (!this.enabled || !this.isKahootMusicPlaying) return;
+      const ctx = this.getContext();
+      const dest = this.getMasterOutput();
+      if (!ctx || !dest) return;
+
+      try {
+        const now = ctx.currentTime;
+        const idx = this.kahootStep % 8;
+        this.kahootStep += 1;
+
+        if (this.kahootMusicMode === 'lobby') {
+          const bassFreq = lobbyBass[idx];
+          if (bassFreq > 0) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(bassFreq, now);
+            gain.gain.setValueAtTime(0.055, now);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+            osc.connect(gain);
+            gain.connect(dest);
+            osc.start(now);
+            osc.stop(now + 0.19);
+          }
+
+          if (idx % 2 === 0 || idx === 7) {
+            const leadFreq = lobbyLead[idx];
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(leadFreq, now);
+            gain2.gain.setValueAtTime(0.04, now);
+            gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+            osc2.connect(gain2);
+            gain2.connect(dest);
+            osc2.start(now);
+            osc2.stop(now + 0.15);
+          }
+        } else if (this.kahootMusicMode === 'question') {
+          const freq = questionPulse[idx];
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = idx % 2 === 0 ? 'triangle' : 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(idx % 2 === 0 ? 0.05 : 0.03, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(now);
+          osc.stop(now + 0.14);
+        } else {
+          const freq = podiumChords[idx];
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          gain.gain.setValueAtTime(0.045, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(now);
+          osc.stop(now + 0.23);
+        }
+      } catch {
+        // ignore audio errors
+      }
+    }, stepMs);
+  }
+
+  public stopKahootMusic() {
+    this.isKahootMusicPlaying = false;
+    if (this.kahootInterval) {
+      clearInterval(this.kahootInterval);
+      this.kahootInterval = null;
+    }
+  }
+
+  public toggleKahootMusic(mode: 'lobby' | 'question' | 'podium' = 'lobby'): boolean {
+    if (this.isKahootMusicPlaying) {
+      this.stopKahootMusic();
+      return false;
+    } else {
+      this.startKahootMusic(mode);
+      return true;
+    }
+  }
+
+  public playKahootGong() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+    try {
+      const now = ctx.currentTime;
+      const freqs = [196, 392, 587.33, 783.99];
+      freqs.forEach((f) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, now);
+        osc.frequency.exponentialRampToValueAtTime(f * 0.98, now + 0.9);
+        gain.gain.setValueAtTime(0.09, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(now);
+        osc.stop(now + 1.0);
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  public playKahootPowerUp() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+    try {
+      const now = ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+      notes.forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + idx * 0.045;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + 0.2);
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  public playKahootDrumroll() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+    try {
+      const now = ctx.currentTime;
+      for (let i = 0; i < 14; i++) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + i * 0.055;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140 + (i % 2) * 18 + i * 4, t);
+        gain.gain.setValueAtTime(0.04 + (i / 14) * 0.06, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + 0.055);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  public playKahootStreakFire() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+    try {
+      const now = ctx.currentTime;
+      const notes = [440, 554.37, 659.25, 880, 1108.73];
+      notes.forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + idx * 0.05;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.1, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + 0.24);
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  // ==========================================
+  // 17. MINIMAL GAMIFIED BACKGROUND MUSIC & FRESH MUSIC STUDIO ENGINE
+  // ==========================================
+  private bgMusicInterval: ReturnType<typeof setInterval> | null = null;
+  public bgMusicEnabled: boolean = (() => {
+    try {
+      return localStorage.getItem('quizme_bg_music_enabled_v1') !== 'false';
+    } catch {
+      return true;
+    }
+  })();
+  public isBgMusicPlaying: boolean = false;
+  public bgMusicTrack: BgMusicTrackId = (() => {
+    try {
+      const saved = localStorage.getItem('quizme_bg_music_track_v1') as BgMusicTrackId;
+      return saved || 'kahoot_minimal';
+    } catch {
+      return 'kahoot_minimal';
+    }
+  })();
+  public bgMusicVolume: number = (() => {
+    try {
+      const saved = parseFloat(localStorage.getItem('quizme_bg_music_vol_v1') || '0.35');
+      return isNaN(saved) ? 0.35 : Math.max(0.05, Math.min(1, saved));
+    } catch {
+      return 0.35;
+    }
+  })();
+  public bgMusicBpm: number = 108;
+  public bgMusicTimbre: BgMusicTimbre = 'marimba';
+  private bgMusicStep: number = 0;
+  private bgMusicListeners: Set<() => void> = new Set();
+
+  public subscribeBgMusic(cb: () => void): () => void {
+    this.bgMusicListeners.add(cb);
+    return () => {
+      this.bgMusicListeners.delete(cb);
+    };
+  }
+
+  private notifyBgMusicListeners() {
+    this.bgMusicListeners.forEach((cb) => {
+      try {
+        cb();
+      } catch {
+        // ignore
+      }
+    });
+  }
+
+  public setBgMusicEnabled(enabled: boolean) {
+    this.bgMusicEnabled = enabled;
+    try {
+      localStorage.setItem('quizme_bg_music_enabled_v1', String(enabled));
+    } catch {
+      // ignore
+    }
+    if (!enabled) {
+      this.stopBgMusic();
+    }
+    this.notifyBgMusicListeners();
+  }
+
+  public setBgMusicTrack(track: BgMusicTrackId, autoStart = true) {
+    this.bgMusicTrack = track;
+    const trackMeta = BG_MUSIC_TRACKS.find((t) => t.id === track);
+    if (trackMeta) {
+      this.bgMusicBpm = trackMeta.defaultBpm;
+    }
+    try {
+      localStorage.setItem('quizme_bg_music_track_v1', track);
+    } catch {
+      // ignore
+    }
+    if (this.isBgMusicPlaying || (autoStart && this.bgMusicEnabled)) {
+      this.startBgMusic(track);
+    } else {
+      this.notifyBgMusicListeners();
+    }
+  }
+
+  public setBgMusicVolume(vol: number) {
+    this.bgMusicVolume = Math.max(0.05, Math.min(1, vol));
+    try {
+      localStorage.setItem('quizme_bg_music_vol_v1', String(this.bgMusicVolume));
+    } catch {
+      // ignore
+    }
+    this.notifyBgMusicListeners();
+  }
+
+  public setBgMusicBpm(bpm: number) {
+    this.bgMusicBpm = Math.max(70, Math.min(160, bpm));
+    if (this.isBgMusicPlaying) {
+      this.startBgMusic(this.bgMusicTrack);
+    } else {
+      this.notifyBgMusicListeners();
+    }
+  }
+
+  public setBgMusicTimbre(timbre: BgMusicTimbre) {
+    this.bgMusicTimbre = timbre;
+    this.notifyBgMusicListeners();
+  }
+
+  public startBgMusic(trackOverride?: BgMusicTrackId) {
+    if (trackOverride) {
+      this.bgMusicTrack = trackOverride;
+    }
+    if (!this.enabled || !this.bgMusicEnabled) {
+      this.notifyBgMusicListeners();
+      return;
+    }
+    if (this.bgMusicInterval) {
+      clearInterval(this.bgMusicInterval);
+      this.bgMusicInterval = null;
+    }
+    this.isBgMusicPlaying = true;
+    this.bgMusicStep = 0;
+
+    // Step duration based on BPM (8th-note steps)
+    const stepMs = Math.round((60 / (this.bgMusicBpm || 108) / 2) * 1000);
+
+    // Minimal, warm, gamified note patterns (Hz)
+    const patterns: Record<BgMusicTrackId, { bass: number[]; melody: number[]; pad: number[] }> = {
+      kahoot_minimal: {
+        bass: [220, 0, 220, 261.63, 293.66, 0, 329.63, 261.63],
+        melody: [440, 0, 523.25, 659.25, 587.33, 0, 523.25, 440],
+        pad: [220, 261.63, 329.63],
+      },
+      crystal_arcade: {
+        bass: [261.63, 0, 329.63, 0, 392.0, 0, 329.63, 0],
+        melody: [523.25, 659.25, 783.99, 659.25, 880.0, 783.99, 659.25, 587.33],
+        pad: [261.63, 329.63, 392.0],
+      },
+      lofi_scholar: {
+        bass: [174.61, 0, 0, 196.0, 220.0, 0, 196.0, 0],
+        melody: [349.23, 440.0, 523.25, 0, 392.0, 493.88, 587.33, 0],
+        pad: [174.61, 220.0, 261.63],
+      },
+      neon_horizon: {
+        bass: [146.83, 146.83, 0, 174.61, 196.0, 0, 174.61, 164.81],
+        melody: [293.66, 349.23, 440.0, 587.33, 523.25, 440.0, 349.23, 329.63],
+        pad: [146.83, 220.0, 293.66],
+      },
+      kyoto_zen: {
+        bass: [196.0, 0, 0, 0, 220.0, 0, 0, 0],
+        melody: [392.0, 440.0, 523.25, 0, 587.33, 523.25, 440.0, 0],
+        pad: [196.0, 293.66, 392.0],
+      },
+      podium_funk: {
+        bass: [261.63, 261.63, 329.63, 392.0, 440.0, 392.0, 329.63, 293.66],
+        melody: [523.25, 0, 659.25, 783.99, 880.0, 783.99, 659.25, 523.25],
+        pad: [261.63, 329.63, 392.0],
+      },
+    };
+
+    this.bgMusicInterval = setInterval(() => {
+      if (!this.enabled || !this.bgMusicEnabled || !this.isBgMusicPlaying) return;
+      const ctx = this.getContext();
+      const dest = this.getMasterOutput();
+      if (!ctx || !dest) return;
+
+      try {
+        const now = ctx.currentTime;
+        const pat = patterns[this.bgMusicTrack] || patterns.kahoot_minimal;
+        const idx = this.bgMusicStep % 8;
+        this.bgMusicStep += 1;
+
+        // Keep gain very minimal and soothing (scaled by bgMusicVolume)
+        const baseGain = 0.032 * this.bgMusicVolume;
+
+        // Soft bass pluck
+        const bFreq = pat.bass[idx];
+        if (bFreq > 0) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(bFreq, now);
+          gain.gain.setValueAtTime(baseGain * 1.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+          osc.connect(gain);
+          gain.connect(dest);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        }
+
+        // Minimal melodic pluck
+        const mFreq = pat.melody[idx];
+        if (mFreq > 0) {
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type =
+            this.bgMusicTimbre === 'crystal'
+              ? 'sine'
+              : this.bgMusicTimbre === 'retro'
+              ? 'square'
+              : 'triangle';
+          osc2.frequency.setValueAtTime(mFreq, now);
+          const noteVol = this.bgMusicTimbre === 'retro' ? baseGain * 0.45 : baseGain * 0.85;
+          gain2.gain.setValueAtTime(noteVol, now);
+          gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.21);
+          osc2.connect(gain2);
+          gain2.connect(dest);
+          osc2.start(now);
+          osc2.stop(now + 0.22);
+        }
+
+        // Warm minimal chord pad on beat 0
+        if (idx === 0 && pat.pad) {
+          pat.pad.forEach((pFreq) => {
+            const padOsc = ctx.createOscillator();
+            const padGain = ctx.createGain();
+            padOsc.type = 'sine';
+            padOsc.frequency.setValueAtTime(pFreq, now);
+            padGain.gain.setValueAtTime(0.0001, now);
+            padGain.gain.linearRampToValueAtTime(baseGain * 0.35, now + 0.3);
+            padGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
+            padOsc.connect(padGain);
+            padGain.connect(dest);
+            padOsc.start(now);
+            padOsc.stop(now + 1.45);
+          });
+        }
+      } catch {
+        // ignore audio errors
+      }
+    }, stepMs);
+
+    this.notifyBgMusicListeners();
+  }
+
+  public stopBgMusic() {
+    this.isBgMusicPlaying = false;
+    if (this.bgMusicInterval) {
+      clearInterval(this.bgMusicInterval);
+      this.bgMusicInterval = null;
+    }
+    this.notifyBgMusicListeners();
+  }
+
+  public toggleBgMusic(): boolean {
+    if (this.isBgMusicPlaying) {
+      this.stopBgMusic();
+      return false;
+    } else {
+      if (!this.bgMusicEnabled) {
+        this.setBgMusicEnabled(true);
+      }
+      this.startBgMusic();
+      return true;
+    }
+  }
 }
 
+export type BgMusicTrackId =
+  | 'kahoot_minimal'
+  | 'crystal_arcade'
+  | 'lofi_scholar'
+  | 'neon_horizon'
+  | 'kyoto_zen'
+  | 'podium_funk';
+
+export type BgMusicTimbre = 'marimba' | 'crystal' | 'rhodes' | 'retro';
+
+export interface BgMusicTrackMeta {
+  id: BgMusicTrackId;
+  title: string;
+  subtitle: string;
+  vibe: string;
+  defaultBpm: number;
+  accentColor: string;
+  badge: string;
+}
+
+export const BG_MUSIC_TRACKS: BgMusicTrackMeta[] = [
+  {
+    id: 'kahoot_minimal',
+    title: 'Kahoot! Study Groove (Minimal)',
+    subtitle: 'Gentle pentatonic marimba & warm bass pulse inspired by Kahoot! lobbies',
+    vibe: 'Playful & Focused',
+    defaultBpm: 112,
+    accentColor: 'from-indigo-600 to-purple-600',
+    badge: 'Signature Groove',
+  },
+  {
+    id: 'crystal_arcade',
+    title: 'Crystal XP Kalimba',
+    subtitle: 'Delicate celesta & kalimba arpeggios for calm, gamified problem solving',
+    vibe: 'Sparkling & Calm',
+    defaultBpm: 104,
+    accentColor: 'from-cyan-500 to-blue-600',
+    badge: 'Minimal RPG',
+  },
+  {
+    id: 'lofi_scholar',
+    title: 'Lo-Fi Scholar Lounge',
+    subtitle: 'Warm Rhodes chords and mellow study beats for deep reading & flashcards',
+    vibe: 'Cozy & Warm',
+    defaultBpm: 92,
+    accentColor: 'from-amber-500 to-orange-600',
+    badge: 'Chill Beats',
+  },
+  {
+    id: 'neon_horizon',
+    title: 'Synthwave Focus Pulse',
+    subtitle: 'Smooth analog synth bassline with atmospheric horizon arpeggios',
+    vibe: 'Deep Flow State',
+    defaultBpm: 118,
+    accentColor: 'from-fuchsia-600 to-pink-600',
+    badge: 'Cyber Flow',
+  },
+  {
+    id: 'kyoto_zen',
+    title: 'Kyoto Bamboo Sanctuary',
+    subtitle: 'Ultra-minimal harmonic chimes and tranquil breathing space',
+    vibe: 'Zen & Minimal',
+    defaultBpm: 84,
+    accentColor: 'from-emerald-500 to-teal-600',
+    badge: 'Ultra Minimal',
+  },
+  {
+    id: 'podium_funk',
+    title: 'Showdown Championship Vibe',
+    subtitle: 'Upbeat game-show rhythm to energize rapid-fire trivia sprints',
+    vibe: 'High Energy',
+    defaultBpm: 128,
+    accentColor: 'from-rose-500 to-amber-500',
+    badge: 'Arena Funk',
+  },
+];
+
 export const soundFx = new SoundEngine();
+

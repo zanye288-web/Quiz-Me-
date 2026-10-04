@@ -22,6 +22,11 @@ import {
   MessageSquarePlus,
   Layers,
   Check,
+  ShieldCheck,
+  Mail,
+  AlertTriangle,
+  Lock,
+  Clock,
 } from 'lucide-react';
 import { PersonaType, QuizResponse, UserStats } from '../types/quiz';
 import { QuizHistoryRecord } from './HistoryView';
@@ -178,7 +183,7 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
   const { fontFamily, setFontFamily, currentAccentConfig } = useTheme();
   const { user, userProfile } = useAuth();
 
-  const [activeSubTab, setActiveSubTab] = useState<'study_picks' | 'feature_board' | 'qol_lab'>('study_picks');
+  const [activeSubTab, setActiveSubTab] = useState<'study_picks' | 'feature_board' | 'qol_lab'>('feature_board');
 
   // Feature Suggestions Board State
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>(() => {
@@ -213,11 +218,56 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
 
-  // New Suggestion Form State
+  // New Suggestion Form State & 5-Layer Anti-Spam Premeasures (Target: zanye288@gmail.com)
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newCategory, setNewCategory] = useState<SuggestionItem['category']>('Quality of Life');
   const [submitBanner, setSubmitBanner] = useState<string | null>(null);
+  const [spamError, setSpamError] = useState<string | null>(null);
+  const [isSendingEmail, setIsSendingEmail] = useState<boolean>(false);
+
+  // Anti-Spam Layer 1: Hidden Honeypot Trap
+  const [honeypotValue, setHoneypotValue] = useState<string>('');
+  // Anti-Spam Layer 2: Form Dwell Timestamp
+  const [formOpenedAt, setFormOpenedAt] = useState<number>(() => Date.now());
+  // Anti-Spam Layer 3: Dynamic Math/Shape Human Challenge
+  const [challengeA, setChallengeA] = useState<number>(() => Math.floor(Math.random() * 6) + 2);
+  const [challengeB, setChallengeB] = useState<number>(() => Math.floor(Math.random() * 5) + 2);
+  const [challengeInput, setChallengeInput] = useState<string>('');
+  // Anti-Spam Layer 4: Cooldown Timer (45 seconds between email dispatches)
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(() => {
+    try {
+      const last = Number(localStorage.getItem('quizme_suggestion_last_email_ts') || '0');
+      const diff = Math.ceil((last + 45_000 - Date.now()) / 1000);
+      return diff > 0 ? diff : 0;
+    } catch {
+      return 0;
+    }
+  });
+  // Email Dispatch Receipt to zanye288@gmail.com
+  const [lastEmailReceipt, setLastEmailReceipt] = useState<{
+    ticketId: string;
+    recipient: string;
+    title: string;
+    category: string;
+    dispatchedAt: string;
+    mailtoUrl: string;
+    gmailUrl: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const t = setInterval(() => {
+      setCooldownSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [cooldownSeconds]);
+
+  const regenerateChallenge = () => {
+    setChallengeA(Math.floor(Math.random() * 7) + 2);
+    setChallengeB(Math.floor(Math.random() * 6) + 2);
+    setChallengeInput('');
+  };
 
   // AI Study Suggestions State
   const [aiStudyPicks, setAiStudyPicks] = useState<SuggestedStudyTopic[]>([]);
@@ -334,36 +384,158 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
     );
   };
 
-  const handleSubmitSuggestion = (e: React.FormEvent) => {
+  const handleSubmitSuggestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    setSpamError(null);
 
-    soundFx.playCorrect();
-    const authorName = userProfile?.displayName || user?.displayName || `${persona} Scholar`;
-    const newItem: SuggestionItem = {
-      id: `sug_custom_${Date.now()}`,
-      title: newTitle.trim(),
-      description:
-        newDescription.trim() ||
-        'Submitted via the Quiz Me! Suggestions Hub to enhance the learning experience.',
-      category: newCategory,
-      status: 'Community Idea',
-      upvotes: 1,
-      author: authorName,
-      createdAt: 'Just now',
-    };
+    const trimmedTitle = newTitle.trim();
+    const trimmedDesc = newDescription.trim();
 
-    setSuggestions((prev) => [newItem, ...prev]);
-    setUpvotedIds((prev) => [...prev, newItem.id]);
-    setNewTitle('');
-    setNewDescription('');
-
-    if (onRewardXp) {
-      onRewardXp(15, 5);
+    // Anti-Spam Premeasure 1: Honeypot check
+    if (honeypotValue.trim().length > 0) {
+      setSpamError('Spam Premeasure Triggered: Automated bot submission blocked.');
+      soundFx.playWrong();
+      return;
     }
 
-    setSubmitBanner('Suggestion posted! You earned +15 XP & +5 Gems for contributing!');
-    setTimeout(() => setSubmitBanner(null), 4000);
+    // Anti-Spam Premeasure 2: Cooldown timer check
+    if (cooldownSeconds > 0) {
+      setSpamError(`Anti-Spam Cooldown: Please wait ${cooldownSeconds}s before emailing another suggestion to zanye288@gmail.com.`);
+      soundFx.playWrong();
+      return;
+    }
+
+    // Anti-Spam Premeasure 3: Minimum title & detail length + gibberish/link check
+    if (trimmedTitle.length < 5) {
+      setSpamError('Please enter a descriptive title of at least 5 characters.');
+      soundFx.playWrong();
+      return;
+    }
+    if (trimmedDesc.length < 12) {
+      setSpamError('Please provide at least 12 characters of detail so your email to zanye288@gmail.com is helpful.');
+      soundFx.playWrong();
+      return;
+    }
+    if (/(.)\1{6,}/i.test(trimmedTitle) || /(.)\1{8,}/i.test(trimmedDesc)) {
+      setSpamError('Spam Premeasure Triggered: Repeated character sequences are blocked.');
+      soundFx.playWrong();
+      return;
+    }
+    if ((trimmedDesc.match(/https?:\/\/|www\./gi) || []).length > 1) {
+      setSpamError('Spam Premeasure Triggered: External link spam is not allowed.');
+      soundFx.playWrong();
+      return;
+    }
+
+    // Anti-Spam Premeasure 4: Human verification challenge
+    const expectedAnswer = String(challengeA + challengeB);
+    if (challengeInput.trim() !== expectedAnswer) {
+      setSpamError(`Human Verification Failed: Please solve ${challengeA} + ${challengeB} correctly.`);
+      soundFx.playWrong();
+      return;
+    }
+
+    // Anti-Spam Premeasure 5: Dwell time check
+    const dwellTimeMs = Date.now() - formOpenedAt;
+    if (dwellTimeMs < 2000) {
+      setSpamError('Spam Premeasure Triggered: Form submitted too quickly. Please review and click send again.');
+      soundFx.playWrong();
+      return;
+    }
+
+    setIsSendingEmail(true);
+    const authorName = userProfile?.displayName || user?.displayName || `${persona} Scholar`;
+    const authorEmail = user?.email || 'scholar@quizme.app';
+
+    try {
+      const res = await fetch('/api/suggestions/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: trimmedTitle,
+          category: newCategory,
+          description: trimmedDesc,
+          authorName,
+          authorEmail,
+          honeypot: honeypotValue,
+          dwellTimeMs,
+          challengeExpected: expectedAnswer,
+          challengeProvided: challengeInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setSpamError(data.error || 'Could not dispatch suggestion email. Please try again.');
+        soundFx.playWrong();
+        setIsSendingEmail(false);
+        return;
+      }
+
+      // Also attempt browser-side FormSubmit AJAX dispatch as secondary delivery path to zanye288@gmail.com
+      fetch('https://formsubmit.co/ajax/zanye288@gmail.com', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          _subject: `[Quiz Me! Suggestion #${data.receipt?.ticketId || 'NEW'}] ${newCategory}: ${trimmedTitle}`,
+          recipient: 'zanye288@gmail.com',
+          category: newCategory,
+          title: trimmedTitle,
+          description: trimmedDesc,
+          submitted_by: `${authorName} (${authorEmail})`,
+          spam_verification: '5/5 Anti-Spam Premeasures Passed',
+        }),
+      }).catch(() => {
+        // Server endpoint already handled primary dispatch
+      });
+
+      soundFx.playCorrect();
+
+      const newItem: SuggestionItem = {
+        id: `sug_custom_${Date.now()}`,
+        title: trimmedTitle,
+        description: trimmedDesc,
+        category: newCategory,
+        status: 'Community Idea',
+        upvotes: 1,
+        author: authorName,
+        createdAt: 'Emailed to zanye288@gmail.com',
+      };
+
+      setSuggestions((prev) => [newItem, ...prev]);
+      setUpvotedIds((prev) => [...prev, newItem.id]);
+      setNewTitle('');
+      setNewDescription('');
+      regenerateChallenge();
+      setFormOpenedAt(Date.now());
+
+      const nowTs = Date.now();
+      try {
+        localStorage.setItem('quizme_suggestion_last_email_ts', String(nowTs));
+      } catch {
+        // ignore
+      }
+      setCooldownSeconds(45);
+
+      if (data.receipt) {
+        setLastEmailReceipt(data.receipt);
+      }
+
+      if (onRewardXp) {
+        onRewardXp(15, 5);
+      }
+
+      setSubmitBanner(
+        'Suggestion emailed to zanye288@gmail.com & posted to board! (+15 XP & +5 Gems)'
+      );
+      setTimeout(() => setSubmitBanner(null), 5000);
+    } catch {
+      setSpamError('Network error while dispatching email. Please try again.');
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const filteredSuggestions = suggestions
@@ -663,32 +835,84 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
       {/* SUB-TAB 3: COMMUNITY IDEA & FEATURE SUGGESTION BOARD */}
       {activeSubTab === 'feature_board' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Submit a Suggestion Form (4 cols) */}
+          {/* Left Column: Submit Suggestion & Email zanye288@gmail.com Form (5 cols) */}
           <form
             onSubmit={handleSubmitSuggestion}
-            className="lg:col-span-4 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4"
+            className="lg:col-span-5 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4"
           >
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-indigo-500" />
-                <span>Submit a Suggestion</span>
-              </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                +15 XP Bonus
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-indigo-500 shrink-0" />
+                  <span>Email a Suggestion</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Directly dispatches your verified idea to{' '}
+                  <strong className="text-indigo-600 dark:text-indigo-400 font-mono">
+                    zanye288@gmail.com
+                  </strong>
+                </p>
+              </div>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                +15 XP & +5 Gems
               </span>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
-                Idea or Topic Title
+            {/* 5-Layer Anti-Spam Premeasures Shield Status */}
+            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>5-Layer Anti-Spam Shield Active</span>
+                </span>
+                <span className="font-mono text-[10px]">
+                  {cooldownSeconds > 0 ? `Cooldown: ${cooldownSeconds}s` : 'Ready'}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Protected by Honeypot Bot Trap · 45s Rate-Limit Cooldown · Link/Gibberish Filter · Dwell Check · Human Challenge
+              </p>
+            </div>
+
+            {/* Hidden Honeypot Input (Anti-Spam Layer 1 — Invisible to real users) */}
+            <div className="hidden" aria-hidden="true">
+              <label>
+                Leave this field blank:
+                <input
+                  type="text"
+                  name="website_honeypot"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={honeypotValue}
+                  onChange={(e) => setHoneypotValue(e.target.value)}
+                />
               </label>
+            </div>
+
+            {spamError && (
+              <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-bold flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                <span>{spamError}</span>
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                  Idea or Topic Title (min 5 chars)
+                </label>
+                <span className="text-[10px] font-mono text-slate-400">
+                  {newTitle.length}/90
+                </span>
+              </div>
               <input
                 type="text"
                 required
+                minLength={5}
                 maxLength={90}
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="e.g., Add Pomodoro break mini-games"
+                placeholder="e.g., Add Kahoot! Team vs Team Battle Mode"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -703,39 +927,124 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="Quality of Life">Quality of Life (QoL)</option>
-                <option value="Voice & Audio">Voice & Microphone</option>
+                <option value="Voice & Audio">Voice, Music & Audio</option>
                 <option value="Themes & Fonts">Themes & Fonts</option>
                 <option value="Study & AI">Study Tools & AI</option>
                 <option value="Quiz Topic">New Quiz Topic Request</option>
-                <option value="Multiplayer">Live Battles & Multiplayer</option>
+                <option value="Multiplayer">Kahoot! Live Battles & Multiplayer</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
-                Details / How it helps learners
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                  Details for zanye288@gmail.com (min 12 chars)
+                </label>
+                <span className="text-[10px] font-mono text-slate-400">
+                  {newDescription.length}/600
+                </span>
+              </div>
               <textarea
                 rows={3}
-                maxLength={400}
+                required
+                minLength={12}
+                maxLength={600}
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="Describe your feature idea, QoL tweak, or quiz topic..."
+                placeholder="Describe your feature idea, Kahoot! upgrade, or quiz topic in detail..."
                 className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              />
+            </div>
+
+            {/* Anti-Spam Human Verification Challenge */}
+            <div className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-800/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-extrabold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Anti-Spam Verification: What is {challengeA} + {challengeB}?</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    regenerateChallenge();
+                  }}
+                  className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                >
+                  New Challenge
+                </button>
+              </div>
+              <input
+                type="number"
+                required
+                value={challengeInput}
+                onChange={(e) => setChallengeInput(e.target.value)}
+                placeholder={`Enter sum (${challengeA} + ${challengeB})`}
+                className="w-full px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-slate-900 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              disabled={isSendingEmail || cooldownSeconds > 0}
+              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
             >
-              <Send className="w-3.5 h-3.5" />
-              <span>Post Suggestion & Claim +15 XP</span>
+              {isSendingEmail ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Verifying & Emailing zanye288@gmail.com...</span>
+                </>
+              ) : cooldownSeconds > 0 ? (
+                <>
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Anti-Spam Cooldown ({cooldownSeconds}s)</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send Email to zanye288@gmail.com & Post</span>
+                </>
+              )}
             </button>
+
+            {/* Verified Email Dispatch Receipt */}
+            {lastEmailReceipt && (
+              <div className="p-4 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 space-y-2.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-black text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Email Dispatched to {lastEmailReceipt.recipient}</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300">
+                    #{lastEmailReceipt.ticketId}
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-relaxed">
+                  Your suggestion <strong>"{lastEmailReceipt.title}"</strong> passed all 5 anti-spam premeasures and was dispatched to <strong>zanye288@gmail.com</strong>.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <a
+                    href={lastEmailReceipt.gmailUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold inline-flex items-center gap-1.5 transition-colors"
+                  >
+                    <Mail className="w-3 h-3" />
+                    <span>Open Copy in Gmail</span>
+                  </a>
+                  <a
+                    href={lastEmailReceipt.mailtoUrl}
+                    className="px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 text-[11px] font-bold hover:bg-emerald-100/60 transition-colors"
+                  >
+                    Open in Mail App
+                  </a>
+                </div>
+              </div>
+            )}
           </form>
 
-          {/* Right Column: Upvote & Roadmap List (8 cols) */}
-          <div className="lg:col-span-8 space-y-4">
+          {/* Right Column: Upvote & Roadmap List (7 cols) */}
+          <div className="lg:col-span-7 space-y-4">
             {/* Filters */}
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center flex-wrap gap-1.5">

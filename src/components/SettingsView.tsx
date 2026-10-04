@@ -42,7 +42,19 @@ import {
   Music,
   Compass,
 } from 'lucide-react';
-import { useTheme, THEME_PRESETS, ACCENT_PALETTES, FONT_CATALOG, AccentColor, FontFamilyChoice, CardCornerRadius, UiDensity } from '../context/ThemeContext';
+import {
+  useTheme,
+  THEME_PRESETS,
+  ACCENT_PALETTES,
+  FONT_CATALOG,
+  ANIMATION_STYLE_CATALOG,
+  AccentColor,
+  FontFamilyChoice,
+  CardCornerRadius,
+  UiDensity,
+  AnimationStyle,
+  AnimationIntensity,
+} from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { AssessmentConfig, PersonaType, DifficultyType, UserStats } from '../types/quiz';
 import { QuizHistoryRecord } from './HistoryView';
@@ -54,6 +66,8 @@ import {
   CustomSoundSlot,
   CustomSoundConfig,
   AmbientSoundscapeMode,
+  BG_MUSIC_TRACKS,
+  BgMusicTrackId,
 } from '../utils/audio';
 import { speechEngine, SpeechSettings, VOICE_PRESETS, VoicePreset } from '../utils/speech';
 import { UserAvatar } from './UserAvatar';
@@ -113,6 +127,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setHighContrast,
     reducedMotion,
     setReducedMotion,
+    animationStyle,
+    setAnimationStyle,
+    animationIntensity,
+    setAnimationIntensity,
+    buttonBounceEnabled,
+    setButtonBounceEnabled,
+    cardHoverLiftEnabled,
+    setCardHoverLiftEnabled,
     confettiEnabled,
     setConfettiEnabled,
     soundVolume,
@@ -121,10 +143,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setQuestionLayout,
     autoReadQuestions,
     setAutoReadQuestions,
-    spoilerFreeImages,
-    setSpoilerFreeImages,
-    autoNextOnCorrect,
-    setAutoNextOnCorrect,
     currentAccentConfig,
     applyPreset,
     resetAllSettings,
@@ -134,6 +152,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [currentSoundProfile, setCurrentSoundProfile] = useState<SoundProfileType>(() => soundFx.getSoundProfile());
   const [isFocusHummingPreview, setIsFocusHummingPreview] = useState<boolean>(soundFx.isFocusHumming);
   const [ambientMode, setAmbientMode] = useState<AmbientSoundscapeMode>(soundFx.ambientMode);
+  const [bgMusicEnabled, setBgMusicEnabled] = useState<boolean>(soundFx.bgMusicEnabled);
+  const [isBgMusicPlaying, setIsBgMusicPlaying] = useState<boolean>(soundFx.isBgMusicPlaying);
+  const [bgMusicTrack, setBgMusicTrack] = useState<BgMusicTrackId>(soundFx.bgMusicTrack);
+  const [bgMusicVolume, setBgMusicVolume] = useState<number>(soundFx.bgMusicVolume);
+
+  useEffect(() => {
+    const unsub = soundFx.subscribeBgMusic(() => {
+      setBgMusicEnabled(soundFx.bgMusicEnabled);
+      setIsBgMusicPlaying(soundFx.isBgMusicPlaying);
+      setBgMusicTrack(soundFx.bgMusicTrack);
+      setBgMusicVolume(soundFx.bgMusicVolume);
+    });
+    return () => unsub();
+  }, []);
   const [previewMascotMood, setPreviewMascotMood] = useState<MascotMood>('idle');
   const {
     mascotCharacter,
@@ -257,14 +289,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         cardRadius,
         highContrast,
         reducedMotion,
+        animationStyle,
+        animationIntensity,
+        buttonBounceEnabled,
+        cardHoverLiftEnabled,
         confettiEnabled,
         soundVolume,
         soundEnabled,
         soundProfile: currentSoundProfile,
         questionLayout,
         autoReadQuestions,
-        spoilerFreeImages,
-        autoNextOnCorrect,
         mascotCharacter,
         mascotTheme,
         persona,
@@ -314,6 +348,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (snap.cardRadius) setCardRadius(snap.cardRadius);
       if (typeof snap.highContrast === 'boolean') setHighContrast(snap.highContrast);
       if (typeof snap.reducedMotion === 'boolean') setReducedMotion(snap.reducedMotion);
+      if (snap.animationStyle) setAnimationStyle(snap.animationStyle);
+      if (snap.animationIntensity) setAnimationIntensity(snap.animationIntensity);
+      if (typeof snap.buttonBounceEnabled === 'boolean') setButtonBounceEnabled(snap.buttonBounceEnabled);
+      if (typeof snap.cardHoverLiftEnabled === 'boolean') setCardHoverLiftEnabled(snap.cardHoverLiftEnabled);
       if (typeof snap.confettiEnabled === 'boolean') setConfettiEnabled(snap.confettiEnabled);
       if (typeof snap.soundVolume === 'number') setSoundVolume(snap.soundVolume);
       if (snap.soundProfile) {
@@ -322,8 +360,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       }
       if (snap.questionLayout) setQuestionLayout(snap.questionLayout);
       if (typeof snap.autoReadQuestions === 'boolean') setAutoReadQuestions(snap.autoReadQuestions);
-      if (typeof snap.spoilerFreeImages === 'boolean') setSpoilerFreeImages(snap.spoilerFreeImages);
-      if (typeof snap.autoNextOnCorrect === 'boolean') setAutoNextOnCorrect(snap.autoNextOnCorrect);
       if (snap.mascotCharacter) setMascotCharacter(snap.mascotCharacter);
       if (snap.mascotTheme) setMascotTheme(snap.mascotTheme);
       if (snap.persona) onPersonaChange(snap.persona);
@@ -1377,6 +1413,130 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Smooth & Bouncy Animation Physics Engine */}
+            <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Smooth &amp; Bouncy Animation Physics</span>
+                </label>
+                <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                  Live Spring Engine
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {ANIMATION_STYLE_CATALOG.map((anim) => {
+                  const isSelected = animationStyle === anim.id;
+                  return (
+                    <button
+                      key={anim.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setAnimationStyle(anim.id);
+                      }}
+                      className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                        isSelected
+                          ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 ring-2 ring-indigo-500/20 shadow-xs'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{anim.icon}</span>
+                          <span className="text-xs font-black text-slate-900 dark:text-white">
+                            {anim.name}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                          {anim.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                        {anim.tagline}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {animationStyle !== 'minimal' && (
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-1 space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                      Spring Intensity:
+                    </span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(
+                        [
+                          { id: 'subtle' as AnimationIntensity, label: 'Subtle' },
+                          { id: 'normal' as AnimationIntensity, label: 'Normal' },
+                          { id: 'extra' as AnimationIntensity, label: 'Extra' },
+                        ]
+                      ).map((lvl) => (
+                        <button
+                          key={lvl.id}
+                          type="button"
+                          onClick={() => {
+                            soundFx.playPop();
+                            setAnimationIntensity(lvl.id);
+                          }}
+                          className={`py-1.5 rounded-xl border text-[11px] font-black cursor-pointer ${
+                            animationIntensity === lvl.id
+                              ? 'border-indigo-500 bg-indigo-600 text-white'
+                              : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {lvl.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setButtonBounceEnabled(!buttonBounceEnabled);
+                      }}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer flex items-center justify-between ${
+                        buttonBounceEnabled
+                          ? 'border-emerald-500/60 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-xs font-black">Button Bounce</div>
+                        <div className="text-[10px] opacity-75">Tactile squish &amp; pop</div>
+                      </div>
+                      <span className="text-xs font-black">{buttonBounceEnabled ? 'ON' : 'OFF'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setCardHoverLiftEnabled(!cardHoverLiftEnabled);
+                      }}
+                      className={`p-2.5 rounded-xl border text-left cursor-pointer flex items-center justify-between ${
+                        cardHoverLiftEnabled
+                          ? 'border-emerald-500/60 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-xs font-black">3D Card Lift</div>
+                        <div className="text-[10px] opacity-75">Spring hover float</div>
+                      </div>
+                      <span className="text-xs font-black">{cardHoverLiftEnabled ? 'ON' : 'OFF'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Interactive Real-Time Live Preview Box */}
@@ -1659,6 +1819,109 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       <div className="truncate">{isFocusHummingPreview ? 'Stop Focus 432Hz' : '432Hz Alpha Tone'}</div>
                     </button>
                   </div>
+                </div>
+
+                {/* Minimal Gamified Background Music (Removable in Settings) */}
+                <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <Music className="w-4 h-4 text-indigo-500" />
+                        <span>Minimal Gamified Background Music</span>
+                      </span>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Gentle, minimal Kahoot!-inspired study groove that plays softly in the background. Toggle off below to completely remove background music.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {bgMusicEnabled && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFx.toggleBgMusic();
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                            isBgMusicPlaying
+                              ? 'bg-amber-500 text-white shadow-xs'
+                              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'
+                          }`}
+                        >
+                          {isBgMusicPlaying ? 'Pause Groove' : 'Play Minimal Music'}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !bgMusicEnabled;
+                          soundFx.setBgMusicEnabled(next);
+                          if (next) {
+                            soundFx.startBgMusic();
+                            triggerSaveNotice('Minimal Gamified Background Music enabled');
+                          } else {
+                            soundFx.stopBgMusic();
+                            triggerSaveNotice('Background Music removed & disabled');
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
+                          bgMusicEnabled
+                            ? 'border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 hover:bg-rose-100'
+                            : 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {bgMusicEnabled ? 'Remove Background Music' : 'Enable Background Music'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {bgMusicEnabled && (
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-slate-600 dark:text-slate-300">
+                          Background Music Volume (Minimal Level)
+                        </span>
+                        <span className="font-mono tabular-nums text-indigo-600 dark:text-indigo-400">
+                          {Math.round(bgMusicVolume * 100)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.05}
+                        max={1}
+                        step={0.05}
+                        value={bgMusicVolume}
+                        onChange={(e) => soundFx.setBgMusicVolume(parseFloat(e.target.value))}
+                        className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
+                      />
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                        {BG_MUSIC_TRACKS.slice(0, 6).map((t) => {
+                          const isCurrent = bgMusicTrack === t.id;
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => {
+                                soundFx.setBgMusicTrack(t.id, true);
+                                triggerSaveNotice(`Switched background groove to ${t.title}`);
+                              }}
+                              className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                                isCurrent
+                                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 font-bold'
+                                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              <div className="text-xs font-extrabold truncate">{t.title}</div>
+                              <div className="text-[10px] text-slate-400 truncate">
+                                {t.badge} · {t.defaultBpm} BPM
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Ambient Study Soundscape Mixer */}
@@ -2259,6 +2522,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               >
                 <div className="bg-white w-4 h-4 rounded-full shadow-md transition-transform" />
               </button>
+            </div>
+
+            {/* Animation Physics Selector in Accessibility & FX */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    Animation Physics &amp; Bounciness Preset
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Choose between Playful Bouncy Spring, Silky Smooth, Snappy Arcade, or Minimal Motion
+                  </div>
+                </div>
+                <span className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400">
+                  {animationStyle}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {ANIMATION_STYLE_CATALOG.map((anim) => (
+                  <button
+                    key={anim.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playPop();
+                      setAnimationStyle(anim.id);
+                    }}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
+                      animationStyle === anim.id
+                        ? 'border-indigo-500 bg-indigo-600 text-white font-black'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    <span>{anim.icon}</span>
+                    <span className="truncate">{anim.name.split(' ')[1] || anim.name}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Reduced Motion */}

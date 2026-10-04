@@ -24,6 +24,7 @@ import {
   Timer,
   Radio,
   WifiOff,
+  Music,
 } from 'lucide-react';
 import { DashboardTab } from './DashboardSidebar';
 import { QuizResponse, UserStats, PersonaType } from '../types/quiz';
@@ -81,6 +82,18 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
   } = usePomodoro();
 
   const [isOnline, setIsOnline] = React.useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
+  const [isBgMusicPlaying, setIsBgMusicPlaying] = React.useState<boolean>(soundFx.isBgMusicPlaying);
+  const [bgMusicEnabled, setBgMusicEnabled] = React.useState<boolean>(soundFx.bgMusicEnabled);
+  const profileMenuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const unsub = soundFx.subscribeBgMusic(() => {
+      setIsBgMusicPlaying(soundFx.isBgMusicPlaying);
+      setBgMusicEnabled(soundFx.bgMusicEnabled);
+    });
+    return () => unsub();
+  }, []);
 
   React.useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -92,6 +105,18 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    if (isProfileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isProfileMenuOpen]);
 
   const getPageInfo = () => {
     switch (activeTab) {
@@ -119,6 +144,11 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
         return {
           title: 'Live Battle Rooms',
           subtitle: 'Synchronous competitive multiplayer assessments with unique room codes',
+        };
+      case 'music':
+        return {
+          title: 'Music & Groove Studio',
+          subtitle: 'Minimal gamified background music, live frequency visualizer, BPM customizer & Kahoot! DJ pads',
         };
       case 'authoring':
         return {
@@ -205,8 +235,8 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
           </div>
         </div>
 
-        {/* Right Section: Badges, Actions, Audio, Theme & Profile */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Right Section: Streamlined Search, Mastery Pill, Mode Selector, Utilities & Profile Menu */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           {/* Quick Command Palette / Search Trigger */}
           {onOpenCommandPalette && (
             <button
@@ -215,29 +245,14 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                 soundFx.playClick();
                 onOpenCommandPalette();
               }}
-              className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs text-xs font-semibold"
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs text-xs font-semibold"
               title="Search & Command Menu (Cmd + K)"
             >
               <Search className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline text-slate-600 dark:text-slate-300">Quick Actions</span>
+              <span className="hidden lg:inline text-slate-600 dark:text-slate-300">Search</span>
               <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400">
                 ⌘K
               </kbd>
-            </button>
-          )}
-
-          {/* Keyboard Shortcuts Trigger */}
-          {onOpenShortcuts && (
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                onOpenShortcuts();
-              }}
-              className="hidden lg:flex p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
-              title="Keyboard Shortcuts Cheatsheet (?)"
-            >
-              <HelpCircle className="w-4 h-4" />
             </button>
           )}
 
@@ -248,86 +263,22 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
               title="Working Offline: Core quizzes & flashcards remain fully functional via local caching"
             >
               <WifiOff className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <span className="hidden sm:inline">Offline Mode</span>
+              <span className="hidden sm:inline">Offline</span>
             </div>
           )}
-
-          {/* Pomodoro Study Timer Quick-Toggle Button */}
-          <button
-            type="button"
-            id="topbar-pomodoro-toggle-btn"
-            onClick={togglePomodoro}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-black shadow-2xs transition-all cursor-pointer ${
-              isPomodoroRunning
-                ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 ring-2 ring-amber-400/20'
-                : isPomodoroOpen
-                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300'
-                : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
-            }`}
-            title="Toggle Pomodoro Study Timer Overlay"
-          >
-            <Timer className={`w-3.5 h-3.5 ${isPomodoroRunning ? 'text-amber-500 animate-spin' : 'text-slate-500 dark:text-slate-400'}`} />
-            <span className="font-mono">{isPomodoroRunning ? formatPomodoroTime(pomodoroTimeLeft) : 'Pomodoro'}</span>
-          </button>
-
-          {/* Live Battle Quick Trigger */}
-          {activeTab !== 'live' && (
-            <button
-              type="button"
-              id="topbar-live-room-btn"
-              onClick={() => {
-                soundFx.playClick();
-                onSelectTab('live');
-              }}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-              title="Join or host a live synchronous multiplayer quiz battle"
-            >
-              <Radio className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
-              <span className="hidden xl:inline">Live Room</span>
-            </button>
-          )}
-
-          {/* Streak & XP Badges */}
-          <div className="hidden md:flex items-center gap-1.5 p-1 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-xs backdrop-blur-sm">
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-rose-500/15 text-amber-700 dark:text-amber-300 border border-amber-300/40 dark:border-amber-700/50 font-black text-xs shadow-2xs group cursor-default"
-              title={`${stats.streak} day streak`}
-            >
-              <Flame className="w-4 h-4 fill-amber-500 text-amber-500 animate-bounce" />
-              <span className="whitespace-nowrap">{stats.streak}d Streak</span>
-            </div>
-
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40 dark:border-indigo-700/50 font-black text-xs shadow-2xs group cursor-default"
-              title={`${stats.xp} Total Experience Points`}
-            >
-              <Award className="w-4 h-4 text-indigo-500" />
-              <span className="whitespace-nowrap">{stats.xp} XP</span>
-            </div>
-
-            {stats.gems !== undefined && (
-              <div
-                className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-gradient-to-r from-emerald-500/15 to-teal-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-300/40 dark:border-emerald-700/50 font-black text-xs shadow-2xs"
-                title={`${stats.gems} Gems`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                <span>{stats.gems}</span>
-              </div>
-            )}
-          </div>
 
           {/* Student / Teacher Mode Selector */}
           {onPersonaChange && (
-            <div className="hidden lg:flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-black shadow-inner">
+            <div className="hidden md:flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-black shadow-inner">
               <button
                 type="button"
                 onClick={() => {
                   soundFx.playClick();
                   onPersonaChange('Student');
                 }}
-                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
                   persona === 'Student'
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25'
+                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-500/25'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
@@ -339,9 +290,9 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                   soundFx.playClick();
                   onPersonaChange('Teacher');
                 }}
-                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
                   persona === 'Teacher'
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25'
+                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-500/25'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
@@ -350,29 +301,140 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
             </div>
           )}
 
-          {/* Firebase Cloud Sync Status */}
-          {isFirebaseConnected && (
-            <div
-              className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60 font-bold text-xs shadow-2xs whitespace-nowrap"
-              title="Connected to Firebase Firestore with real-time cloud persistence"
+          {/* Unified Streak & XP Pill */}
+          <div
+            onClick={() => {
+              soundFx.playClick();
+              onSelectTab('analytics');
+            }}
+            className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs text-xs font-black cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+            title={`${stats.streak} day streak • ${stats.xp} XP • ${stats.gems ?? 0} Gems`}
+          >
+            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+              <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+              <span>{stats.streak}d</span>
+            </span>
+            <span className="text-slate-300 dark:text-slate-600">•</span>
+            <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+              <Award className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{stats.xp} XP</span>
+            </span>
+          </div>
+
+          {/* New Quiz Quick Action Button (Only when not in Studio) */}
+          {activeTab !== 'studio' && (
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                onSelectTab('studio');
+              }}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-xs font-black shadow-sm shadow-indigo-500/25 hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <Cloud className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Cloud Synced</span>
-            </div>
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">New Quiz</span>
+            </button>
           )}
 
-          {/* User Account / Profile Customization */}
+          {/* Compact Utility Group: Pomodoro, Theme, Sound, Settings */}
+          <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
+            <button
+              type="button"
+              id="topbar-pomodoro-toggle-btn"
+              onClick={togglePomodoro}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                isPomodoroRunning
+                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 ring-1 ring-amber-400/50'
+                  : isPomodoroOpen
+                  ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+              title="Toggle Pomodoro Study Timer"
+            >
+              <Timer className={`w-3.5 h-3.5 ${isPomodoroRunning ? 'text-amber-500 animate-spin' : ''}`} />
+              {isPomodoroRunning && (
+                <span className="font-mono text-[11px]">{formatPomodoroTime(pomodoroTimeLeft)}</span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              id="theme-mode-toggle"
+              onClick={handleThemeClick}
+              className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              title={resolvedTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label="Toggle Light and Dark Mode"
+            >
+              {resolvedTheme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Moon className="w-4 h-4 text-indigo-600" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              id="sound-fx-toggle"
+              onClick={handleSoundClick}
+              className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              title={soundEnabled ? 'Sound Effects Active' : 'Sound Effects Muted'}
+              aria-label="Toggle Sound Effects"
+            >
+              {soundEnabled ? (
+                <Volume2 className="w-4 h-4 text-emerald-500" />
+              ) : (
+                <VolumeX className="w-4 h-4 text-slate-400" />
+              )}
+            </button>
+
+            {bgMusicEnabled && (
+              <button
+                type="button"
+                id="bg-music-quick-toggle"
+                onClick={() => {
+                  soundFx.playClick();
+                  soundFx.toggleBgMusic();
+                }}
+                className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                  isBgMusicPlaying
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+                }`}
+                title={
+                  isBgMusicPlaying
+                    ? 'Minimal Gamified Background Music Playing (Click to pause)'
+                    : 'Play Minimal Gamified Background Music'
+                }
+                aria-label="Toggle Minimal Background Music"
+              >
+                <Music className={`w-4 h-4 ${isBgMusicPlaying ? 'animate-pulse' : ''}`} />
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                onOpenSettings();
+              }}
+              className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              title="Open Quick Preferences"
+            >
+              <Sliders className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* User Account / Scholar Menu Dropdown */}
           {user && (
-            <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
+            <div ref={profileMenuRef} className="relative">
               <button
                 type="button"
                 onClick={() => {
                   soundFx.playClick();
-                  onOpenProfileModal?.();
+                  setIsProfileMenuOpen((prev) => !prev);
                 }}
-                className="flex items-center gap-1.5 p-0.5 sm:px-1.5 hover:opacity-85 transition-opacity cursor-pointer text-left"
-                title="Customize your scholar profile"
+                className="flex items-center gap-2 p-1 sm:pr-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer shadow-2xs"
+                title="Scholar Profile & Quick Menu"
               >
                 <UserAvatar
                   displayName={userProfile?.displayName || user.displayName}
@@ -382,135 +444,119 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                   avatarBg={userProfile?.avatarBg}
                   size="xs"
                 />
-                <div className="hidden xl:flex flex-col min-w-0 max-w-[90px]">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate leading-tight">
-                    {userProfile?.displayName || user.displayName || 'Scholar'}
-                  </span>
-                  <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate leading-none">
-                    {userProfile?.headline || 'Edit Profile'}
-                  </span>
+                <span className="hidden xl:inline text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[90px] truncate">
+                  {userProfile?.displayName || user.displayName || 'Scholar'}
+                </span>
+              </button>
+
+              {isProfileMenuOpen && (
+                <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-2 z-50 space-y-1">
+                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+                    <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                      {userProfile?.displayName || user.displayName || 'Scholar'}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                      {isFirebaseConnected && (
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Cloud Synced
+                        </span>
+                      )}
+                      <span>•</span>
+                      <span>{stats.gems ?? 0} Gems</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setIsProfileMenuOpen(false);
+                      onOpenProfileModal?.();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <UserIcon className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>Customize Scholar Profile</span>
+                  </button>
+
+                  {onOpenUploadQuiz && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setIsProfileMenuOpen(false);
+                        onOpenUploadQuiz();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Upload Quiz File</span>
+                    </button>
+                  )}
+
+                  {activeTab !== 'live' && (
+                    <button
+                      type="button"
+                      id="topbar-live-room-btn"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setIsProfileMenuOpen(false);
+                        onSelectTab('live');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <Radio className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Live Multiplayer Room</span>
+                    </button>
+                  )}
+
+                  {onOpenShortcuts && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setIsProfileMenuOpen(false);
+                        onOpenShortcuts();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Keyboard Shortcuts (?)</span>
+                    </button>
+                  )}
+
+                  <div className="pt-1 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setIsProfileMenuOpen(false);
+                        switchAccount();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <Users className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Switch Account</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setIsProfileMenuOpen(false);
+                        logout();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
                 </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundFx.playClick();
-                  onOpenProfileModal?.();
-                }}
-                className="hidden md:flex p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
-                title="Customize Profile"
-              >
-                <UserIcon className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundFx.playClick();
-                  switchAccount();
-                }}
-                className="hidden md:flex p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-amber-500 transition-colors cursor-pointer"
-                title="Switch scholar account"
-              >
-                <Users className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundFx.playClick();
-                  logout();
-                }}
-                className="hidden md:flex p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
-                title="Sign out of account"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
+              )}
             </div>
           )}
-
-          {/* Upload Created Quiz Button */}
-          {onOpenUploadQuiz && (
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                onOpenUploadQuiz();
-              }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:text-indigo-600 dark:hover:text-indigo-300 text-xs font-black shadow-2xs hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer whitespace-nowrap"
-              title="Upload your created quiz file (JSON or formatted text)"
-            >
-              <Upload className="w-3.5 h-3.5 text-indigo-500" />
-              <span className="hidden md:inline">Upload Quiz</span>
-            </button>
-          )}
-
-          {/* New Quiz Quick Action Button */}
-          {activeTab !== 'studio' && (
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                onSelectTab('studio');
-              }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-xs font-black shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/35 hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer whitespace-nowrap"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">New Quiz</span>
-            </button>
-          )}
-
-          {/* Light / Dark Mode Switcher */}
-          <button
-            type="button"
-            id="theme-mode-toggle"
-            onClick={handleThemeClick}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
-            title={resolvedTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            aria-label="Toggle Light and Dark Mode"
-          >
-            {resolvedTheme === 'dark' ? (
-              <>
-                <Sun className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-bold hidden lg:inline">Light</span>
-              </>
-            ) : (
-              <>
-                <Moon className="w-4 h-4 text-indigo-600" />
-                <span className="text-xs font-bold hidden lg:inline">Dark</span>
-              </>
-            )}
-          </button>
-
-          {/* Sound Effects Toggle Button */}
-          <button
-            type="button"
-            id="sound-fx-toggle"
-            onClick={handleSoundClick}
-            className={`p-2 rounded-xl border transition-all cursor-pointer ${
-              soundEnabled
-                ? 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
-                : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-100 dark:bg-slate-900 text-slate-400'
-            }`}
-            title={soundEnabled ? 'Sound Effects Active' : 'Sound Effects Muted'}
-            aria-label="Toggle Sound Effects"
-          >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-500" /> : <VolumeX className="w-4 h-4" />}
-          </button>
-
-          {/* Settings Button */}
-          <button
-            type="button"
-            onClick={() => {
-              soundFx.playClick();
-              onOpenSettings();
-            }}
-            className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer"
-            title="Open Settings Studio"
-          >
-            <Sliders className="w-4 h-4" />
-          </button>
         </div>
       </div>
     </header>

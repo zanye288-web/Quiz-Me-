@@ -340,6 +340,46 @@ export const THEME_PRESETS: ThemePreset[] = [
   },
 ];
 
+export type AnimationStyle = 'bouncy' | 'smooth' | 'snappy' | 'minimal';
+export type AnimationIntensity = 'subtle' | 'normal' | 'extra';
+
+export const ANIMATION_STYLE_CATALOG: {
+  id: AnimationStyle;
+  name: string;
+  tagline: string;
+  icon: string;
+  badge: string;
+}[] = [
+  {
+    id: 'bouncy',
+    name: 'Playful Bouncy Spring',
+    tagline: 'Elastic spring physics, tactile button squish & lively overshoot pops.',
+    icon: '🏀',
+    badge: 'Gamified Default',
+  },
+  {
+    id: 'smooth',
+    name: 'Silky Smooth & Fluid',
+    tagline: 'Velvety quintic easing with graceful glides and zero overshoot.',
+    icon: '🌊',
+    badge: 'Editorial',
+  },
+  {
+    id: 'snappy',
+    name: 'Hyper-Snappy Arcade',
+    tagline: 'Instant high-velocity micro-pops engineered for speed runners.',
+    icon: '⚡',
+    badge: 'Esports / Fast',
+  },
+  {
+    id: 'minimal',
+    name: 'Minimal / No Motion',
+    tagline: 'Disables spring transitions and floating loops for pure stillness.',
+    icon: '🧘',
+    badge: 'Vestibular Safe',
+  },
+];
+
 interface ThemeContextType {
   theme: ThemeMode;
   resolvedTheme: 'light' | 'dark';
@@ -357,6 +397,14 @@ interface ThemeContextType {
   setHighContrast: (val: boolean) => void;
   reducedMotion: boolean;
   setReducedMotion: (val: boolean) => void;
+  animationStyle: AnimationStyle;
+  setAnimationStyle: (style: AnimationStyle) => void;
+  animationIntensity: AnimationIntensity;
+  setAnimationIntensity: (intensity: AnimationIntensity) => void;
+  buttonBounceEnabled: boolean;
+  setButtonBounceEnabled: (val: boolean) => void;
+  cardHoverLiftEnabled: boolean;
+  setCardHoverLiftEnabled: (val: boolean) => void;
   confettiEnabled: boolean;
   setConfettiEnabled: (val: boolean) => void;
   soundVolume: number;
@@ -379,6 +427,10 @@ const FONT_KEY = 'quizme_font_v1';
 const RADIUS_KEY = 'quizme_card_radius_v1';
 const CONTRAST_KEY = 'quizme_high_contrast_v1';
 const MOTION_KEY = 'quizme_reduced_motion_v1';
+const ANIM_STYLE_KEY = 'quizme_animation_style_v1';
+const ANIM_INTENSITY_KEY = 'quizme_animation_intensity_v1';
+const BTN_BOUNCE_KEY = 'quizme_btn_bounce_v1';
+const CARD_LIFT_KEY = 'quizme_card_lift_v1';
 const CONFETTI_KEY = 'quizme_confetti_enabled_v1';
 const VOLUME_KEY = 'quizme_sound_volume';
 const LAYOUT_KEY = 'quizme_question_layout_v1';
@@ -439,6 +491,36 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return false;
   });
 
+  const [animationStyle, setAnimationStyleState] = useState<AnimationStyle>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(ANIM_STYLE_KEY) as AnimationStyle;
+      if (['bouncy', 'smooth', 'snappy', 'minimal'].includes(saved)) return saved;
+    }
+    return 'bouncy';
+  });
+
+  const [animationIntensity, setAnimationIntensityState] = useState<AnimationIntensity>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(ANIM_INTENSITY_KEY) as AnimationIntensity;
+      if (['subtle', 'normal', 'extra'].includes(saved)) return saved;
+    }
+    return 'normal';
+  });
+
+  const [buttonBounceEnabled, setButtonBounceEnabledState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(BTN_BOUNCE_KEY) !== 'false';
+    }
+    return true;
+  });
+
+  const [cardHoverLiftEnabled, setCardHoverLiftEnabledState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(CARD_LIFT_KEY) !== 'false';
+    }
+    return true;
+  });
+
   const [confettiEnabled, setConfettiEnabledState] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(CONFETTI_KEY) !== 'false';
@@ -481,7 +563,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     currentDensity: UiDensity,
     currentRadius: CardCornerRadius,
     isHighContrast: boolean,
-    isReducedMotion: boolean
+    isReducedMotion: boolean,
+    currentAnimStyle: AnimationStyle = animationStyle,
+    currentAnimIntensity: AnimationIntensity = animationIntensity,
+    isBtnBounce: boolean = buttonBounceEnabled,
+    isCardLift: boolean = cardHoverLiftEnabled
   ) => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
@@ -499,12 +585,18 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       root.style.colorScheme = 'light';
     }
 
+    const effectiveStyle = isReducedMotion ? 'minimal' : currentAnimStyle;
+
     root.setAttribute('data-accent', currentAccent);
     root.setAttribute('data-font', currentFont);
     root.setAttribute('data-density', currentDensity);
     root.setAttribute('data-radius', currentRadius);
     root.setAttribute('data-contrast', isHighContrast ? 'high' : 'standard');
-    root.setAttribute('data-motion', isReducedMotion ? 'reduced' : 'smooth');
+    root.setAttribute('data-motion', effectiveStyle === 'minimal' ? 'reduced' : effectiveStyle);
+    root.setAttribute('data-animation-style', effectiveStyle);
+    root.setAttribute('data-animation-intensity', currentAnimIntensity);
+    root.setAttribute('data-button-bounce', isBtnBounce && effectiveStyle !== 'minimal' ? 'true' : 'false');
+    root.setAttribute('data-card-lift', isCardLift && effectiveStyle !== 'minimal' ? 'true' : 'false');
 
     const palette = ACCENT_PALETTES[currentAccent] || ACCENT_PALETTES.indigo;
     root.style.setProperty('--accent-hex', palette.primaryHex);
@@ -529,7 +621,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         uiDensity,
         cardRadius,
         highContrast,
-        reducedMotion
+        reducedMotion,
+        animationStyle,
+        animationIntensity,
+        buttonBounceEnabled,
+        cardHoverLiftEnabled
       );
     };
 
@@ -541,7 +637,19 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     mediaQuery.addEventListener('change', listener);
     return () => mediaQuery.removeEventListener('change', listener);
-  }, [theme, accent, fontFamily, uiDensity, cardRadius, highContrast, reducedMotion]);
+  }, [
+    theme,
+    accent,
+    fontFamily,
+    uiDensity,
+    cardRadius,
+    highContrast,
+    reducedMotion,
+    animationStyle,
+    animationIntensity,
+    buttonBounceEnabled,
+    cardHoverLiftEnabled,
+  ]);
 
   const setTheme = (newTheme: ThemeMode) => {
     setThemeState(newTheme);
@@ -631,6 +739,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const setReducedMotion = (val: boolean) => {
     setReducedMotionState(val);
     localStorage.setItem(MOTION_KEY, String(val));
+    if (val) {
+      setAnimationStyleState('minimal');
+      localStorage.setItem(ANIM_STYLE_KEY, 'minimal');
+    } else if (animationStyle === 'minimal') {
+      setAnimationStyleState('bouncy');
+      localStorage.setItem(ANIM_STYLE_KEY, 'bouncy');
+    }
     applyThemeToDOM(
       resolvedTheme === 'dark',
       accent,
@@ -638,6 +753,85 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       uiDensity,
       cardRadius,
       highContrast,
+      val,
+      val ? 'minimal' : animationStyle === 'minimal' ? 'bouncy' : animationStyle,
+      animationIntensity,
+      buttonBounceEnabled,
+      cardHoverLiftEnabled
+    );
+  };
+
+  const setAnimationStyle = (style: AnimationStyle) => {
+    setAnimationStyleState(style);
+    localStorage.setItem(ANIM_STYLE_KEY, style);
+    const isMin = style === 'minimal';
+    setReducedMotionState(isMin);
+    localStorage.setItem(MOTION_KEY, String(isMin));
+    applyThemeToDOM(
+      resolvedTheme === 'dark',
+      accent,
+      fontFamily,
+      uiDensity,
+      cardRadius,
+      highContrast,
+      isMin,
+      style,
+      animationIntensity,
+      buttonBounceEnabled,
+      cardHoverLiftEnabled
+    );
+  };
+
+  const setAnimationIntensity = (intensity: AnimationIntensity) => {
+    setAnimationIntensityState(intensity);
+    localStorage.setItem(ANIM_INTENSITY_KEY, intensity);
+    applyThemeToDOM(
+      resolvedTheme === 'dark',
+      accent,
+      fontFamily,
+      uiDensity,
+      cardRadius,
+      highContrast,
+      reducedMotion,
+      animationStyle,
+      intensity,
+      buttonBounceEnabled,
+      cardHoverLiftEnabled
+    );
+  };
+
+  const setButtonBounceEnabled = (val: boolean) => {
+    setButtonBounceEnabledState(val);
+    localStorage.setItem(BTN_BOUNCE_KEY, String(val));
+    applyThemeToDOM(
+      resolvedTheme === 'dark',
+      accent,
+      fontFamily,
+      uiDensity,
+      cardRadius,
+      highContrast,
+      reducedMotion,
+      animationStyle,
+      animationIntensity,
+      val,
+      cardHoverLiftEnabled
+    );
+  };
+
+  const setCardHoverLiftEnabled = (val: boolean) => {
+    setCardHoverLiftEnabledState(val);
+    localStorage.setItem(CARD_LIFT_KEY, String(val));
+    applyThemeToDOM(
+      resolvedTheme === 'dark',
+      accent,
+      fontFamily,
+      uiDensity,
+      cardRadius,
+      highContrast,
+      reducedMotion,
+      animationStyle,
+      animationIntensity,
+      buttonBounceEnabled,
       val
     );
   };
@@ -685,6 +879,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCardRadius('3xl');
     setHighContrast(false);
     setReducedMotion(false);
+    setAnimationStyle('bouncy');
+    setAnimationIntensity('normal');
+    setButtonBounceEnabled(true);
+    setCardHoverLiftEnabled(true);
     setConfettiEnabled(true);
     setSoundVolume(0.85);
     setQuestionLayout('stacked');
@@ -712,6 +910,14 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setHighContrast,
         reducedMotion,
         setReducedMotion,
+        animationStyle,
+        setAnimationStyle,
+        animationIntensity,
+        setAnimationIntensity,
+        buttonBounceEnabled,
+        setButtonBounceEnabled,
+        cardHoverLiftEnabled,
+        setCardHoverLiftEnabled,
         confettiEnabled,
         setConfettiEnabled,
         soundVolume,

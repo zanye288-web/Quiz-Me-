@@ -131,125 +131,88 @@ export const UserStats: React.FC<UserStatsProps> = ({
     );
   }
 
+  const gaugeRadius = 22;
+  const gaugeCircumference = 2 * Math.PI * gaugeRadius;
+  const gaugeStrokeDashoffset = gaugeCircumference - (progressPercent / 100) * gaugeCircumference;
+
   return (
     <div
-      className="p-3.5 rounded-3xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 shadow-sm space-y-3 relative overflow-hidden group transition-all hover:border-indigo-300 dark:hover:border-indigo-600/60"
+      onClick={onOpenAnalytics}
+      className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs relative overflow-hidden group transition-all hover:border-indigo-300 dark:hover:border-indigo-600/60 cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      title="View Performance & XP Analytics"
     >
-      {/* Background ambient glow effect */}
-      <div className="absolute -top-10 -right-10 w-28 h-28 bg-indigo-500/10 dark:bg-indigo-500/15 rounded-full blur-2xl pointer-events-none transition-all group-hover:bg-indigo-500/20" />
-
-      {/* Header Info: Level Badge & XP Count */}
-      <div className="flex items-center justify-between relative z-10">
-        <div className="flex items-center gap-2.5">
-          <div className="relative">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-xs shadow-sm shadow-indigo-500/30">
-              <span className="text-xs">L{currentLevel}</span>
-            </div>
-            {/* Active streak mini indicator */}
-            {stats.streak > 0 && (
-              <div
-                className="absolute -top-1 -right-1.5 flex items-center justify-center px-1 py-0.2 rounded-full bg-amber-500 text-white text-[9px] font-black border border-white dark:border-slate-800 shadow-xs"
-                title={`${stats.streak} day streak`}
-              >
-                <Flame className="w-2.5 h-2.5 fill-white" />
-                <span>{stats.streak}</span>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-black text-slate-900 dark:text-white tracking-tight">
-                Level {currentLevel}
-              </span>
-              <span className={`text-[10px] font-bold ${rank.color} flex items-center gap-0.5`}>
-                <RankIcon className="w-2.5 h-2.5" />
-                {rank.title}
-              </span>
-            </div>
-            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
-              {stats.quizzesCompleted} {stats.quizzesCompleted === 1 ? 'quiz' : 'quizzes'} completed
-            </p>
-          </div>
-        </div>
-
-        {/* Total XP pill */}
-        <div className="flex flex-col items-end">
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300">
-            <Zap className="w-3 h-3 fill-indigo-500 text-indigo-500" />
-            <span className="text-xs font-black tracking-tight">{stats.xp} XP</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Animated XP Progress Bar Section */}
-      <div className="space-y-1.5 relative z-10">
-        <div className="flex items-center justify-between text-[11px] font-extrabold">
-          <span className="text-slate-600 dark:text-slate-300 flex items-center gap-1">
-            <span>Next Level</span>
-            <span className="text-[10px] text-slate-400 font-semibold">
-              ({currentLevelXp}/{XP_PER_LEVEL} XP)
-            </span>
-          </span>
-          <span className="text-indigo-600 dark:text-indigo-400 font-black">
-            {progressPercent}%
-          </span>
-        </div>
-
-        {/* Multi-layered Progress Track */}
-        <div className="relative w-full bg-slate-100 dark:bg-slate-700/60 h-2.5 rounded-full overflow-hidden p-0.5 shadow-inner">
-          {/* Animated Bar Fill with Framer Motion */}
-          <motion.div
-            className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-500 relative overflow-hidden shadow-xs"
-            initial={{ width: '0%' }}
-            animate={{ width: `${progressPercent}%` }}
-            transition={{
-              type: 'spring',
-              stiffness: 60,
-              damping: 15,
-              mass: 0.8,
-            }}
-          >
-            {/* Shimmer light sweep animation */}
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-              initial={{ x: '-100%' }}
-              animate={{ x: '100%' }}
-              transition={{
-                repeat: Infinity,
-                duration: 2.2,
-                ease: 'linear',
-              }}
+      <div className="flex items-center gap-3 relative z-10">
+        {/* Circular Progress Gauge */}
+        <div className="relative w-13 h-13 shrink-0 flex items-center justify-center">
+          <svg className="w-13 h-13 -rotate-90" viewBox="0 0 52 52">
+            <circle
+              cx="26"
+              cy="26"
+              r={gaugeRadius}
+              className="text-slate-100 dark:text-slate-700"
+              strokeWidth="4"
+              stroke="currentColor"
+              fill="transparent"
             />
-          </motion.div>
-        </div>
-
-        {/* XP needed label */}
-        <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 font-medium pt-0.5">
-          <span>{xpNeeded} XP to Level {currentLevel + 1}</span>
-          <span className="font-bold text-slate-500 dark:text-slate-400">
-            {accuracyPercent}% Accuracy
-          </span>
-        </div>
-      </div>
-
-      {/* Mini Streak & Accuracy Sub-Bars */}
-      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100 dark:border-slate-700/60 relative z-10 text-[10px]">
-        {/* Streak Indicator */}
-        <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 text-amber-800 dark:text-amber-300">
-          <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500 shrink-0" />
-          <div className="truncate">
-            <span className="font-bold">{stats.streak}d Streak</span>
+            <motion.circle
+              cx="26"
+              cy="26"
+              r={gaugeRadius}
+              stroke="url(#sidebarXpGauge)"
+              strokeWidth="4"
+              strokeDasharray={gaugeCircumference}
+              initial={{ strokeDashoffset: gaugeCircumference }}
+              animate={{ strokeDashoffset: gaugeStrokeDashoffset }}
+              transition={{ duration: 1, ease: 'easeOut' }}
+              strokeLinecap="round"
+              fill="transparent"
+            />
+            <defs>
+              <linearGradient id="sidebarXpGauge" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#6366f1" />
+                <stop offset="100%" stopColor="#a855f7" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-[11px] font-black text-slate-900 dark:text-white leading-none">
+              L{currentLevel}
+            </span>
+            <span className="text-[8px] font-bold text-indigo-500 dark:text-indigo-400 mt-0.5">
+              {progressPercent}%
+            </span>
           </div>
         </div>
 
-        {/* Accuracy Indicator */}
-        <div className="flex items-center gap-1.5 p-1.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300">
-          <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-          <div className="truncate">
-            <span className="font-bold">{accuracyPercent}% Score</span>
+        {/* Right Info & Metrics */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-1">
+            <span className={`text-[11px] font-black ${rank.color} flex items-center gap-1 truncate`}>
+              <RankIcon className="w-3 h-3 shrink-0" />
+              <span className="truncate">{rank.title}</span>
+            </span>
+            <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 shrink-0">
+              {stats.xp} XP
+            </span>
+          </div>
+
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
+            {xpNeeded} XP to Level {currentLevel + 1}
+          </div>
+
+          <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60 text-[10px] font-bold">
+            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+              <Flame className="w-3 h-3 fill-amber-500 text-amber-500 shrink-0" />
+              {stats.streak}d
+            </span>
+            <span className="text-slate-300 dark:text-slate-600">•</span>
+            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+              <TrendingUp className="w-3 h-3 text-emerald-500 shrink-0" />
+              {accuracyPercent}%
+            </span>
+            <ChevronRight className="w-3 h-3 text-slate-400 ml-auto group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
       </div>

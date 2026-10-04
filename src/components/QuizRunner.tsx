@@ -162,6 +162,16 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
   const [lastSpeedMultiplier, setLastSpeedMultiplier] = useState<number | null>(null);
   const [speedMultipliers, setSpeedMultipliers] = useState<Record<number, number>>({});
 
+  // Kahoot! Arcade Streak, Points & Power-Ups State
+  const [kahootStreak, setKahootStreak] = useState<number>(0);
+  const [kahootArcadePoints, setKahootArcadePoints] = useState<number>(0);
+  const [lastPointsEarned, setLastPointsEarned] = useState<number>(0);
+  const [doublePointsArmed, setDoublePointsArmed] = useState<boolean>(false);
+  const [doublePointsUsed, setDoublePointsUsed] = useState<boolean>(false);
+  const [streakShieldArmed, setStreakShieldArmed] = useState<boolean>(false);
+  const [streakShieldUsed, setStreakShieldUsed] = useState<boolean>(false);
+  const [streakSavedBanner, setStreakSavedBanner] = useState<boolean>(false);
+
   // Global Timer
   const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
   const totalTimeLimitSecs = assessmentConfig.timeLimitMinutes * 60;
@@ -962,7 +972,26 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
 
     let multiplier = 1.0;
     if (isCorrect) {
-      if (isChallengeMode) {
+      const nextStreak = kahootStreak + 1;
+      setKahootStreak(nextStreak);
+      setStreakSavedBanner(false);
+
+      // Calculate Kahoot! style arcade points (base 750-1000 + streak bonus + 2x power-up)
+      const speedFactor = isChallengeMode
+        ? Math.max(0.5, questionTimeRemaining / questionTimeLimit)
+        : 0.88;
+      let rawArcadePts = Math.round(600 + 400 * speedFactor) + Math.min(500, (nextStreak - 1) * 100);
+      if (doublePointsArmed) {
+        rawArcadePts *= 2;
+        setDoublePointsArmed(false);
+        setDoublePointsUsed(true);
+      }
+      setLastPointsEarned(rawArcadePts);
+      setKahootArcadePoints((prev) => prev + rawArcadePts);
+
+      if (nextStreak >= 3) {
+        soundFx.playKahootStreakFire();
+      } else if (isChallengeMode) {
         multiplier = calculateSpeedMultiplier();
         setSpeedMultipliers((prev) => ({
           ...prev,
@@ -980,6 +1009,20 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
       }
     } else {
       soundFx.playIncorrect();
+      setLastPointsEarned(0);
+      if (doublePointsArmed) {
+        setDoublePointsArmed(false);
+        setDoublePointsUsed(true);
+      }
+      if (streakShieldArmed && kahootStreak > 0) {
+        // Streak Shield protects the streak!
+        setStreakShieldArmed(false);
+        setStreakShieldUsed(true);
+        setStreakSavedBanner(true);
+      } else {
+        setKahootStreak(0);
+        setStreakSavedBanner(false);
+      }
       setSpeedMultipliers((prev) => ({
         ...prev,
         [currentQuestion.id]: 1.0,
@@ -1697,6 +1740,19 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                 <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                   {currentQuestion.points || 20} pts
                 </span>
+
+                {/* Kahoot! Arcade Score & Answer Streak Pill */}
+                <span className="text-xs font-mono font-black px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                  <span>{kahootArcadePoints.toLocaleString()} Arcade Pts</span>
+                </span>
+
+                {kahootStreak >= 2 && (
+                  <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-xs flex items-center gap-1 animate-bounce">
+                    <Flame className="w-3.5 h-3.5 fill-white" />
+                    <span>{kahootStreak} Streak!</span>
+                  </span>
+                )}
               </div>
 
               {/* Timestamp & Flag Buttons */}
@@ -1969,7 +2025,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center flex-wrap gap-2 shrink-0">
                   <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -1979,6 +2035,44 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                     />
                     <span>Auto-Submit Voice</span>
                   </label>
+
+                  {/* Kahoot! 2x Double Points Power-Up */}
+                  <button
+                    type="button"
+                    disabled={doublePointsUsed}
+                    onClick={() => {
+                      soundFx.playKahootPowerUp();
+                      setDoublePointsArmed((prev) => !prev);
+                    }}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-extrabold transition-all cursor-pointer disabled:opacity-40 ${
+                      doublePointsArmed
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-2 ring-amber-400/40'
+                        : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100'
+                    }`}
+                    title="Kahoot! Power-Up: Double Arcade Points on this question (1 per quiz)"
+                  >
+                    <Zap className="w-3 h-3 fill-current" />
+                    <span>{doublePointsArmed ? '2x Armed!' : doublePointsUsed ? '2x Used' : '2x Points'}</span>
+                  </button>
+
+                  {/* Kahoot! Streak Shield Power-Up */}
+                  <button
+                    type="button"
+                    disabled={streakShieldUsed}
+                    onClick={() => {
+                      soundFx.playKahootPowerUp();
+                      setStreakShieldArmed((prev) => !prev);
+                    }}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-extrabold transition-all cursor-pointer disabled:opacity-40 ${
+                      streakShieldArmed
+                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs ring-2 ring-emerald-400/40'
+                        : 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
+                    }`}
+                    title="Kahoot! Power-Up: Protect your Answer Streak if you miss (1 per quiz)"
+                  >
+                    <Flame className="w-3 h-3" />
+                    <span>{streakShieldArmed ? 'Shield ON' : streakShieldUsed ? 'Shield Used' : 'Streak Shield'}</span>
+                  </button>
 
                   {currentQuestion.type === 'multiple_choice' &&
                     currentQuestion.options &&
@@ -2004,6 +2098,13 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 {currentQuestion.options.map((option, idx) => {
                   const letter = ['A', 'B', 'C', 'D'][idx] || `${idx + 1}`;
+                  const kahootShape = ['▲', '◆', '●', '■'][idx % 4];
+                  const kahootBadgeColors = [
+                    'bg-rose-600 text-white border-rose-700',
+                    'bg-blue-600 text-white border-blue-700',
+                    'bg-amber-500 text-white border-amber-600',
+                    'bg-emerald-600 text-white border-emerald-700',
+                  ][idx % 4];
                   const isSelected = selectedOption === option;
                   const isEliminated = (eliminatedOptions[currentQuestion.id] || []).includes(option);
 
@@ -2043,10 +2144,13 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         soundFx.playClick();
                         setSelectedOption(option);
                       }}
-                      className={`p-4 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${optionStyle}`}
+                      className={`kahoot-tile p-4 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${optionStyle}`}
                     >
-                      <span className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                        {letter}
+                      <span
+                        className={`w-9 h-9 rounded-xl font-black text-xs flex items-center justify-center gap-0.5 shrink-0 border shadow-2xs ${kahootBadgeColors}`}
+                      >
+                        <span>{kahootShape}</span>
+                        <span className="text-[10px] opacity-90">{letter}</span>
                       </span>
                       <span className={`${optSizeClass} font-semibold flex-1 leading-snug`}>
                         {option}
@@ -2252,7 +2356,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                     size="sm"
                   />
                   <div className="flex-1 space-y-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center flex-wrap gap-2">
                       {isCurrentCorrect ? (
                         <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       ) : (
@@ -2263,6 +2367,16 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                           ? currentQuestion.gamified_feedback?.success_quote || 'Spark on! Correct! Nicely done.'
                           : `Keep going! Correct Answer: ${currentQuestion.correct_answer}`}
                       </h4>
+                      {isCurrentCorrect && lastPointsEarned > 0 && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-black bg-emerald-600 text-white shadow-2xs">
+                          +{lastPointsEarned.toLocaleString()} Kahoot! Pts
+                        </span>
+                      )}
+                      {streakSavedBanner && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500 text-slate-950">
+                          🛡️ Streak Shield Saved Your {kahootStreak} Streak!
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pt-1">

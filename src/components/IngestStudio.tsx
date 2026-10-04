@@ -92,8 +92,11 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   historyRecords = [],
 }) => {
   const { currentAccentConfig } = useTheme();
+  // Top-level Studio Workspace Organization: 'builder' | 'tracks' | 'recommended'
+  const [studioSection, setStudioSection] = useState<'builder' | 'tracks' | 'recommended'>('builder');
   // Input Tabs: 'presets' | 'text' | 'file' | 'audio' | 'url'
-  const [activeTab, setActiveTab] = useState<'presets' | 'text' | 'file' | 'audio' | 'url'>('presets');
+  const [activeTab, setActiveTab] = useState<'presets' | 'text' | 'file' | 'audio' | 'url'>('text');
+  const [showAllPresetsInBuilder, setShowAllPresetsInBuilder] = useState<boolean>(false);
   const [selectedPresetId, setSelectedPresetId] = useState<string>(PRESET_TOPICS[0].id);
   const [selectedTrackForDetail, setSelectedTrackForDetail] = useState<SelectedTrackInfo | null>(null);
   const [inputText, setInputText] = useState('');
@@ -187,6 +190,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   ];
 
   const handleCustomizeTopic = (prompt: string, diff: DifficultyType, types: QuestionType[]) => {
+    setStudioSection('builder');
     setActiveTab('text');
     setInputText(prompt);
     setDifficulty(diff);
@@ -406,77 +410,75 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
     }
   };
 
-  return (
-    <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8 space-y-6">
-      {/* Hero Welcome Card */}
-      <div className="rounded-3xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-sm relative overflow-hidden transition-all">
-        {/* Subtle decorative gradient mesh in the card corner */}
-        <div className="absolute -top-16 -right-16 w-64 h-64 bg-gradient-to-bl from-indigo-500/15 via-purple-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
+  const xpPerLevel = 150;
+  const currentLevel = stats.level || Math.floor(stats.xp / xpPerLevel) + 1;
+  const currentLevelXp = stats.xp % xpPerLevel;
+  const levelProgressPct = Math.min(100, Math.max(0, Math.round((currentLevelXp / xpPerLevel) * 100)));
+  const accuracyPct =
+    stats.totalQuestions > 0 ? Math.round((stats.totalCorrect / stats.totalQuestions) * 100) : 100;
+  const ringRadius = 26;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringDashoffset = ringCircumference - (levelProgressPct / 100) * ringCircumference;
 
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
-          <div className="flex items-center gap-4 max-w-2xl min-w-0">
+  const displayedPresets = showAllPresetsInBuilder ? PRESET_TOPICS : PRESET_TOPICS.slice(0, 4);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* Top Studio Header & Segmented Workspace Switcher */}
+      <div className="rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xs relative overflow-hidden transition-all">
+        <div className="absolute -top-16 -right-16 w-64 h-64 bg-gradient-to-bl from-indigo-500/10 via-purple-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
+          <div className="flex items-center gap-3.5 min-w-0">
             <MascotAvatar
               mood={persona === 'Teacher' ? 'teacher' : 'happy'}
-              size="md"
+              size="sm"
               className="shrink-0 hidden sm:inline-flex"
             />
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-300/40 dark:border-indigo-700/50 shadow-2xs">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
-                <span>AI Multi-Modal Assessment Studio</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Create Custom Quizzes in Seconds
+                </h2>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80">
+                  <Sparkles className="w-3 h-3 text-indigo-500" />
+                  <span>Multi-Modal Studio</span>
+                </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                Create Custom Quizzes in Seconds
-              </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Generate tailored, interactive quizzes from custom topics, documents, voice audio recordings, or YouTube video lectures.
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                Generate tailored assessments from notes, documents, voice recordings, or curated tracks.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 bg-gradient-to-br from-slate-50 to-indigo-50/50 dark:from-slate-800/80 dark:to-indigo-950/30 p-3.5 rounded-2xl border border-slate-200/80 dark:border-indigo-900/40 shrink-0 shadow-2xs">
-            <div className="p-2.5 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-500/20">
-              <GraduationCap className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                Evaluation Mode
-              </div>
-              <div className="text-xs font-black text-slate-900 dark:text-white">
-                {persona === 'Teacher' ? '🧑‍🏫 Teacher / Formative' : '🎓 Student / Practice'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Launch Topic Capsules */}
-        <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800/80 relative z-10">
-          <div className="flex items-center gap-2 mb-3">
-            <Compass className="w-3.5 h-3.5 text-indigo-500" />
-            <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Popular Topic Starters:
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_STARTER_TOPICS.map((topic) => (
-              <button
-                key={topic.label}
-                type="button"
-                onClick={() => {
-                  soundFx.playClick();
-                  setActiveTab('text');
-                  setInputText(topic.prompt);
-                  const creationCard = document.getElementById('creation-card-main');
-                  if (creationCard) {
-                    creationCard.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-2xs hover:scale-105 hover:shadow-xs active:scale-95 ${topic.color}`}
-              >
-                <span>{topic.icon}</span>
-                <span>{topic.label}</span>
-              </button>
-            ))}
+          {/* Segmented Workspace Switcher (Matches 3-View Clean Organization) */}
+          <div className="flex items-center p-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 self-start lg:self-center shrink-0">
+            {[
+              { id: 'builder', label: 'Studio Builder', icon: Sparkles },
+              { id: 'tracks', label: `Curated Tracks (${PRESET_TOPICS.length})`, icon: BookOpen },
+              { id: 'recommended', label: 'For You', icon: Compass },
+            ].map((view) => {
+              const Icon = view.icon;
+              const isSelected = studioSection === view.id;
+              return (
+                <button
+                  key={view.id}
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setStudioSection(view.id as 'builder' | 'tracks' | 'recommended');
+                  }}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                    isSelected
+                      ? `${currentAccentConfig.activeBtn} text-white shadow-xs`
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{view.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -498,197 +500,323 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
         </div>
       )}
 
-      {/* AI-Recommended Quizzes Section (Adaptive Pedagogical Suggestions) */}
-      <RecommendedQuizzesSection
-        persona={persona}
-        stats={stats}
-        historyRecords={historyRecords}
-        onStartQuiz={onStartQuiz}
-        onCustomizeTopic={handleCustomizeTopic}
-        onOpenTutor={onOpenTutor}
-      />
+      {/* VIEW 3: Dedicated Personalized Recommendations View */}
+      {studioSection === 'recommended' && (
+        <RecommendedQuizzesSection
+          persona={persona}
+          stats={stats}
+          historyRecords={historyRecords}
+          onStartQuiz={onStartQuiz}
+          onCustomizeTopic={handleCustomizeTopic}
+          onOpenTutor={onOpenTutor}
+        />
+      )}
 
-      {/* Main Creation Card */}
-      <div
-        id="creation-card-main"
-        className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-colors"
-      >
-        {/* Creation Mode Tabs */}
-        <div className="flex border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 p-2 gap-2 overflow-x-auto scrollbar-none items-center">
-          {[
-            { id: 'presets', label: 'Curated Sets', icon: Lightbulb },
-            { id: 'text', label: 'Notes & Prompts', icon: FileText },
-            { id: 'file', label: 'Document & Images', icon: Upload },
-            { id: 'audio', label: 'Spoken Memo', icon: Mic },
-            { id: 'url', label: 'Web / Video URL', icon: Link2 },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                id={`tab-select-${tab.id}`}
-                onClick={() => {
-                  soundFx.playClick();
-                  setActiveTab(tab.id as 'presets' | 'text' | 'file' | 'audio' | 'url');
-                }}
-                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  isActive
-                    ? `${currentAccentConfig.activeBtn} text-white shadow-xs`
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.label}</span>
-                {tab.id === 'audio' && (
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                )}
-              </button>
-            );
-          })}
-
-          {onOpenUploadQuiz && (
+      {/* VIEW 2: Dedicated Curated Curriculum Tracks View */}
+      {studioSection === 'tracks' && (
+        <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <span>Curated Curriculum Tracks</span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold border border-indigo-200 dark:border-indigo-800">
+                  {PRESET_TOPICS.length} Tracks
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Launch a prebuilt track immediately or generate fresh AI questions tailored to your settings.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => {
                 soundFx.playClick();
-                onOpenUploadQuiz();
+                setStudioSection('builder');
               }}
-              className="ml-auto flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-black border border-indigo-200/80 dark:border-indigo-800/80 transition-all cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
-              title="Upload your own created quiz (JSON or text)"
+              className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer self-start sm:self-center"
             >
-              <Upload className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Upload Created Quiz</span>
+              ← Back to Studio Builder
             </button>
-          )}
-        </div>
+          </div>
 
-        {/* Tab Body Contents */}
-        <div className="p-6">
-          {/* Tab 1: Popular Starter Topics */}
-          {activeTab === 'presets' && (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>Curated Curriculum Tracks</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold border border-indigo-200 dark:border-indigo-800">
-                      {PRESET_TOPICS.length} Tracks
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Select a curriculum topic to generate a fresh AI assessment with your custom matrix, or play the prebuilt track instantly.
-                  </p>
-                </div>
-                {selectedPreset && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-indigo-500" />
-                    <span>Active Topic: {selectedPreset.title}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {PRESET_TOPICS.map((preset) => {
-                  const isSelected = selectedPresetId === preset.id;
-                  return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {PRESET_TOPICS.map((preset) => {
+              const isSelected = selectedPresetId === preset.id;
+              return (
+                <div
+                  key={preset.id}
+                  onClick={() => {
+                    soundFx.playClick();
+                    setSelectedPresetId(preset.id);
+                    setInputText(preset.inputText);
+                    setSelectedQuestionTypes(preset.suggestedTypes);
+                    setValidationWarning(null);
+                    setErrorMessage(null);
+                  }}
+                  className={`p-4 rounded-2xl border transition-all text-left cursor-pointer relative flex flex-col justify-between ${
+                    isSelected
+                      ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 shadow-sm ring-2 ring-indigo-500/20'
+                      : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 hover:border-indigo-300 dark:hover:border-indigo-700'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-2xl">{preset.icon}</span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        {isSelected ? '✓ Selected' : preset.category}
+                      </span>
+                    </div>
                     <div
-                      key={preset.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenTrackDetail(preset);
+                      }}
+                      className="cursor-pointer group/title"
+                    >
+                      <div className="font-extrabold text-sm text-slate-900 dark:text-white group-hover/title:text-indigo-600 dark:group-hover/title:text-indigo-400 transition-colors">
+                        {preset.title}
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                        {preset.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenTrackDetail(preset);
+                      }}
+                      className="w-full py-1.5 px-2.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-200/80 dark:border-indigo-800/80"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Key Takeaways</span>
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          soundFx.playClick();
+                          setSelectedPresetId(preset.id);
+                          setInputText(preset.inputText);
+                          handleGenerateQuiz(preset.inputText);
+                        }}
+                        className="py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>AI Quiz</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLoadPreset(preset);
+                        }}
+                        className="py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Prebuilt</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 1: Default Studio Builder (12-Column Bento Dashboard Grid) */}
+      {studioSection === 'builder' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Primary Creation Column (8 Cols) */}
+          <div
+            id="creation-card-main"
+            className="lg:col-span-8 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-colors"
+          >
+            {/* Creation Mode Tabs */}
+            <div className="flex border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 p-2.5 gap-1.5 overflow-x-auto scrollbar-none items-center">
+              {[
+                { id: 'text', label: 'Notes & Prompts', icon: FileText },
+                { id: 'file', label: 'Files & Images', icon: Upload },
+                { id: 'audio', label: 'Voice Memo', icon: Mic },
+                { id: 'url', label: 'Web / Video URL', icon: Link2 },
+                { id: 'presets', label: 'Curated Sets', icon: Lightbulb },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    id={`tab-select-${tab.id}`}
+                    onClick={() => {
+                      soundFx.playClick();
+                      setActiveTab(tab.id as 'presets' | 'text' | 'file' | 'audio' | 'url');
+                    }}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                      isActive
+                        ? `${currentAccentConfig.activeBtn} text-white shadow-xs`
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{tab.label}</span>
+                    {tab.id === 'audio' && (
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    )}
+                  </button>
+                );
+              })}
+
+              {onOpenUploadQuiz && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    onOpenUploadQuiz();
+                  }}
+                  className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-black border border-indigo-200/80 dark:border-indigo-800/80 transition-all cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
+                  title="Upload your own created quiz (JSON or text)"
+                >
+                  <Upload className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="hidden sm:inline">Upload Quiz</span>
+                </button>
+              )}
+            </div>
+
+            {/* Tab Body Contents */}
+            <div className="p-5 sm:p-6">
+              {/* Tab 1: Popular Starter Topics (Compact 4-Card Featured View inside Builder) */}
+              {activeTab === 'presets' && (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                        <span>Featured Curriculum Tracks</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold border border-indigo-200 dark:border-indigo-800">
+                          {selectedPreset.title}
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Pick a track below or browse all {PRESET_TOPICS.length} curriculum tracks.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
                       onClick={() => {
                         soundFx.playClick();
-                        setSelectedPresetId(preset.id);
-                        setInputText(preset.inputText);
-                        setSelectedQuestionTypes(preset.suggestedTypes);
-                        setValidationWarning(null);
-                        setErrorMessage(null);
+                        setShowAllPresetsInBuilder((prev) => !prev);
                       }}
-                      className={`p-4 rounded-2xl border transition-all text-left cursor-pointer relative flex flex-col justify-between ${
-                        isSelected
-                          ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 shadow-sm ring-2 ring-indigo-500/20'
-                          : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 hover:border-indigo-300 dark:hover:border-indigo-700'
-                      }`}
+                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer shrink-0 self-start sm:self-center"
                     >
-                      <div>
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <span className="text-2xl">{preset.icon}</span>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              isSelected
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            {isSelected ? '✓ Selected Topic' : preset.category}
-                          </span>
-                        </div>
+                      {showAllPresetsInBuilder ? 'Show Featured (4)' : `Show All (${PRESET_TOPICS.length}) →`}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {displayedPresets.map((preset) => {
+                      const isSelected = selectedPresetId === preset.id;
+                      return (
                         <div
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenTrackDetail(preset);
+                          key={preset.id}
+                          onClick={() => {
+                            soundFx.playClick();
+                            setSelectedPresetId(preset.id);
+                            setInputText(preset.inputText);
+                            setSelectedQuestionTypes(preset.suggestedTypes);
+                            setValidationWarning(null);
+                            setErrorMessage(null);
                           }}
-                          className="cursor-pointer group/title"
-                          title="Click to view Key Takeaways & review source material"
+                          className={`p-4 rounded-2xl border transition-all text-left cursor-pointer relative flex flex-col justify-between ${
+                            isSelected
+                              ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 shadow-sm ring-2 ring-indigo-500/20'
+                              : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 hover:border-indigo-300 dark:hover:border-indigo-700'
+                          }`}
                         >
-                          <div className="font-extrabold text-sm text-slate-900 dark:text-white group-hover/title:text-indigo-600 dark:group-hover/title:text-indigo-400 transition-colors">
-                            {preset.title}
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="text-xl">{preset.icon}</span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  isSelected
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                                }`}
+                              >
+                                {isSelected ? '✓ Selected' : preset.category}
+                              </span>
+                            </div>
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenTrackDetail(preset);
+                              }}
+                              className="cursor-pointer group/title"
+                            >
+                              <div className="font-extrabold text-sm text-slate-900 dark:text-white group-hover/title:text-indigo-600 dark:group-hover/title:text-indigo-400 transition-colors">
+                                {preset.title}
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                                {preset.description}
+                              </p>
+                            </div>
                           </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                            {preset.description}
-                          </p>
-                        </div>
-                      </div>
 
-                      <div className="space-y-2 mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenTrackDetail(preset);
-                          }}
-                          className="w-full py-1.5 px-2.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-200/80 dark:border-indigo-800/80 shadow-2xs hover:shadow-xs"
-                          title="Review AI-generated key takeaways & source summary before starting"
-                        >
-                          <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
-                          <span>Key Takeaways & Review</span>
-                        </button>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              soundFx.playClick();
-                              setSelectedPresetId(preset.id);
-                              setInputText(preset.inputText);
-                              handleGenerateQuiz(preset.inputText);
-                            }}
-                            className="py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
-                            title="Generate fresh questions using Gemini AI"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span>AI Quiz</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleLoadPreset(preset);
-                            }}
-                            className="py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
-                            title="Play prebuilt questions immediately"
-                          >
-                            <Zap className="w-3.5 h-3.5 text-amber-500" />
-                            <span>Prebuilt</span>
-                          </button>
+                          <div className="grid grid-cols-3 gap-1.5 mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenTrackDetail(preset);
+                              }}
+                              className="py-1.5 px-2 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer border border-indigo-200/80 dark:border-indigo-800/80"
+                            >
+                              <BookOpen className="w-3 h-3 text-indigo-500" />
+                              <span>Review</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                soundFx.playClick();
+                                setSelectedPresetId(preset.id);
+                                setInputText(preset.inputText);
+                                handleGenerateQuiz(preset.inputText);
+                              }}
+                              className="py-1.5 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-black flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              <span>AI Quiz</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleLoadPreset(preset);
+                              }}
+                              className="py-1.5 px-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
+                            >
+                              <Zap className="w-3 h-3 text-amber-500" />
+                              <span>Play</span>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
           {/* Tab 2: Paste Notes / Text */}
           {activeTab === 'text' && (
@@ -1091,17 +1219,20 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             </div>
           </div>
 
-          {/* Prompter Flexibility & Pedagogical Directives (User Request) */}
-          <div className="rounded-2xl border border-indigo-200/70 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 p-4 transition-all">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-xs">
+          {/* Unified Collapsible Formats & AI Prompter Directives */}
+          <div className="rounded-2xl border border-indigo-200/70 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 p-3.5 sm:p-4 transition-all">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-xs shrink-0">
                   <SlidersHorizontal className="w-4 h-4" />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                      Prompter Flexibility & Custom AI Directives
+                      Question Formats & AI Directives
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      {selectedQuestionTypes.length} {selectedQuestionTypes.length === 1 ? 'Format' : 'Formats'}
                     </span>
                     {(customInstructions.trim() || promptStyle !== 'Standard' || focusSubtopics.trim()) && (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
@@ -1109,8 +1240,8 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Fine-tune AI pedagogical focus, target audience, style, and domain constraints.
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    Configure cognitive question types, target audience, style & domain rules.
                   </p>
                 </div>
               </div>
@@ -1121,9 +1252,9 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                   soundFx.playClick();
                   setShowAdvancedPrompter(!showAdvancedPrompter);
                 }}
-                className="px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                className="px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0"
               >
-                <span>{showAdvancedPrompter ? 'Hide Tuning' : 'Customize Prompter'}</span>
+                <span>{showAdvancedPrompter ? 'Hide Options' : 'Customize'}</span>
                 {showAdvancedPrompter ? (
                   <ChevronUp className="w-3.5 h-3.5" />
                 ) : (
@@ -1132,30 +1263,67 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
               </button>
             </div>
 
-            {/* Quick Modifier Chips */}
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {PROMPT_MODIFIERS.map((mod, i) => {
-                const isActive = customInstructions.includes(mod.text);
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleApplyModifier(mod.text)}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer flex items-center gap-1 ${
-                      isActive
-                        ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
-                        : 'bg-white/80 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-400 dark:hover:border-indigo-600'
-                    }`}
-                  >
-                    <span>{mod.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Expanded Prompter Drawer */}
+            {/* Expanded Prompter & Formats Drawer */}
             {showAdvancedPrompter && (
               <div className="mt-4 pt-4 border-t border-indigo-200/60 dark:border-indigo-900/50 space-y-4">
+                {/* Question Formats Checkbox Row */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                    Cognitive Formats Included
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'multiple_choice' as QuestionType, label: 'Multiple Choice (MCQ)' },
+                      { id: 'fill_in_blank' as QuestionType, label: 'Fill in the Blank' },
+                      { id: 'open_explanation' as QuestionType, label: 'Short Conceptual Explanation' },
+                      { id: 'code_media_challenge' as QuestionType, label: 'Code & Media Tasks' },
+                    ].map((t) => {
+                      const isSelected = selectedQuestionTypes.includes(t.id);
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => toggleQuestionType(t.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 shadow-2xs font-extrabold'
+                              : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                          }`}
+                        >
+                          {isSelected ? '✓ ' : '+ '}
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Quick Modifier Chips */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                    One-Click Pedagogical Lenses
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PROMPT_MODIFIERS.map((mod, i) => {
+                      const isActive = customInstructions.includes(mod.text);
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => handleApplyModifier(mod.text)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer flex items-center gap-1 ${
+                            isActive
+                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
+                              : 'bg-white/80 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-400 dark:hover:border-indigo-600'
+                          }`}
+                        >
+                          <span>{mod.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Custom Directives Textarea */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -1274,38 +1442,6 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             )}
           </div>
 
-          {/* Question Formats Checkbox Row */}
-          <div>
-            <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-              Cognitive Formats Included
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: 'multiple_choice' as QuestionType, label: 'Multiple Choice (MCQ)' },
-                { id: 'fill_in_blank' as QuestionType, label: 'Fill in the Blank' },
-                { id: 'open_explanation' as QuestionType, label: 'Short Conceptual Explanation' },
-                { id: 'code_media_challenge' as QuestionType, label: 'Code & Media Tasks' },
-              ].map((t) => {
-                const isSelected = selectedQuestionTypes.includes(t.id);
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => toggleQuestionType(t.id)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 shadow-2xs font-extrabold'
-                        : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                    }`}
-                  >
-                    {isSelected ? '✓ ' : '+ '}
-                    {t.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Validation Warning Banner */}
           {validationWarning && (
             <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-sm shadow-xs animate-shake">
@@ -1353,7 +1489,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
           )}
 
           {/* Primary Action Button */}
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="button"
               id="generate-quiz-btn"
@@ -1382,6 +1518,168 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
           </div>
         </div>
       </div>
+
+          {/* Right Bento Widget Column (4 Cols — Matches Gauge & Modular Cards in Reference Images) */}
+          <div className="lg:col-span-4 space-y-5">
+            {/* Bento Card 1: Circular Mastery & Evaluation Gauge */}
+            <div className="rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  Scholar Mastery Gauge
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80">
+                  {persona === 'Teacher' ? '🧑‍🏫 Instructor' : '🎓 Student'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
+                  <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r={ringRadius}
+                      className="text-slate-100 dark:text-slate-800"
+                      strokeWidth="5"
+                      stroke="currentColor"
+                      fill="transparent"
+                    />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r={ringRadius}
+                      stroke="url(#studioBentoGauge)"
+                      strokeWidth="5"
+                      strokeDasharray={ringCircumference}
+                      strokeDashoffset={ringDashoffset}
+                      strokeLinecap="round"
+                      fill="transparent"
+                    />
+                    <defs>
+                      <linearGradient id="studioBentoGauge" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#6366f1" />
+                        <stop offset="100%" stopColor="#a855f7" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xs font-black text-slate-900 dark:text-white leading-none">
+                      L{currentLevel}
+                    </span>
+                    <span className="text-[9px] font-bold text-indigo-500">{levelProgressPct}%</span>
+                  </div>
+                </div>
+
+                <div className="flex-1 grid grid-cols-2 gap-2">
+                  <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="text-[10px] font-bold text-slate-400">Streak</div>
+                    <div className="text-sm font-black text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-0.5">
+                      <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                      <span>{stats.streak}d</span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="text-[10px] font-bold text-slate-400">Accuracy</div>
+                    <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
+                      <BarChart3 className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>{accuracyPct}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bento Card 2: Quick Topic Starters */}
+            <div className="rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Compass className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Quick Topic Starters
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setStudioSection('tracks');
+                  }}
+                  className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                >
+                  All 12 Tracks →
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {QUICK_STARTER_TOPICS.map((topic) => (
+                  <button
+                    key={topic.label}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setActiveTab('text');
+                      setInputText(topic.prompt);
+                      setValidationWarning(null);
+                      setErrorMessage(null);
+                    }}
+                    className={`flex items-center gap-2 p-2.5 rounded-2xl text-xs font-bold border transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 ${topic.color}`}
+                  >
+                    <span className="text-base shrink-0">{topic.icon}</span>
+                    <span className="truncate">{topic.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bento Card 3: Adaptive AI Recommendations Spotlight */}
+            <div className="rounded-3xl p-5 border border-indigo-200/70 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/30 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-500" />
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                    Adaptive AI For You
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                  {historyRecords.length} Evaluated
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                {historyRecords.length > 0
+                  ? 'Personalized remediation & progression quizzes synced with your Firestore history.'
+                  : 'Complete your first quiz to unlock tailored weak-spot diagnostics and adaptive tracks.'}
+              </p>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setStudioSection('recommended');
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                >
+                  <span>View Recommendations</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                {onOpenTutor && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      onOpenTutor();
+                    }}
+                    className="py-2.5 px-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Ask Tutor
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* QuizTrack Detail Drawer with AI Key Takeaways Summary Section */}
       <QuizTrackDetailDrawer

@@ -98,16 +98,142 @@
   /* Reduced Motion Mode */
   html[data-motion="reduced"] *,
   html[data-motion="reduced"] *::before,
-  html[data-motion="reduced"] *::after {
+  html[data-motion="reduced"] *::after,
+  html[data-animation-style="minimal"] *,
+  html[data-animation-style="minimal"] *::before,
+  html[data-animation-style="minimal"] *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+
+  /* Dynamic Spring & Smooth Physics Variables */
+  html[data-animation-style="bouncy"] {
+    --spring-easing: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --spring-duration: 320ms;
+    --btn-hover-scale: 1.03;
+    --btn-active-scale: 0.94;
+    --card-lift-y: -4px;
+  }
+
+  html[data-animation-style="bouncy"][data-animation-intensity="subtle"] {
+    --spring-easing: cubic-bezier(0.28, 1.32, 0.54, 1);
+    --spring-duration: 260ms;
+    --btn-hover-scale: 1.015;
+    --btn-active-scale: 0.97;
+    --card-lift-y: -2px;
+  }
+
+  html[data-animation-style="bouncy"][data-animation-intensity="extra"] {
+    --spring-easing: cubic-bezier(0.38, 1.82, 0.58, 1);
+    --spring-duration: 390ms;
+    --btn-hover-scale: 1.05;
+    --btn-active-scale: 0.91;
+    --card-lift-y: -6px;
+  }
+
+  html[data-animation-style="smooth"] {
+    --spring-easing: cubic-bezier(0.22, 1, 0.36, 1);
+    --spring-duration: 280ms;
+    --btn-hover-scale: 1.015;
+    --btn-active-scale: 0.98;
+    --card-lift-y: -3px;
+  }
+
+  html[data-animation-style="snappy"] {
+    --spring-easing: cubic-bezier(0.16, 1, 0.3, 1);
+    --spring-duration: 160ms;
+    --btn-hover-scale: 1.025;
+    --btn-active-scale: 0.95;
+    --card-lift-y: -3px;
+  }
+
+  /* Tactile Button Bounce & Squish Physics */
+  html[data-button-bounce="true"]:not([data-animation-style="minimal"]) button:not(:disabled) {
+    transition:
+      transform var(--spring-duration, 300ms) var(--spring-easing, cubic-bezier(0.34, 1.56, 0.64, 1)),
+      background-color 200ms ease,
+      border-color 200ms ease,
+      box-shadow 220ms ease,
+      color 180ms ease;
+  }
+
+  html[data-button-bounce="true"]:not([data-animation-style="minimal"]) button:not(:disabled):hover {
+    transform: translateY(-1px) scale(var(--btn-hover-scale, 1.025));
+  }
+
+  html[data-button-bounce="true"]:not([data-animation-style="minimal"]) button:not(:disabled):active {
+    transform: translateY(1px) scale(var(--btn-active-scale, 0.95));
+  }
+
+  /* Card 3D Spring Hover Lift */
+  html[data-card-lift="true"]:not([data-animation-style="minimal"]) .rounded-3xl {
+    transition:
+      transform var(--spring-duration, 320ms) var(--spring-easing, cubic-bezier(0.34, 1.56, 0.64, 1)),
+      box-shadow 260ms ease,
+      border-color 220ms ease;
   }
 
   /* UI Density compact mode scale */
   html[data-density="compact"] {
     font-size: 14.5px;
   }
+}
+
+/* Bouncy Keyframes for Gamified UI & Kahoot! Arena */
+@keyframes springPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.75) translateY(14px);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.04) translateY(-3px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes kahootPulseBeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes floatEmojiUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.6) rotate(-8deg);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0px) scale(1.15) rotate(6deg);
+  }
+  80% {
+    opacity: 0.9;
+    transform: translateY(-90px) scale(1) rotate(-4deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-130px) scale(0.8) rotate(8deg);
+  }
+}
+
+.animate-spring-pop {
+  animation: springPopIn 0.45s var(--spring-easing, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+}
+
+.animate-kahoot-beat {
+  animation: kahootPulseBeat 1.2s ease-in-out infinite;
+}
+
+.animate-float-emoji {
+  animation: floatEmojiUp 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* Vibrant animations & mesh backdrops */
@@ -175,6 +301,133 @@
   box-shadow: 0 12px 28px -6px rgba(99, 102, 241, 0.15), 0 8px 16px -4px rgba(168, 85, 247, 0.1);
 }
 
+/* ==========================================================================
+   UI ELEMENT HOVER GLINT ANIMATION (Plays when hovering over UI elements)
+   ========================================================================== */
+@keyframes uiGlintSweep {
+  0% {
+    transform: translateX(-160%) skewX(-22deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(220%) skewX(-22deg);
+    opacity: 0;
+  }
+}
+
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) :where(button:not(:disabled):not(.no-glint), .kahoot-tile, .glint-hover) {
+  position: relative;
+  overflow: hidden;
+}
+
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) button:not(:disabled):not(.no-glint)::after,
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) .kahoot-tile::after,
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) .glint-hover::after {
+  content: '';
+  position: absolute;
+  top: -10%;
+  left: 0;
+  width: 45%;
+  height: 120%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.28) 45%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0.28) 55%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-160%) skewX(-22deg);
+  pointer-events: none;
+  z-index: 15;
+  opacity: 0;
+}
+
+html.dark:not([data-motion="reduced"]):not([data-hover-glint="false"]) button:not(:disabled):not(.no-glint)::after,
+html.dark:not([data-motion="reduced"]):not([data-hover-glint="false"]) .kahoot-tile::after,
+html.dark:not([data-motion="reduced"]):not([data-hover-glint="false"]) .glint-hover::after {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.14) 45%,
+    rgba(255, 255, 255, 0.34) 50%,
+    rgba(255, 255, 255, 0.14) 55%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) button:not(:disabled):not(.no-glint):hover::after,
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) .kahoot-tile:hover::after,
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) .glint-hover:hover::after {
+  animation: uiGlintSweep 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Interactive Card Hover Glint Border & Sheen */
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) :where(.rounded-3xl.group, .rounded-2xl.group) {
+  position: relative;
+  overflow: hidden;
+}
+
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) .rounded-3xl.group::after,
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) .rounded-2xl.group::after {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: 0;
+  width: 38%;
+  height: 140%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(99, 102, 241, 0.08) 35%,
+    rgba(255, 255, 255, 0.38) 50%,
+    rgba(168, 85, 247, 0.08) 65%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-180%) skewX(-22deg);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+}
+
+html.dark:not([data-motion="reduced"]):not([data-hover-glint="false"]) .rounded-3xl.group::after,
+html.dark:not([data-motion="reduced"]):not([data-hover-glint="false"]) .rounded-2xl.group::after {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(99, 102, 241, 0.12) 35%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(168, 85, 247, 0.12) 65%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) .rounded-3xl.group:hover::after,
+html:not([data-motion="reduced"]):not([data-hover-glint="false"]) .rounded-2xl.group:hover::after {
+  animation: uiGlintSweep 0.78s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Music Studio Live Equalizer & Vinyl Animations */
+@keyframes musicEqPulse {
+  0%, 100% {
+    transform: scaleY(0.22);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.animate-eq-bar {
+  transform-origin: bottom;
+  animation: musicEqPulse 0.8s ease-in-out infinite;
+}
+
 /* Custom smooth scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
@@ -190,5 +443,6 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.6);
 }
+
 
 
