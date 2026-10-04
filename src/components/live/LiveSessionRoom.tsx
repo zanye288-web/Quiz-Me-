@@ -44,69 +44,65 @@ interface LiveSessionRoomProps {
   onAwardLiveRewards?: (xpEarned: number, gemsEarned: number, wonFirstPlace: boolean) => void;
 }
 
-const KAHOOT_SHAPES = [
+const OPTION_TILES = [
   {
     index: 0,
-    name: 'Triangle',
-    symbol: '▲',
+    name: 'Option A',
+    symbol: 'A',
     keyHint: '1',
-    bg: 'bg-[#e21b3c] hover:bg-[#c81533]',
-    barBg: 'bg-[#e21b3c]',
-    shadow: 'shadow-[0_6px_0_#9c1028]',
-    border: 'border-[#ff4d6d]',
-    hex: '#e21b3c',
+    bg: 'bg-indigo-600 hover:bg-indigo-500',
+    barBg: 'bg-indigo-600',
+    shadow: 'shadow-sm',
+    border: 'border-indigo-400/50',
   },
   {
     index: 1,
-    name: 'Diamond',
-    symbol: '◆',
+    name: 'Option B',
+    symbol: 'B',
     keyHint: '2',
-    bg: 'bg-[#1368ce] hover:bg-[#1056ac]',
-    barBg: 'bg-[#1368ce]',
-    shadow: 'shadow-[0_6px_0_#0b3d7a]',
-    border: 'border-[#4ea0ff]',
-    hex: '#1368ce',
+    bg: 'bg-violet-600 hover:bg-violet-500',
+    barBg: 'bg-violet-600',
+    shadow: 'shadow-sm',
+    border: 'border-violet-400/50',
   },
   {
     index: 2,
-    name: 'Circle',
-    symbol: '●',
+    name: 'Option C',
+    symbol: 'C',
     keyHint: '3',
-    bg: 'bg-[#d89e00] hover:bg-[#b88600]',
-    barBg: 'bg-[#d89e00]',
-    shadow: 'shadow-[0_6px_0_#8a6400]',
-    border: 'border-[#ffd04d]',
-    hex: '#d89e00',
+    bg: 'bg-amber-600 hover:bg-amber-500',
+    barBg: 'bg-amber-500',
+    shadow: 'shadow-sm',
+    border: 'border-amber-400/50',
   },
   {
     index: 3,
-    name: 'Square',
-    symbol: '■',
+    name: 'Option D',
+    symbol: 'D',
     keyHint: '4',
-    bg: 'bg-[#26890c] hover:bg-[#1f7009]',
-    barBg: 'bg-[#26890c]',
-    shadow: 'shadow-[0_6px_0_#154d06]',
-    border: 'border-[#5cd63a]',
-    hex: '#26890c',
+    bg: 'bg-emerald-600 hover:bg-emerald-500',
+    barBg: 'bg-emerald-600',
+    shadow: 'shadow-sm',
+    border: 'border-emerald-400/50',
   },
 ];
 
-const KAHOOT_WAITING_QUIPS = [
-  'Genius machine at work...',
-  'Were you fast enough for maximum speed points?',
-  'Classroom legend in the making...',
-  'Calculating your streak flame multiplier...',
-  'Drumroll please...',
+const WAITING_MESSAGES = [
+  'Checking your speed bonus...',
+  'Nice! Waiting for everyone else to finish...',
+  'Great job locking in your answer!',
+  'Counting up your streak bonus...',
+  'Get ready to see the results...',
 ];
 
 const AVATAR_BADGE_MAP: Record<string, string> = {
-  rose: 'bg-[#e21b3c]',
-  indigo: 'bg-[#1368ce]',
-  amber: 'bg-[#d89e00]',
-  emerald: 'bg-[#26890c]',
-  violet: 'bg-[#46178f]',
-  cyan: 'bg-[#0891b2]',
-  teal: 'bg-[#0d9488]',
+  rose: 'bg-rose-600',
+  indigo: 'bg-indigo-600',
+  amber: 'bg-amber-600',
+  emerald: 'bg-emerald-600',
+  violet: 'bg-violet-600',
+  cyan: 'bg-cyan-600',
+  teal: 'bg-teal-600',
 };
 
 interface FloatingEmote {
@@ -212,7 +208,7 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
       }
       setHiddenOptionIndices([]);
       setReviewSubView('chart');
-      setWaitingQuipIndex(Math.floor(Math.random() * KAHOOT_WAITING_QUIPS.length));
+      setWaitingQuipIndex(Math.floor(Math.random() * WAITING_MESSAGES.length));
 
       // Trigger brief "Get Ready!" splash on question start
       setShowGetReadySplash(true);
@@ -599,63 +595,63 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
   const isFinalDoubleRound = currentQIndex === questions.length - 1 && questions.length > 1;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5 pb-12 relative">
+    <div className="max-w-5xl mx-auto space-y-4 pb-8 relative">
       {/* Floating Live Reaction Emotes Overlay */}
-      <div className="fixed inset-x-0 bottom-16 pointer-events-none z-50 overflow-hidden h-64">
+      <div className="fixed inset-x-0 bottom-16 pointer-events-none z-50 overflow-hidden h-56">
         {floatingEmotes.map((item) => (
           <div
             key={item.id}
             style={{ left: `${item.leftPercent}%` }}
-            className="absolute bottom-0 text-4xl animate-float-emoji drop-shadow-lg"
+            className="absolute bottom-0 text-3xl animate-float-emoji drop-shadow-lg"
           >
             {item.emoji}
           </div>
         ))}
       </div>
 
-      {/* ================= KAHOOT! TOP CONTROL & GAME PIN BAR ================= */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 rounded-3xl bg-[#25076b] text-white border-2 border-purple-400/30 shadow-xl">
+      {/* ================= TOP CONTROL & GAME CODE BAR ================= */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md">
         <div className="flex items-center gap-3">
-          {/* PIN Badge */}
+          {/* Code Badge */}
           <button
             type="button"
             onClick={handleCopyRoomCode}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-white text-[#25076b] font-mono font-black text-sm hover:bg-purple-100 transition-all cursor-pointer shadow-sm"
-            title="Click to copy Game PIN"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-600/20 border border-indigo-500/40 text-indigo-200 font-mono font-black text-xs hover:bg-indigo-600/30 transition-all cursor-pointer"
+            title="Click to copy Game Code"
           >
-            <span className="text-[10px] uppercase tracking-wider text-purple-700 font-sans">
-              PIN:
+            <span className="text-[10px] uppercase tracking-wider text-indigo-300 font-sans">
+              CODE:
             </span>
-            <span className="tracking-widest text-base">{roomCode}</span>
+            <span className="tracking-widest text-sm text-white">{roomCode}</span>
             {copiedCode ? (
-              <Check className="w-4 h-4 text-emerald-600" />
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
             ) : (
-              <Copy className="w-3.5 h-3.5 text-purple-600" />
+              <Copy className="w-3 h-3 text-indigo-300" />
             )}
           </button>
 
           <div className="hidden sm:block">
-            <h2 className="text-sm font-black text-white truncate max-w-xs">
+            <h2 className="text-xs font-black text-white truncate max-w-xs">
               {session.quiz?.quiz_title}
             </h2>
-            <p className="text-[11px] text-purple-200 font-semibold">
+            <p className="text-[11px] text-slate-400 font-medium">
               {session.status === 'lobby'
-                ? 'Waiting for players in lobby...'
+                ? 'Waiting for players to join...'
                 : session.status === 'finished'
-                ? 'Final Podium Standings'
+                ? 'Final Results'
                 : `Question ${currentQIndex + 1} of ${questions.length}`}
             </p>
           </div>
         </div>
 
         {/* Center Reaction Emote Bar */}
-        <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md px-2.5 py-1 rounded-2xl border border-white/15">
+        <div className="flex items-center gap-1 bg-slate-800/90 px-2 py-1 rounded-xl border border-slate-700">
           {['🔥', '🎉', '⚡', '🧠', '👑', '🚀'].map((em) => (
             <button
               key={em}
               type="button"
               onClick={() => handleTriggerEmote(em)}
-              className="w-8 h-8 rounded-xl hover:bg-white/20 flex items-center justify-center text-base transition-transform cursor-pointer"
+              className="w-7 h-7 rounded-lg hover:bg-slate-700 flex items-center justify-center text-sm transition-transform cursor-pointer"
               title={`Send ${em} reaction`}
             >
               {em}
@@ -664,26 +660,26 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
         </div>
 
         {/* Right Music Toggle, Player Score & Leave */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleToggleMusic}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
               isMusicOn
-                ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-sm'
-                : 'bg-white/10 text-purple-100 border-white/20 hover:bg-white/20'
+                ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
+                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
             }`}
-            title="Toggle synthesized Kahoot! groove music"
+            title="Turn game music on or off"
           >
-            {isMusicOn ? <Volume2 className="w-4 h-4 animate-bounce" /> : <VolumeX className="w-4 h-4" />}
-            <span className="hidden md:inline">{isMusicOn ? 'Groove ON' : 'Music'}</span>
+            {isMusicOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span className="hidden md:inline">{isMusicOn ? 'Music On' : 'Music'}</span>
           </button>
 
           {currentParticipant && (
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-black/40 border border-white/15">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700">
               {currentParticipant.streak >= 2 && (
                 <span className="inline-flex items-center gap-0.5 text-xs font-black text-amber-400">
-                  <Flame className="w-3.5 h-3.5 fill-amber-400 animate-bounce" />
+                  <Flame className="w-3.5 h-3.5 fill-amber-400" />
                   {currentParticipant.streak}
                 </span>
               )}
@@ -700,67 +696,67 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
               soundFx.playClick();
               onLeave();
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#e21b3c] hover:bg-[#c81533] text-white text-xs font-black transition-all cursor-pointer shadow-xs"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Exit</span>
+            <span className="hidden sm:inline">Leave</span>
           </button>
         </div>
       </div>
 
-      {/* ================= 1. KAHOOT! LOBBY PHASE ================= */}
+      {/* ================= 1. LOBBY PHASE ================= */}
       {session.status === 'lobby' && (
-        <div className="rounded-3xl overflow-hidden bg-gradient-to-b from-[#46178f] via-[#34116c] to-[#21084a] text-white shadow-2xl border-2 border-purple-400/30 p-6 sm:p-10 space-y-8 animate-spring-pop">
-          {/* Giant Kahoot! Join Header Card */}
-          <div className="max-w-3xl mx-auto bg-white text-slate-900 rounded-3xl p-5 sm:p-7 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6 border-4 border-purple-300">
+        <div className="rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-6 space-y-5">
+          {/* Join Header Card */}
+          <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-violet-950 text-white rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 border border-indigo-500/30">
             <div className="text-center sm:text-left space-y-1">
-              <div className="text-xs font-black uppercase tracking-widest text-slate-400">
-                Join at <span className="text-[#46178f]">QuizMe! Live Arena</span>
+              <div className="text-[11px] font-black uppercase tracking-wider text-indigo-300">
+                Live Quiz Lobby
               </div>
-              <div className="text-sm font-bold text-slate-600">
-                Enter this Game PIN on any device or open tab:
+              <div className="text-xs sm:text-sm font-medium text-slate-300">
+                Share this 6-digit Game Code with friends so they can join:
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="text-center">
-                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  GAME PIN:
+            <div className="flex items-center gap-2.5">
+              <div className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 text-center">
+                <div className="text-[9px] font-bold uppercase tracking-widest text-indigo-200">
+                  GAME CODE
                 </div>
-                <div className="text-4xl sm:text-6xl font-black tracking-widest text-slate-950 font-mono">
+                <div className="text-2xl sm:text-4xl font-black tracking-widest text-white font-mono">
                   {roomCode}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={handleCopyRoomCode}
-                className="p-3 rounded-2xl bg-slate-100 hover:bg-purple-100 text-[#46178f] transition-colors cursor-pointer"
-                title="Copy Game PIN"
+                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Copy Game Code"
               >
-                {copiedCode ? <Check className="w-6 h-6 text-emerald-600" /> : <Copy className="w-6 h-6" />}
+                {copiedCode ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5" />}
               </button>
             </div>
           </div>
 
-          {/* Middle Controls Bar: Player Count + Add Bots + Start Kahoot! */}
-          <div className="flex flex-wrap items-center justify-between gap-4 border-y border-white/15 py-4">
-            <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-black/35 border border-white/15">
-              <Users className="w-5 h-5 text-amber-400" />
-              <span className="text-lg font-black">{participantsList.length}</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-200">
+          {/* Middle Controls Bar: Player Count + Add Bots + Start Game */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-y border-slate-200 dark:border-slate-800 py-3">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span className="text-sm font-black text-slate-900 dark:text-white">{participantsList.length}</span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                 Players Ready
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
               {isHost && (
                 <button
                   type="button"
                   onClick={handleAddBots}
-                  className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-black text-xs border border-white/20 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
                 >
-                  <UserPlus className="w-4 h-4 text-amber-300" />
-                  <span>+ Add 3 AI Challengers</span>
+                  <UserPlus className="w-4 h-4 text-indigo-500" />
+                  <span>+ Add 3 AI Players</span>
                 </button>
               )}
 
@@ -768,46 +764,46 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                 <button
                   type="button"
                   onClick={handleStartGame}
-                  className="flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-[#26890c] hover:bg-[#1f7009] text-white font-black text-base shadow-[0_6px_0_#154d06] active:translate-y-1 transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm shadow-sm transition-all cursor-pointer"
                 >
-                  <Play className="w-5 h-5 fill-current" />
-                  <span>Start Kahoot! Battle</span>
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>Start Game</span>
                 </button>
               ) : (
-                <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/15 text-amber-300 font-black text-sm animate-pulse">
+                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 font-bold text-xs">
                   <Sparkles className="w-4 h-4" />
-                  <span>You&apos;re in! See your nickname on stage...</span>
+                  <span>You&apos;re in! Waiting for host to start...</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Bouncy Lobby Player Badges Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 min-h-[140px]">
+          {/* Lobby Player Badges Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 min-h-[100px]">
             {participantsList.map((p, idx) => {
-              const badgeColor = AVATAR_BADGE_MAP[p.avatarColor] || 'bg-[#1368ce]';
-              const shapeSymbol = KAHOOT_SHAPES[idx % 4].symbol;
+              const badgeColor = AVATAR_BADGE_MAP[p.avatarColor] || 'bg-indigo-600';
+              const letterSymbol = OPTION_TILES[idx % 4].symbol;
               return (
                 <div
                   key={p.id}
-                  className="p-3.5 rounded-2xl bg-white/15 backdrop-blur-md border border-white/25 flex items-center gap-3 shadow-lg animate-spring-pop"
+                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 flex items-center gap-2.5 shadow-2xs"
                 >
                   <div
-                    className={`w-11 h-11 rounded-xl ${badgeColor} text-white font-black text-lg flex items-center justify-center shadow-md shrink-0`}
+                    className={`w-9 h-9 rounded-lg ${badgeColor} text-white font-black text-sm flex items-center justify-center shrink-0`}
                   >
-                    {shapeSymbol}
+                    {p.name.charAt(0).toUpperCase() || letterSymbol}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-black text-sm text-white truncate flex items-center gap-1.5">
+                    <div className="font-bold text-xs text-slate-900 dark:text-white truncate flex items-center gap-1.5">
                       <span className="truncate">{p.name}</span>
                       {p.id === currentUserId && (
-                        <span className="px-1.5 py-0.5 text-[9px] rounded bg-amber-400 text-slate-950 font-black uppercase shrink-0">
+                        <span className="px-1.5 py-0.5 text-[9px] rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-black uppercase shrink-0">
                           You
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-purple-200 font-bold">
-                      {p.id.startsWith('bot_') ? '🤖 AI Challenger' : '⚡ Ready to Battle'}
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                      {p.id.startsWith('bot_') ? '🤖 AI Player' : '✓ Ready'}
                     </div>
                   </div>
                 </div>
@@ -817,70 +813,57 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
         </div>
       )}
 
-      {/* ================= 2. 3-2-1-GO! KAHOOT! COUNTDOWN ================= */}
+      {/* ================= 2. 3-2-1-GO! COUNTDOWN ================= */}
       {session.status === 'countdown' && (
-        <div className="rounded-3xl bg-gradient-to-br from-[#46178f] via-[#25076b] to-[#120338] text-white p-16 text-center space-y-6 shadow-2xl border-2 border-purple-400/30 min-h-[440px] flex flex-col items-center justify-center">
-          <div className="text-xs font-black uppercase tracking-[0.3em] text-amber-300">
-            Eyes on the Main Stage!
+        <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-10 text-center space-y-4 shadow-xl border border-indigo-500/30 min-h-[320px] flex flex-col items-center justify-center">
+          <div className="text-xs font-black uppercase tracking-widest text-indigo-300">
+            Get Ready!
           </div>
           <div
             key={startingCount}
-            className={`w-36 h-36 rounded-3xl ${
-              KAHOOT_SHAPES[(3 - startingCount + 4) % 4].barBg
-            } flex items-center justify-center text-7xl font-black text-white shadow-2xl border-4 border-white/40 animate-spring-pop`}
+            className="w-28 h-28 rounded-2xl bg-indigo-600 flex items-center justify-center text-5xl font-black text-white shadow-xl border-2 border-indigo-400/50"
           >
             {startingCount > 0 ? startingCount : 'GO!'}
           </div>
-          <p className="text-purple-200 text-base font-bold">
-            Fastest accurate answers win up to 1,500 points per question!
+          <p className="text-slate-300 text-sm font-medium">
+            Answer quickly and accurately to earn extra speed points!
           </p>
         </div>
       )}
 
-      {/* ================= 3. KAHOOT! LIVE QUESTION STAGE ================= */}
+      {/* ================= 3. LIVE QUESTION STAGE ================= */}
       {session.status === 'in_progress' && currentQuestion && (
-        <div className="space-y-5 animate-spring-pop">
+        <div className="space-y-4">
           {/* "Get Ready!" Splash Overlay Banner */}
           {showGetReadySplash ? (
-            <div className="rounded-3xl bg-gradient-to-br from-[#46178f] via-[#311068] to-[#1a063b] text-white p-12 sm:p-16 text-center space-y-5 shadow-2xl border-2 border-purple-400/40 min-h-[420px] flex flex-col items-center justify-center animate-spring-pop">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 text-amber-300 text-xs font-black uppercase tracking-widest">
-                <Sparkles className="w-4 h-4" />
+            <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-10 text-center space-y-4 shadow-xl border border-indigo-500/30 min-h-[320px] flex flex-col items-center justify-center">
+              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/10 text-indigo-200 text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
                 <span>
                   Question {currentQIndex + 1} of {questions.length}
                 </span>
               </div>
 
-              <h2 className="text-3xl sm:text-5xl font-black tracking-tight max-w-3xl leading-tight">
+              <h2 className="text-2xl sm:text-3xl font-black tracking-tight max-w-2xl leading-snug">
                 {currentQuestion.question}
               </h2>
 
               {(isFinalDoubleRound || doublePointsActiveThisRound) && (
-                <div className="inline-flex items-center gap-2 px-5 py-2 rounded-2xl bg-amber-400 text-slate-950 font-black text-sm shadow-xl animate-bounce">
-                  <Zap className="w-5 h-5 fill-current" />
-                  <span>2X DOUBLE POINTS ACTIVE!</span>
+                <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs shadow-md">
+                  <Zap className="w-4 h-4 fill-current" />
+                  <span>2X POINTS ACTIVE!</span>
                 </div>
               )}
-
-              <div className="flex items-center gap-3 pt-4">
-                {KAHOOT_SHAPES.map((s) => (
-                  <div
-                    key={s.index}
-                    className={`w-12 h-12 rounded-2xl ${s.barBg} flex items-center justify-center text-white text-2xl font-black shadow-lg animate-bounce`}
-                  >
-                    {s.symbol}
-                  </div>
-                ))}
-              </div>
             </div>
           ) : (
             <>
               {/* Top Question Display Stage Card */}
-              <div className="rounded-3xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 shadow-xl p-6 sm:p-8 text-center space-y-4 relative overflow-hidden">
+              <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-6 text-center space-y-4 relative overflow-hidden">
                 {/* Top Progress Bar */}
-                <div className="absolute top-0 left-0 right-0 h-2 bg-slate-100 dark:bg-slate-800">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-slate-100 dark:bg-slate-800">
                   <div
                     className={`h-full transition-all duration-300 ${
-                      timeLeft <= 5 ? 'bg-[#e21b3c]' : 'bg-[#46178f]'
+                      timeLeft <= 5 ? 'bg-rose-500' : 'bg-indigo-600'
                     }`}
                     style={{
                       width: `${Math.min(
@@ -893,61 +876,59 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
 
                 {/* Question Metadata & Double Points Badge */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                  <span className="px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-950/70 text-[#46178f] dark:text-purple-300 text-xs font-black uppercase tracking-wider">
+                  <span className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 text-indigo-600 dark:text-indigo-300 text-xs font-bold">
                     Question {currentQIndex + 1} of {questions.length}
                   </span>
 
                   {(isFinalDoubleRound || doublePointsActiveThisRound) && (
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider shadow-xs animate-pulse">
+                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black">
                       <Zap className="w-3.5 h-3.5 fill-current" />
-                      <span>2x Double Points Round</span>
+                      <span>2x Points Round</span>
                     </span>
                   )}
 
-                  <span className="text-xs font-bold text-slate-400">
-                    Press keys <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">1-4</kbd> to answer
+                  <span className="text-xs font-medium text-slate-400">
+                    Press <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">1-4</kbd> to answer
                   </span>
                 </div>
 
-                {/* Big Stage Question Text */}
-                <h2 className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white leading-snug max-w-4xl mx-auto py-2">
+                {/* Stage Question Text */}
+                <h2 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white leading-snug max-w-3xl mx-auto py-1">
                   {currentQuestion.question}
                 </h2>
 
                 {currentQuestion.code_snippet && (
-                  <pre className="p-4 rounded-2xl bg-slate-950 text-emerald-400 font-mono text-xs overflow-x-auto text-left max-w-3xl mx-auto border border-slate-800">
+                  <pre className="p-3.5 rounded-xl bg-slate-950 text-emerald-400 font-mono text-xs overflow-x-auto text-left max-w-2xl mx-auto border border-slate-800">
                     <code>{currentQuestion.code_snippet}</code>
                   </pre>
                 )}
 
-                {/* Middle Stage HUD: Left Timer Circle + Center Power-Ups + Right Answer Counter */}
-                <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  {/* Left Kahoot! Circular Timer */}
+                {/* Middle Stage HUD: Left Timer + Center Power-Ups + Right Answer Counter */}
+                <div className="pt-1 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  {/* Left Circular Timer */}
                   <div
-                    className={`w-20 h-20 rounded-full flex flex-col items-center justify-center font-black text-white shadow-xl border-4 border-white/30 shrink-0 ${
-                      timeLeft <= 5
-                        ? 'bg-[#e21b3c] animate-bounce'
-                        : 'bg-[#46178f] animate-kahoot-beat'
+                    className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black text-white shadow-sm shrink-0 ${
+                      timeLeft <= 5 ? 'bg-rose-600 animate-pulse' : 'bg-indigo-600'
                     }`}
                   >
-                    <span className="text-2xl sm:text-3xl font-mono leading-none">{timeLeft}</span>
+                    <span className="text-xl font-mono leading-none">{timeLeft}</span>
                     <span className="text-[9px] uppercase tracking-wider opacity-80">sec</span>
                   </div>
 
-                  {/* Center Kahoot!+ Tactical Power-Ups Dock */}
-                  <div className="flex flex-wrap items-center justify-center gap-2.5 p-2 rounded-2xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700">
+                  {/* Center Power-Ups Dock */}
+                  <div className="flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700">
                     <button
                       type="button"
                       disabled={!doublePointsAvailable || hasSubmittedCurrent}
                       onClick={handleActivateDoublePoints}
-                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         doublePointsActiveThisRound
-                          ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-500 shadow-md'
+                          ? 'bg-amber-400 text-slate-950 shadow-xs'
                           : doublePointsAvailable
                           ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700 hover:bg-amber-50'
                           : 'opacity-40 bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                       }`}
-                      title="Double your points if you answer this question right!"
+                      title="Double your points if you get this question right"
                     >
                       <Zap className="w-3.5 h-3.5 fill-current" />
                       <span>{doublePointsActiveThisRound ? '2x Active!' : '2x Points'}</span>
@@ -957,14 +938,14 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                       type="button"
                       disabled={!fiftyFiftyAvailable || hasSubmittedCurrent}
                       onClick={handleActivateFiftyFifty}
-                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         hiddenOptionIndices.length > 0
-                          ? 'bg-indigo-600 text-white shadow-md'
+                          ? 'bg-indigo-600 text-white shadow-xs'
                           : fiftyFiftyAvailable
                           ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50'
                           : 'opacity-40 bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                       }`}
-                      title="Eliminate 2 wrong geometric shapes!"
+                      title="Hide 2 wrong choices"
                     >
                       <Scissors className="w-3.5 h-3.5" />
                       <span>50/50</span>
@@ -974,46 +955,46 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                       type="button"
                       disabled={!streakShieldAvailable || hasSubmittedCurrent}
                       onClick={handleActivateStreakShield}
-                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                         streakShieldActiveThisRound
-                          ? 'bg-emerald-600 text-white shadow-md'
+                          ? 'bg-emerald-600 text-white shadow-xs'
                           : streakShieldAvailable
                           ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50'
                           : 'opacity-40 bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed'
                       }`}
-                      title="Protect your answer streak even if you miss this question!"
+                      title="Keep your streak even if you miss this question"
                     >
                       <Shield className="w-3.5 h-3.5" />
                       <span>{streakShieldActiveThisRound ? 'Shield ON' : 'Streak Shield'}</span>
                     </button>
                   </div>
 
-                  {/* Right Kahoot! Answer Counter Circle */}
-                  <div className="flex flex-col items-center justify-center px-4 py-2.5 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white shrink-0 shadow-md">
-                    <span className="text-2xl font-black font-mono leading-none">
+                  {/* Right Answer Counter */}
+                  <div className="flex flex-col items-center justify-center px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 text-white shrink-0">
+                    <span className="text-lg font-black font-mono leading-none">
                       {answeredCount}/{participantsList.length}
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 mt-1">
-                      Answers
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">
+                      Answered
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Iconic 2x2 Kahoot! Geometric Color Tiles Pad */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* 2x2 Answer Option Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {(currentQuestion.options && currentQuestion.options.length > 0
                   ? currentQuestion.options
                   : [
                       currentQuestion.correct_answer,
-                      'Alternative Principle B',
-                      'Secondary Hypothesis C',
+                      'Option B',
+                      'Option C',
                       'None of the Above',
                     ]
                 )
                   .slice(0, 4)
                   .map((opt, idx) => {
-                    const shape = KAHOOT_SHAPES[idx % 4];
+                    const tile = OPTION_TILES[idx % 4];
                     const selectedAnswerText =
                       localSelectedOption || myCurrentAnswer?.selectedAnswer;
                     const isPicked = selectedAnswerText === opt;
@@ -1023,9 +1004,9 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                       return (
                         <div
                           key={idx}
-                          className="p-6 rounded-3xl bg-slate-200/60 dark:bg-slate-800/40 border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-xs font-black uppercase tracking-widest text-slate-400 min-h-[104px]"
+                          className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-800/40 border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 min-h-[76px]"
                         >
-                          ✂️ Eliminated by 50/50 Power-Up
+                          Removed by 50/50
                         </div>
                       );
                     }
@@ -1036,33 +1017,33 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                         type="button"
                         disabled={hasSubmittedCurrent}
                         onClick={() => handleSelectOption(opt)}
-                        className={`group relative p-5 sm:p-7 rounded-3xl text-white font-black text-left transition-all flex items-center justify-between gap-4 min-h-[104px] ${
-                          shape.bg
-                        } ${shape.shadow} border-2 ${shape.border} ${
+                        className={`group relative p-4 sm:p-5 rounded-2xl text-white font-bold text-left transition-all flex items-center justify-between gap-3 min-h-[76px] ${
+                          tile.bg
+                        } ${tile.shadow} border ${tile.border} ${
                           hasSubmittedCurrent
                             ? isPicked
-                              ? 'ring-4 ring-white scale-[1.01] opacity-100'
-                              : 'opacity-40 scale-[0.98]'
-                            : 'cursor-pointer active:translate-y-1.5'
+                              ? 'ring-2 ring-white scale-[1.01] opacity-100'
+                              : 'opacity-45'
+                            : 'cursor-pointer active:translate-y-0.5'
                         }`}
                       >
-                        <div className="flex items-center gap-4 min-w-0">
-                          <div className="w-13 h-13 rounded-2xl bg-black/20 flex items-center justify-center text-3xl font-black shrink-0 shadow-inner">
-                            {shape.symbol}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-black/20 flex items-center justify-center text-sm font-black shrink-0">
+                            {tile.symbol}
                           </div>
-                          <span className="text-base sm:text-xl font-black leading-snug drop-shadow-xs">
+                          <span className="text-sm sm:text-base font-bold leading-snug">
                             {opt}
                           </span>
                         </div>
 
                         <div className="shrink-0 flex items-center gap-2">
                           {isPicked ? (
-                            <span className="px-3 py-1 rounded-xl bg-white text-slate-950 text-xs font-black uppercase shadow-md">
-                              Locked In ✓
+                            <span className="px-2.5 py-1 rounded-lg bg-white text-slate-950 text-[11px] font-black">
+                              Selected ✓
                             </span>
                           ) : (
-                            <span className="hidden sm:inline-flex w-7 h-7 rounded-lg bg-black/20 items-center justify-center text-xs font-mono opacity-75">
-                              {shape.keyHint}
+                            <span className="hidden sm:inline-flex w-6 h-6 rounded-md bg-black/20 items-center justify-center text-[11px] font-mono opacity-75">
+                              {tile.keyHint}
                             </span>
                           )}
                         </div>
@@ -1071,20 +1052,20 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                   })}
               </div>
 
-              {/* Kahoot! "Answer Locked In" Suspense Bar + Host Fast-Forward */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-2xl bg-[#25076b] text-white border border-purple-400/30">
-                <div className="flex items-center gap-2.5 text-xs sm:text-sm font-black">
+              {/* Status Bar + Host Skip */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 px-4 py-3 rounded-2xl bg-slate-900 text-white border border-slate-800">
+                <div className="flex items-center gap-2 text-xs font-bold">
                   {hasSubmittedCurrent ? (
                     <>
-                      <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
+                      <Sparkles className="w-4 h-4 text-amber-400" />
                       <span className="text-amber-300">
-                        Answer Locked In! {KAHOOT_WAITING_QUIPS[waitingQuipIndex]}
+                        Answer saved! {WAITING_MESSAGES[waitingQuipIndex]}
                       </span>
                     </>
                   ) : (
                     <>
-                      <Zap className="w-4 h-4 text-amber-400" />
-                      <span>Click a geometric shape above before the timer hits zero!</span>
+                      <Zap className="w-4 h-4 text-indigo-400" />
+                      <span>Pick an answer above before time runs out!</span>
                     </>
                   )}
                 </div>
@@ -1093,9 +1074,9 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                   <button
                     type="button"
                     onClick={() => updateSessionStatus(roomCode, 'question_review')}
-                    className="px-4 py-2 rounded-xl bg-white text-[#25076b] hover:bg-purple-100 text-xs font-black transition-all cursor-pointer shrink-0 shadow-sm"
+                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer shrink-0"
                   >
-                    Reveal Bar Chart Now →
+                    Show Results Now →
                   </button>
                 )}
               </div>
@@ -1104,79 +1085,79 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
         </div>
       )}
 
-      {/* ================= 4. KAHOOT! BAR-CHART REVEAL & SCOREBOARD CLIMBER ================= */}
+      {/* ================= 4. RESULTS REVEAL & SCOREBOARD ================= */}
       {session.status === 'question_review' && currentQuestion && (
-        <div className="space-y-5 animate-spring-pop">
-          {/* Top Full-Width Correct / Incorrect Feedback Banner */}
+        <div className="space-y-4">
+          {/* Top Correct / Incorrect Feedback Banner */}
           {myCurrentAnswer ? (
             <div
-              className={`p-5 sm:p-6 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 ${
+              className={`p-4 sm:p-5 rounded-2xl text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 ${
                 myCurrentAnswer.isCorrect
-                  ? 'bg-gradient-to-r from-[#26890c] via-emerald-600 to-teal-600'
-                  : 'bg-gradient-to-r from-[#e21b3c] via-rose-600 to-pink-600'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600'
+                  : 'bg-gradient-to-r from-rose-600 to-pink-600'
               }`}
             >
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 shadow-md">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
                   {myCurrentAnswer.isCorrect ? (
-                    <CheckCircle2 className="w-9 h-9 text-white" />
+                    <CheckCircle2 className="w-6 h-6 text-white" />
                   ) : (
-                    <XCircle className="w-9 h-9 text-white" />
+                    <XCircle className="w-6 h-6 text-white" />
                   )}
                 </div>
                 <div>
-                  <div className="text-2xl sm:text-3xl font-black tracking-tight">
-                    {myCurrentAnswer.isCorrect ? 'CORRECT! Genius Move!' : 'INCORRECT! Tough Break!'}
+                  <div className="text-lg sm:text-xl font-black tracking-tight">
+                    {myCurrentAnswer.isCorrect ? 'Correct! Nice work!' : 'Not quite right!'}
                   </div>
-                  <div className="text-xs sm:text-sm font-bold text-white/90 mt-0.5 flex flex-wrap items-center gap-2">
+                  <div className="text-xs font-medium text-white/90 mt-0.5 flex flex-wrap items-center gap-2">
                     <span>
                       Correct Answer: <strong className="underline">{currentQuestion.correct_answer}</strong>
                     </span>
                     {currentParticipant && currentParticipant.streak >= 2 && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black">
-                        <Flame className="w-3.5 h-3.5 fill-current" />
-                        Answer Streak {currentParticipant.streak}x!
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black">
+                        <Flame className="w-3 h-3 fill-current" />
+                        {currentParticipant.streak}x Streak!
                       </span>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="px-5 py-3 rounded-2xl bg-black/25 backdrop-blur-xs text-center shrink-0 border border-white/20">
-                <div className="text-[10px] font-black uppercase tracking-widest opacity-80">
+              <div className="px-4 py-2 rounded-xl bg-black/20 text-center shrink-0 border border-white/15">
+                <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">
                   Points Earned
                 </div>
-                <div className="text-2xl sm:text-3xl font-black font-mono">
+                <div className="text-xl font-black font-mono">
                   +{myCurrentAnswer.pointsEarned.toLocaleString()}
                 </div>
               </div>
             </div>
           ) : (
-            <div className="p-5 rounded-3xl bg-slate-800 text-white flex items-center justify-between">
-              <div className="font-black text-lg">⏰ Time&apos;s Up!</div>
+            <div className="p-4 rounded-2xl bg-slate-800 text-white flex items-center justify-between">
+              <div className="font-bold text-base">⏰ Time&apos;s Up!</div>
               <div className="text-xs font-bold text-emerald-400">
                 Correct Answer: {currentQuestion.correct_answer}
               </div>
             </div>
           )}
 
-          {/* Switcher between Kahoot! Bar Chart & Scoreboard Climber + Next Question Button */}
+          {/* Switcher between Vote Chart & Scoreboard + Next Question Button */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex bg-slate-200/80 dark:bg-slate-800 p-1.5 rounded-2xl">
+            <div className="flex bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl">
               <button
                 type="button"
                 onClick={() => {
                   soundFx.playPop();
                   setReviewSubView('chart');
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
                   reviewSubView === 'chart'
-                    ? 'bg-white dark:bg-slate-900 text-[#46178f] dark:text-purple-300 shadow-xs'
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
                     : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
-                <BarChart3 className="w-4 h-4" />
-                <span>Kahoot! Vote Bar Chart</span>
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Answer Breakdown</span>
               </button>
               <button
                 type="button"
@@ -1184,14 +1165,14 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                   soundFx.playPop();
                   setReviewSubView('scoreboard');
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black cursor-pointer transition-all ${
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
                   reviewSubView === 'scoreboard'
-                    ? 'bg-white dark:bg-slate-900 text-[#46178f] dark:text-purple-300 shadow-xs'
+                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
                     : 'text-slate-600 dark:text-slate-400'
                 }`}
               >
-                <Trophy className="w-4 h-4" />
-                <span>Scoreboard Climber</span>
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Leaderboard</span>
               </button>
             </div>
 
@@ -1199,12 +1180,12 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
               <button
                 type="button"
                 onClick={handleNextStep}
-                className="flex items-center gap-2 px-7 py-3.5 rounded-2xl bg-[#1368ce] hover:bg-[#1056ac] text-white font-black text-sm shadow-[0_5px_0_#0b3d7a] active:translate-y-1 transition-all cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-sm transition-all cursor-pointer"
               >
                 <span>
                   {currentQIndex + 1 < questions.length
                     ? 'Next Question'
-                    : 'Reveal Podium Finale 🏆'}
+                    : 'Show Final Winners 🏆'}
                 </span>
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -1212,23 +1193,23 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
           </div>
 
           {reviewSubView === 'chart' ? (
-            /* KAHOOT! VERTICAL BAR CHART + EXPLANATION */
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              {/* Left 7 Cols: Iconic 4-Shape Bar Chart */}
-              <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border-2 border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-6">
+            /* VERTICAL BAR CHART + EXPLANATION */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Left 7 Cols: 4-Option Bar Chart */}
+              <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between space-y-5">
                 <div className="text-center">
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
                     {currentQuestion.question}
                   </h3>
-                  <p className="text-xs text-slate-400 font-bold mt-1">
-                    Room Answer Distribution ({answeredCount} Votes)
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    How players voted ({answeredCount} total)
                   </p>
                 </div>
 
                 {/* Vertical Bars Container */}
-                <div className="grid grid-cols-4 gap-4 items-end h-52 pt-8 px-2 sm:px-6 border-b-2 border-slate-200 dark:border-slate-800">
+                <div className="grid grid-cols-4 gap-3 items-end h-40 pt-6 px-2 sm:px-4 border-b border-slate-200 dark:border-slate-800">
                   {(currentQuestion.options || []).slice(0, 4).map((opt, idx) => {
-                    const shape = KAHOOT_SHAPES[idx % 4];
+                    const tile = OPTION_TILES[idx % 4];
                     const isCorrectOpt =
                       opt.trim().toLowerCase() ===
                       currentQuestion.correct_answer.trim().toLowerCase();
@@ -1237,26 +1218,26 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                     ).length;
                     const heightPct =
                       answeredCount > 0
-                        ? Math.max(14, Math.round((voteCount / answeredCount) * 100))
+                        ? Math.max(16, Math.round((voteCount / answeredCount) * 100))
                         : isCorrectOpt
                         ? 65
                         : 18;
 
                     return (
-                      <div key={idx} className="flex flex-col items-center h-full justify-end gap-2">
+                      <div key={idx} className="flex flex-col items-center h-full justify-end gap-1.5">
                         <div className="flex items-center gap-1 text-xs font-black text-slate-800 dark:text-slate-200">
                           <span>{voteCount}</span>
                           {isCorrectOpt && (
-                            <CheckCircle2 className="w-4 h-4 text-[#26890c]" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                           )}
                         </div>
                         <div
-                          className={`w-full rounded-t-2xl ${shape.barBg} transition-all duration-700 flex items-end justify-center pb-2 text-white font-black text-lg shadow-md ${
-                            isCorrectOpt ? 'ring-4 ring-emerald-400/60' : 'opacity-60'
+                          className={`w-full rounded-t-xl ${tile.barBg} transition-all duration-700 flex items-end justify-center pb-2 text-white font-black text-sm shadow-xs ${
+                            isCorrectOpt ? 'ring-2 ring-emerald-400' : 'opacity-60'
                           }`}
                           style={{ height: `${heightPct}%` }}
                         >
-                          {shape.symbol}
+                          {tile.symbol}
                         </div>
                       </div>
                     );
@@ -1264,31 +1245,31 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                 </div>
 
                 {/* Legend Below Bars */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {(currentQuestion.options || []).slice(0, 4).map((opt, idx) => {
-                    const shape = KAHOOT_SHAPES[idx % 4];
+                    const tile = OPTION_TILES[idx % 4];
                     const isCorrectOpt =
                       opt.trim().toLowerCase() ===
                       currentQuestion.correct_answer.trim().toLowerCase();
                     return (
                       <div
                         key={idx}
-                        className={`p-3 rounded-2xl border-2 flex items-center justify-between gap-2 text-xs font-bold ${
+                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs font-semibold ${
                           isCorrectOpt
-                            ? 'border-[#26890c] bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-200'
+                            ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-200'
                             : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-500'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span
-                            className={`w-6 h-6 rounded-lg ${shape.barBg} text-white flex items-center justify-center font-black shrink-0`}
+                            className={`w-5 h-5 rounded-md ${tile.barBg} text-white flex items-center justify-center font-black text-[11px] shrink-0`}
                           >
-                            {shape.symbol}
+                            {tile.symbol}
                           </span>
                           <span className="truncate">{opt}</span>
                         </div>
                         {isCorrectOpt && (
-                          <span className="px-2 py-0.5 rounded bg-[#26890c] text-white text-[10px] font-black shrink-0">
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black shrink-0">
                             ✓ Correct
                           </span>
                         )}
@@ -1298,32 +1279,32 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                 </div>
               </div>
 
-              {/* Right 5 Cols: Pedagogical Explanation + Top 3 Snapshot */}
-              <div className="lg:col-span-5 space-y-5">
-                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border-2 border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[#46178f] dark:text-purple-400">
+              {/* Right 5 Cols: Explanation + Top 3 Snapshot */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
                     <BookOpen className="w-4 h-4" />
-                    <span>Why This Shape Won</span>
+                    <span>Why This Answer Is Right</span>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                     {currentQuestion.explanation ||
-                      `The verified solution is "${currentQuestion.correct_answer}".`}
+                      `The right answer is "${currentQuestion.correct_answer}".`}
                   </p>
                 </div>
 
                 {/* Mini Top Standings */}
-                <div className="bg-[#25076b] text-white rounded-3xl p-6 shadow-xl space-y-3">
+                <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-md space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-300">
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-400">
                       <Trophy className="w-4 h-4" />
-                      <span>Current Top Contenders</span>
+                      <span>Top Players</span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setReviewSubView('scoreboard')}
-                      className="text-[11px] font-bold text-purple-200 hover:text-white underline cursor-pointer"
+                      className="text-[11px] font-bold text-indigo-300 hover:text-white underline cursor-pointer"
                     >
-                      Full Scoreboard →
+                      See All →
                     </button>
                   </div>
 
@@ -1333,22 +1314,22 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                       return (
                         <div
                           key={p.id}
-                          className="p-3 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-between"
+                          className="p-2.5 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center justify-between"
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="w-6 h-6 rounded-lg bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shrink-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-5 h-5 rounded-md bg-amber-400 text-slate-950 font-black text-[11px] flex items-center justify-center shrink-0">
                               {rankIdx + 1}
                             </span>
-                            <span className="font-black text-xs truncate">{p.name}</span>
+                            <span className="font-bold text-xs truncate">{p.name}</span>
                             {p.streak >= 2 && (
-                              <span className="text-[10px] font-black text-orange-300">
+                              <span className="text-[10px] font-black text-amber-400">
                                 🔥{p.streak}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             {roundPts > 0 && (
-                              <span className="text-[10px] font-black text-emerald-300">
+                              <span className="text-[10px] font-bold text-emerald-400">
                                 +{roundPts}
                               </span>
                             )}
@@ -1364,63 +1345,55 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
               </div>
             </div>
           ) : (
-            /* KAHOOT! FULL SCOREBOARD CLIMBER VIEW */
-            <div className="rounded-3xl bg-gradient-to-b from-[#46178f] to-[#25076b] text-white p-6 sm:p-10 shadow-2xl space-y-6">
+            /* FULL SCOREBOARD VIEW */
+            <div className="rounded-2xl bg-slate-900 text-white p-6 border border-slate-800 shadow-lg space-y-5">
               <div className="text-center space-y-1">
-                <div className="text-xs font-black uppercase tracking-widest text-amber-300">
-                  Kahoot! Arena Standings
+                <div className="text-xs font-bold uppercase tracking-widest text-indigo-400">
+                  Live Standings
                 </div>
-                <h3 className="text-2xl sm:text-4xl font-black">Scoreboard</h3>
+                <h3 className="text-xl sm:text-2xl font-black">Leaderboard</h3>
               </div>
 
-              <div className="max-w-2xl mx-auto space-y-3">
+              <div className="max-w-xl mx-auto space-y-2.5">
                 {participantsList.map((p, idx) => {
                   const roundPts = p.answers?.[currentQIndex]?.pointsEarned || 0;
                   return (
                     <div
                       key={p.id}
-                      className={`p-4 rounded-2xl flex items-center justify-between transition-all ${
+                      className={`p-3.5 rounded-xl flex items-center justify-between transition-all ${
                         idx === 0
-                          ? 'bg-white text-slate-950 shadow-xl scale-[1.02]'
-                          : 'bg-white/15 text-white border border-white/20'
+                          ? 'bg-indigo-600 text-white shadow-md'
+                          : 'bg-slate-800 text-white border border-slate-700'
                       }`}
                     >
-                      <div className="flex items-center gap-3.5">
+                      <div className="flex items-center gap-3">
                         <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm ${
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs ${
                             idx === 0
                               ? 'bg-amber-400 text-slate-950'
-                              : 'bg-black/30 text-white'
+                              : 'bg-slate-700 text-white'
                           }`}
                         >
                           {idx + 1}
                         </div>
-                        <div>
-                          <div className="font-black text-sm sm:text-base flex items-center gap-2">
-                            <span>{p.name}</span>
-                            {p.streak >= 2 && (
-                              <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-orange-500 text-white text-[10px] font-black">
-                                <Flame className="w-3 h-3 fill-current" />
-                                {p.streak} Streak
-                              </span>
-                            )}
-                          </div>
+                        <div className="font-bold text-sm flex items-center gap-2">
+                          <span>{p.name}</span>
+                          {p.streak >= 2 && (
+                            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black">
+                              <Flame className="w-3 h-3 fill-current" />
+                              {p.streak}x
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         {roundPts > 0 && (
-                          <span
-                            className={`px-2.5 py-1 rounded-lg text-xs font-black ${
-                              idx === 0
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-emerald-400/20 text-emerald-300'
-                            }`}
-                          >
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-400/20 text-emerald-300 text-xs font-bold">
                             +{roundPts.toLocaleString()}
                           </span>
                         )}
-                        <span className="text-lg sm:text-xl font-black font-mono">
+                        <span className="text-base font-black font-mono">
                           {p.score.toLocaleString()}
                         </span>
                       </div>
@@ -1433,49 +1406,49 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
         </div>
       )}
 
-      {/* ================= 5. KAHOOT! 3-2-1 SPOTLIGHT PODIUM FINALE ================= */}
+      {/* ================= 5. FINAL WINNERS PODIUM ================= */}
       {session.status === 'finished' && (
-        <div className="rounded-3xl overflow-hidden bg-gradient-to-b from-[#46178f] via-[#2c0c5e] to-[#160433] text-white p-6 sm:p-10 shadow-2xl border-2 border-purple-400/40 space-y-10 animate-spring-pop">
+        <div className="rounded-2xl overflow-hidden bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 text-white p-6 sm:p-8 shadow-xl border border-indigo-500/30 space-y-8">
           {/* Spotlight Header */}
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-widest shadow-lg">
-              <Crown className="w-4 h-4 fill-current" />
-              <span>Kahoot! Grand Podium Finale</span>
+          <div className="text-center space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider">
+              <Crown className="w-3.5 h-3.5 fill-current" />
+              <span>Final Podium</span>
             </div>
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight">
+            <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
               {session.quiz?.quiz_title}
             </h1>
-            <p className="text-purple-200 text-sm font-semibold">
-              Bonus Scholar XP &amp; Gems have been added to your main profile!
+            <p className="text-indigo-200 text-xs sm:text-sm">
+              Bonus XP and Gems have been added to your profile!
             </p>
           </div>
 
-          {/* 3-2-1 Rising Podium Pillars */}
-          <div className="grid grid-cols-3 gap-3 sm:gap-6 max-w-3xl mx-auto items-end pt-6">
+          {/* 3-2-1 Podium Pillars */}
+          <div className="grid grid-cols-3 gap-3 sm:gap-5 max-w-2xl mx-auto items-end pt-4">
             {/* 2nd Place Silver */}
             <div className="flex flex-col items-center">
               {participantsList[1] ? (
                 <>
-                  <div className="w-14 h-14 rounded-2xl bg-[#1368ce] flex items-center justify-center text-white font-black text-2xl shadow-xl mb-2 border-2 border-white">
-                    ◆
+                  <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-md mb-1.5 border border-white/40">
+                    {participantsList[1].name.charAt(0).toUpperCase()}
                   </div>
-                  <div className="font-black text-xs sm:text-sm text-white truncate max-w-full mb-1">
+                  <div className="font-bold text-xs sm:text-sm text-white truncate max-w-full mb-0.5">
                     {participantsList[1].name}
                   </div>
-                  <div className="text-xs font-mono font-bold text-purple-200 mb-3">
+                  <div className="text-[11px] font-mono font-bold text-indigo-200 mb-2">
                     {participantsList[1].score.toLocaleString()} pts
                   </div>
-                  <div className="w-full h-36 rounded-t-3xl bg-gradient-to-t from-slate-600 to-slate-400 border-t-4 border-slate-200 flex flex-col items-center justify-start pt-4 shadow-2xl">
-                    <span className="w-10 h-10 rounded-full bg-white text-slate-900 font-black text-xl flex items-center justify-center shadow-md">
+                  <div className="w-full h-28 rounded-t-2xl bg-gradient-to-t from-slate-700 to-slate-500 border-t-2 border-slate-300 flex flex-col items-center justify-start pt-3">
+                    <span className="w-8 h-8 rounded-full bg-white text-slate-900 font-black text-base flex items-center justify-center">
                       2
                     </span>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-white/90 mt-2">
-                      Silver Medal
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white/90 mt-1">
+                      2nd Place
                     </span>
                   </div>
                 </>
               ) : (
-                <div className="w-full h-24 rounded-t-3xl bg-white/5" />
+                <div className="w-full h-20 rounded-t-2xl bg-white/5" />
               )}
             </div>
 
@@ -1483,22 +1456,22 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
             <div className="flex flex-col items-center">
               {participantsList[0] && (
                 <>
-                  <Crown className="w-10 h-10 text-amber-400 fill-amber-400 animate-bounce mb-1" />
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-[#d89e00] flex items-center justify-center text-white font-black text-3xl shadow-2xl mb-2 border-4 border-amber-300">
-                    ●
+                  <Crown className="w-8 h-8 text-amber-400 fill-amber-400 mb-1" />
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-amber-500 flex items-center justify-center text-slate-950 font-black text-2xl shadow-lg mb-1.5 border-2 border-amber-200">
+                    {participantsList[0].name.charAt(0).toUpperCase()}
                   </div>
-                  <div className="font-black text-sm sm:text-lg text-amber-300 truncate max-w-full mb-1">
+                  <div className="font-black text-sm sm:text-base text-amber-300 truncate max-w-full mb-0.5">
                     {participantsList[0].name}
                   </div>
-                  <div className="text-xs sm:text-sm font-mono font-black text-white mb-3">
+                  <div className="text-xs font-mono font-black text-white mb-2">
                     {participantsList[0].score.toLocaleString()} pts
                   </div>
-                  <div className="w-full h-48 sm:h-52 rounded-t-3xl bg-gradient-to-t from-amber-600 via-amber-500 to-yellow-400 border-t-4 border-yellow-200 flex flex-col items-center justify-start pt-5 text-slate-950 shadow-2xl">
-                    <span className="w-12 h-12 rounded-full bg-slate-950 text-amber-400 font-black text-2xl flex items-center justify-center shadow-lg">
+                  <div className="w-full h-36 sm:h-40 rounded-t-2xl bg-gradient-to-t from-amber-600 via-amber-500 to-yellow-400 border-t-2 border-yellow-200 flex flex-col items-center justify-start pt-4 text-slate-950">
+                    <span className="w-10 h-10 rounded-full bg-slate-950 text-amber-400 font-black text-xl flex items-center justify-center">
                       1
                     </span>
-                    <span className="text-xs font-black uppercase tracking-widest mt-2">
-                      Champion
+                    <span className="text-[11px] font-black uppercase tracking-wider mt-1.5">
+                      Winner
                     </span>
                   </div>
                 </>
@@ -1509,39 +1482,39 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
             <div className="flex flex-col items-center">
               {participantsList[2] ? (
                 <>
-                  <div className="w-14 h-14 rounded-2xl bg-[#e21b3c] flex items-center justify-center text-white font-black text-2xl shadow-xl mb-2 border-2 border-white">
-                    ▲
+                  <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center text-white font-black text-lg shadow-md mb-1.5 border border-white/40">
+                    {participantsList[2].name.charAt(0).toUpperCase()}
                   </div>
-                  <div className="font-black text-xs sm:text-sm text-white truncate max-w-full mb-1">
+                  <div className="font-bold text-xs sm:text-sm text-white truncate max-w-full mb-0.5">
                     {participantsList[2].name}
                   </div>
-                  <div className="text-xs font-mono font-bold text-purple-200 mb-3">
+                  <div className="text-[11px] font-mono font-bold text-indigo-200 mb-2">
                     {participantsList[2].score.toLocaleString()} pts
                   </div>
-                  <div className="w-full h-28 rounded-t-3xl bg-gradient-to-t from-amber-900 to-amber-700 border-t-4 border-amber-400 flex flex-col items-center justify-start pt-3 shadow-2xl">
-                    <span className="w-9 h-9 rounded-full bg-white text-amber-950 font-black text-lg flex items-center justify-center shadow-md">
+                  <div className="w-full h-24 rounded-t-2xl bg-gradient-to-t from-amber-900 to-amber-700 border-t-2 border-amber-400 flex flex-col items-center justify-start pt-2.5">
+                    <span className="w-7 h-7 rounded-full bg-white text-amber-950 font-black text-sm flex items-center justify-center">
                       3
                     </span>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-200 mt-1.5">
-                      Bronze
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-200 mt-1">
+                      3rd Place
                     </span>
                   </div>
                 </>
               ) : (
-                <div className="w-full h-20 rounded-t-3xl bg-white/5" />
+                <div className="w-full h-16 rounded-t-2xl bg-white/5" />
               )}
             </div>
           </div>
 
           {/* Full Standings & Action Buttons */}
-          <div className="max-w-2xl mx-auto bg-white/10 backdrop-blur-md rounded-3xl p-6 border border-white/15 space-y-4">
+          <div className="max-w-xl mx-auto bg-white/5 rounded-2xl p-5 border border-white/10 space-y-3.5">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black uppercase tracking-wider text-purple-200 flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-200 flex items-center gap-1.5">
                 <Award className="w-4 h-4 text-amber-400" />
-                <span>Complete Arena Standings</span>
+                <span>All Players</span>
               </h3>
-              <span className="text-xs font-bold text-emerald-300">
-                {questions.length} Questions Completed
+              <span className="text-xs font-medium text-emerald-300">
+                {questions.length} Questions
               </span>
             </div>
 
@@ -1553,20 +1526,20 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                 return (
                   <div
                     key={p.id}
-                    className="p-3.5 rounded-2xl bg-black/25 border border-white/10 flex items-center justify-between"
+                    className="p-3 rounded-xl bg-black/25 border border-white/10 flex items-center justify-between"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="w-7 h-7 rounded-lg bg-white/15 font-black text-xs flex items-center justify-center">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-6 h-6 rounded-md bg-white/10 font-black text-xs flex items-center justify-center">
                         #{idx + 1}
                       </span>
                       <div>
-                        <div className="font-black text-sm">{p.name}</div>
-                        <div className="text-[11px] text-purple-200">
+                        <div className="font-bold text-xs sm:text-sm">{p.name}</div>
+                        <div className="text-[11px] text-slate-300">
                           {correctCount}/{questions.length} Correct
                         </div>
                       </div>
                     </div>
-                    <div className="font-mono font-black text-base text-amber-300">
+                    <div className="font-mono font-black text-sm text-amber-300">
                       {p.score.toLocaleString()} pts
                     </div>
                   </div>
@@ -1574,15 +1547,15 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
               })}
             </div>
 
-            <div className="pt-3 flex flex-col sm:flex-row justify-center gap-3">
+            <div className="pt-2 flex flex-col sm:flex-row justify-center gap-2.5">
               {isHost && (
                 <button
                   type="button"
                   onClick={handlePlayAgain}
-                  className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-[#26890c] hover:bg-[#1f7009] text-white font-black text-sm shadow-[0_5px_0_#154d06] cursor-pointer"
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span>Play Another Kahoot! Round</span>
+                  <span>Play Again</span>
                 </button>
               )}
               <button
@@ -1592,9 +1565,9 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
                   soundFx.playClick();
                   onLeave();
                 }}
-                className="px-6 py-3.5 rounded-2xl bg-white text-[#25076b] hover:bg-purple-100 font-black text-sm cursor-pointer shadow-md"
+                className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs cursor-pointer"
               >
-                Back to Kahoot! Arena Hub
+                Back to Live Lobby
               </button>
             </div>
           </div>

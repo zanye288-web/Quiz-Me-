@@ -113,28 +113,28 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-6xl mx-auto px-4 py-3.5 sm:py-4 space-y-4 animate-in fade-in duration-300">
       {/* Live Visualizer Stage Hero */}
-      <div className="relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 text-white p-6 sm:p-8 shadow-xl">
+      <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 text-white p-4 sm:p-6 shadow-lg">
         {/* Decorative Ambient Glow */}
         <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-fuchsia-500/15 blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           {/* Left: Spinning Vinyl & Track Info */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 min-w-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 min-w-0">
             <div className="relative shrink-0">
               <div
-                className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-tr ${currentTrackMeta.accentColor} p-1 shadow-2xl border-2 border-white/20 flex items-center justify-center ${
+                className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr ${currentTrackMeta.accentColor} p-1 shadow-2xl border-2 border-white/20 flex items-center justify-center ${
                   isPlaying ? 'animate-spin' : ''
                 }`}
                 style={{ animationDuration: '6s' }}
               >
                 <div className="w-full h-full rounded-full bg-slate-950/90 flex items-center justify-center relative">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-400 to-fuchsia-400 flex items-center justify-center shadow-inner">
-                    <div className="w-2.5 h-2.5 rounded-full bg-slate-950" />
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-400 to-fuchsia-400 flex items-center justify-center shadow-inner">
+                    <div className="w-2 h-2 rounded-full bg-slate-950" />
                   </div>
-                  <Disc className="w-16 h-16 text-white/15 absolute" />
+                  <Disc className="w-14 h-14 text-white/15 absolute" />
                 </div>
               </div>
               {isPlaying && (
@@ -144,33 +144,33 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
               )}
             </div>
 
-            <div className="space-y-2 min-w-0">
+            <div className="space-y-1.5 min-w-0">
               <div className="flex items-center flex-wrap gap-2 text-xs text-indigo-200/90">
                 <span className="font-bold text-emerald-300">
-                  {isPlaying ? '● Now Playing' : bgMusicEnabled ? '○ Ready to Play' : '✕ Disabled in Settings'}
+                  {isPlaying ? '● Playing' : bgMusicEnabled ? '○ Ready' : '✕ Muted in Settings'}
                 </span>
                 <span aria-hidden="true">·</span>
                 <span>{currentTrackMeta.badge}</span>
                 <span aria-hidden="true">·</span>
                 <span className="font-mono tabular-nums">{bpm} BPM</span>
                 <span aria-hidden="true">·</span>
-                <span className="capitalize">{timbre} Synth</span>
+                <span className="capitalize">{timbre} Sound</span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
                 {currentTrackMeta.title}
               </h1>
 
-              <p className="text-xs sm:text-sm text-indigo-100/80 max-w-xl leading-relaxed">
+              <p className="text-xs text-indigo-100/80 max-w-xl leading-relaxed">
                 {currentTrackMeta.subtitle}
               </p>
 
               {/* Transport Controls */}
-              <div className="pt-2 flex flex-wrap items-center gap-2.5">
+              <div className="pt-1.5 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => handlePrevNextTrack(-1)}
-                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all cursor-pointer"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all cursor-pointer"
                   title="Previous Track"
                 >
                   <SkipBack className="w-4 h-4" />
@@ -179,7 +179,7 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                 <button
                   type="button"
                   onClick={handleTogglePlay}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-black text-xs sm:text-sm transition-all cursor-pointer shadow-lg ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs transition-all cursor-pointer shadow-md ${
                     isPlaying
                       ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
                       : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
@@ -188,12 +188,12 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                   {isPlaying ? (
                     <>
                       <Pause className="w-4 h-4 fill-current" />
-                      <span>Pause Groove</span>
+                      <span>Pause Music</span>
                     </>
                   ) : (
                     <>
                       <Play className="w-4 h-4 fill-current" />
-                      <span>Play Gamified Music</span>
+                      <span>Play Music</span>
                     </>
                   )}
                 </button>
@@ -201,7 +201,7 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                 <button
                   type="button"
                   onClick={() => handlePrevNextTrack(1)}
-                  className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all cursor-pointer"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all cursor-pointer"
                   title="Next Track"
                 >
                   <SkipForward className="w-4 h-4" />
@@ -211,12 +211,12 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                 <button
                   type="button"
                   onClick={handleToggleBgMusicSetting}
-                  className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
                     bgMusicEnabled
                       ? 'bg-indigo-500/25 border-indigo-400/50 text-indigo-100 hover:bg-indigo-500/35'
                       : 'bg-rose-500/25 border-rose-400/50 text-rose-200 hover:bg-rose-500/35'
                   }`}
-                  title="Enable or completely remove background music across the app"
+                  title="Turn background music on or off across the app"
                 >
                   {bgMusicEnabled ? (
                     <>
@@ -226,7 +226,7 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                   ) : (
                     <>
                       <VolumeX className="w-4 h-4 text-rose-300" />
-                      <span>Background Music: OFF (Removed)</span>
+                      <span>Background Music: OFF</span>
                     </>
                   )}
                 </button>
@@ -235,18 +235,18 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
           </div>
 
           {/* Right: Live Multi-Band Spectrum Visualizer */}
-          <div className="w-full lg:w-72 bg-slate-950/60 border border-white/10 rounded-2xl p-4 flex flex-col justify-between gap-3 backdrop-blur-md">
+          <div className="w-full lg:w-64 bg-slate-950/60 border border-white/10 rounded-2xl p-3.5 flex flex-col justify-between gap-2.5 backdrop-blur-md">
             <div className="flex items-center justify-between text-[11px] font-bold text-indigo-200">
               <span className="flex items-center gap-1.5">
                 <Radio className={`w-3.5 h-3.5 ${isPlaying ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
-                <span>Live Spectrum</span>
+                <span>Visualizer</span>
               </span>
               <span className="font-mono tabular-nums text-emerald-300">
-                {Math.round(volume * 100)}% Gain
+                {Math.round(volume * 100)}% Volume
               </span>
             </div>
 
-            <div className="h-24 flex items-end justify-between gap-1 pt-2 px-1">
+            <div className="h-20 flex items-end justify-between gap-1 pt-1 px-1">
               {eqBars.map((heightPct, i) => (
                 <div
                   key={i}
@@ -283,22 +283,22 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
       </div>
 
       {/* Main Grid: 6 Gamified Soundtracks + Live Synth & Ambient Mixer */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Left 7 Cols: Curated Gamified & Study Soundtracks */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <Music className="w-5 h-5 text-indigo-500" />
-                <span>Gamified & Study Soundtracks</span>
+              <h2 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <Music className="w-4 h-4 text-indigo-500" />
+                <span>Study & Quiz Music Tracks</span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Minimal, non-intrusive procedural loops synthesized in real time—keeps playing while you study or take quizzes
+                Gentle background loops that keep playing while you study or take a quiz
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {BG_MUSIC_TRACKS.map((track) => {
               const isSelected = activeTrack === track.id;
               const isTrackActivePlaying = isSelected && isPlaying;
@@ -307,7 +307,7 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                   key={track.id}
                   type="button"
                   onClick={() => handleSelectTrack(track.id)}
-                  className={`p-4 rounded-3xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-3 group ${
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2.5 group ${
                     isSelected
                       ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 ring-2 ring-indigo-500/20 shadow-sm'
                       : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-300 dark:hover:border-indigo-700'
@@ -425,15 +425,15 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
             {/* Synth Instrument Timbre */}
             <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
               <span className="text-xs font-bold text-slate-600 dark:text-slate-300 block">
-                Lead Synth Instrument
+                Instrument Sound
               </span>
               <div className="grid grid-cols-2 gap-2">
                 {(
                   [
-                    { id: 'marimba', label: 'Warm Marimba', desc: 'Kahoot! Wood Pluck' },
-                    { id: 'crystal', label: 'Crystal Kalimba', desc: 'Pure Sine Chime' },
-                    { id: 'rhodes', label: 'Lo-Fi Rhodes', desc: 'Mellow Electric Keys' },
-                    { id: 'retro', label: '8-Bit Chiptune', desc: 'Classic Arcade Wave' },
+                    { id: 'marimba', label: 'Warm Marimba', desc: 'Soft Wood Pluck' },
+                    { id: 'crystal', label: 'Crystal Chimes', desc: 'Bright Bell Tone' },
+                    { id: 'rhodes', label: 'Lo-Fi Keys', desc: 'Mellow Electric Piano' },
+                    { id: 'retro', label: 'Retro Arcade', desc: 'Classic 8-Bit Sound' },
                   ] as const
                 ).map((inst) => (
                   <button
@@ -495,16 +495,16 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
             </div>
           </div>
 
-          {/* Interactive Kahoot! & Game Show DJ Soundboard */}
-          <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+          {/* Interactive Soundboard */}
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-2.5">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>Kahoot! Arena DJ Soundboard</span>
+                  <span>Fun Soundboard</span>
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Tap any pad to trigger live game-show stingers and fanfare
+                  Tap any button to play fun sound effects
                 </p>
               </div>
             </div>

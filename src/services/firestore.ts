@@ -83,9 +83,14 @@ export interface UserProfileDocument {
   role: PersonaType;
   headline?: string;
   bio?: string;
-  avatarType?: 'google' | 'icon' | 'custom';
+  avatarType?: 'google' | 'icon' | 'custom' | 'mascot';
   avatarIcon?: string;
   avatarBg?: string;
+  mascotCharacter?: string;
+  mascotTheme?: string;
+  equippedAccessory?: string;
+  unlockedMascots?: string[];
+  unlockedAccessories?: string[];
   learningGoal?: string;
   hasCustomizedProfile?: boolean;
   hasCompletedStarterTutorial?: boolean;
@@ -96,6 +101,7 @@ export interface UserProfileDocument {
   maxHearts: number;
   xp: number;
   gems: number;
+  coins?: number;
   level: number;
   quizzesCompleted: number;
   totalCorrect: number;

@@ -82,43 +82,43 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       items: [
         {
           id: 'studio' as DashboardTab,
-          label: 'AI Quiz Studio',
-          shortLabel: 'Studio',
+          label: 'Make a Quiz',
+          shortLabel: 'Create',
           icon: Sparkles,
-          badge: 'Create',
-          description: 'Generate from topics, files & audio',
+          badge: 'New',
+          description: 'Turn any topic, notes, or file into a quiz',
         },
         {
           id: 'notes' as DashboardTab,
-          label: 'AI Study Notes',
+          label: 'Study Guides',
           shortLabel: 'Notes',
           icon: FileText,
           badge: null,
-          description: 'Structured concepts, pitfalls & self-checks',
+          description: 'Easy study notes, tips & quick summaries',
         },
         {
           id: 'flashcards' as DashboardTab,
-          label: 'Flashcard Studio',
+          label: 'Flashcards',
           shortLabel: 'Cards',
           icon: Layers,
           badge: null,
-          description: 'Generate flashcards & spaced recall',
+          description: 'Flip cards to memorize key facts fast',
         },
         {
           id: 'gamma' as DashboardTab,
-          label: 'Gamma Deck Studio',
-          shortLabel: 'Gamma',
+          label: 'Slide Decks',
+          shortLabel: 'Slides',
           icon: Layout,
           badge: null,
-          description: 'Interactive visual slide decks',
+          description: 'Visual study slides with built-in questions',
         },
         {
           id: 'authoring' as DashboardTab,
-          label: 'Custom Builder',
+          label: 'Write Your Own',
           shortLabel: 'Builder',
           icon: PlusCircle,
           badge: null,
-          description: 'Write custom questions & rubrics',
+          description: 'Create your own questions from scratch',
         },
       ],
     },
@@ -131,15 +131,15 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           shortLabel: 'Library',
           icon: BookOpen,
           badge: '12',
-          description: 'Science, coding, history & trivia',
+          description: 'Ready-to-play quizzes in science, coding & history',
         },
         {
           id: 'community' as DashboardTab,
-          label: 'Community Feed',
+          label: 'Community Quizzes',
           shortLabel: 'Community',
           icon: Users,
           badge: null,
-          description: 'Quizzes shared by teachers & students',
+          description: 'Quizzes shared by other learners & teachers',
         },
         {
           id: 'live' as DashboardTab,
@@ -147,23 +147,23 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           shortLabel: 'Live',
           icon: Radio,
           badge: 'Live',
-          description: 'Synchronous room code sessions',
+          description: 'Play live with friends using a game code',
         },
         {
           id: 'music' as DashboardTab,
-          label: 'Music & Groove',
+          label: 'Music & Beats',
           shortLabel: 'Music',
           icon: Music,
           badge: 'Fresh',
-          description: 'Live synth equalizer, study beats & DJ pads',
+          description: 'Study beats, sound effects & custom tempo',
         },
         {
           id: 'suggestions' as DashboardTab,
-          label: 'Suggestions Hub',
-          shortLabel: 'Suggest',
+          label: 'Ideas & Feedback',
+          shortLabel: 'Ideas',
           icon: Lightbulb,
           badge: null,
-          description: 'Smart topic recommendations & feedback',
+          description: 'Send suggestions or pick what to study next',
         },
       ],
     },
@@ -172,35 +172,35 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       items: [
         {
           id: 'achievements' as DashboardTab,
-          label: 'Learning Path',
-          shortLabel: 'Path',
+          label: 'Achievements',
+          shortLabel: 'Badges',
           icon: Trophy,
           badge: null,
-          description: 'Adaptive skill tree & badge trophies',
+          description: 'Unlock 1,000+ badges, trophies & rewards',
         },
         {
           id: 'analytics' as DashboardTab,
-          label: 'Performance & XP',
+          label: 'My Stats',
           shortLabel: 'Stats',
           icon: BarChart3,
           badge: `${stats.totalQuestions > 0 ? Math.round((stats.totalCorrect / stats.totalQuestions) * 100) : 100}%`,
-          description: 'Mastery levels, streaks & accuracy',
+          description: 'Your accuracy, streaks & level progress',
         },
         {
           id: 'history' as DashboardTab,
-          label: 'History & Diplomas',
+          label: 'Past Quizzes',
           shortLabel: 'History',
           icon: History,
           badge: historyCount > 0 ? String(historyCount) : null,
-          description: 'Past quiz archives & certificates',
+          description: 'Review past quizzes & certificates',
         },
         {
           id: 'settings' as DashboardTab,
-          label: 'Settings & UI',
+          label: 'Settings',
           shortLabel: 'Settings',
           icon: Sliders,
           badge: null,
-          description: 'Colors, typography & voice audio',
+          description: 'Themes, animations, sounds & profile',
         },
       ],
     },
@@ -228,7 +228,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       }`}
     >
       {/* App Brand Header with Mascot as Official Logo */}
-      <div className="p-3.5 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between min-h-[68px]">
+      <div className="px-3 py-2.5 border-b border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between min-h-[56px]">
         <AppLogo
           collapsed={isCollapsed}
           mood={persona === 'Teacher' ? 'teacher' : stats.streak > 3 ? 'streak' : 'idle'}
@@ -249,17 +249,17 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       </div>
 
       {/* Main Categorized Navigation Sections */}
-      <nav className="flex-1 p-3 space-y-3 overflow-y-auto scrollbar-none">
+      <nav className="flex-1 px-2.5 py-2 space-y-2 overflow-y-auto scrollbar-none">
         {navigationSections.map((sec, secIdx) => {
           const hasActiveItem = sec.items.some((i) => i.id === activeTab);
           const isGroupOpen = isCollapsed || expandedGroups[sec.title] || hasActiveItem;
           return (
-            <div key={sec.title} className="space-y-1">
+            <div key={sec.title} className="space-y-0.5">
               {!isCollapsed ? (
                 <button
                   type="button"
                   onClick={() => toggleGroup(sec.title)}
-                  className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer"
                 >
                   <span>{sec.title}</span>
                   <ChevronDown
@@ -269,7 +269,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   />
                 </button>
               ) : secIdx > 0 ? (
-                <div className="my-2 border-t border-slate-200 dark:border-slate-800" />
+                <div className="my-1.5 border-t border-slate-200 dark:border-slate-800" />
               ) : null}
 
               {isGroupOpen &&
@@ -282,7 +282,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                       type="button"
                       id={`nav-tab-${item.id}`}
                       onClick={() => handleTabClick(item.id)}
-                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-left transition-all cursor-pointer group relative ${
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-all cursor-pointer group relative ${
                         isActive
                           ? `${currentAccentConfig.activeBtn} font-bold shadow-xs`
                           : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80 font-medium'
@@ -290,13 +290,13 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                       title={`${item.label} — ${item.description}`}
                     >
                       <div
-                        className={`p-1.5 rounded-xl transition-colors shrink-0 ${
+                        className={`p-1.5 rounded-lg transition-colors shrink-0 ${
                           isActive
                             ? 'bg-white/20 text-white'
                             : `bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:${currentAccentConfig.activeText}`
                         }`}
                       >
-                        <Icon className="w-4 h-4" />
+                        <Icon className="w-3.5 h-3.5" />
                       </div>
 
                       {!isCollapsed && (

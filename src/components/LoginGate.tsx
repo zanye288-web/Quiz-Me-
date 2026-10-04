@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles,
   Zap,
@@ -24,6 +25,7 @@ import { useTheme } from '../context/ThemeContext';
 import { soundFx } from '../utils/audio';
 import { PersonaType } from '../types/quiz';
 import { AppLogo } from './AppLogo';
+import { MascotAvatar, MASCOT_CATALOG, MASCOT_ACCESSORY_CATALOG } from './MascotAvatar';
 
 export const LoginGate: React.FC = () => {
   const {
@@ -44,6 +46,20 @@ export const LoginGate: React.FC = () => {
 
   // Mode: 'signin' | 'signup' | 'forgot_password'
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot_password'>('signin');
+  const [showcaseIndex, setShowcaseIndex] = useState<number>(0);
+
+  // Cycle through all mascots on the login page with smooth fade-in and fade-out
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setShowcaseIndex((prev) => (prev + 1) % MASCOT_CATALOG.length);
+    }, 3400);
+    return () => clearInterval(interval);
+  }, []);
+
+  const currentShowcaseMascot = MASCOT_CATALOG[showcaseIndex] || MASCOT_CATALOG[0];
+  const currentShowcaseAccessory =
+    MASCOT_ACCESSORY_CATALOG.find((a) => a.id === currentShowcaseMascot.defaultAccessory) ||
+    MASCOT_ACCESSORY_CATALOG[0];
 
   // Form Fields
   const [email, setEmail] = useState('');
@@ -294,6 +310,85 @@ export const LoginGate: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Animated Mascot Showcase — All 10 Mascots Fade In & Out with Their Unique Poses */}
+            <div className="mb-5 p-4 rounded-2xl bg-gradient-to-br from-indigo-50/90 via-white to-violet-50/90 dark:from-slate-800/90 dark:via-slate-900 dark:to-indigo-950/60 border border-indigo-200/70 dark:border-indigo-800/60 shadow-inner">
+              <div className="flex items-center justify-between gap-3">
+                <div className="relative w-20 h-20 flex items-center justify-center shrink-0">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={currentShowcaseMascot.id}
+                      initial={{ opacity: 0, scale: 0.82, y: 6 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.82, y: -6 }}
+                      transition={{ duration: 0.55, ease: 'easeInOut' }}
+                      className="flex items-center justify-center"
+                    >
+                      <MascotAvatar
+                        character={currentShowcaseMascot.id}
+                        theme={currentShowcaseMascot.defaultTheme}
+                        accessory={currentShowcaseMascot.defaultAccessory || 'none'}
+                        mood="happy"
+                        size="lg"
+                        interactive={false}
+                      />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={currentShowcaseMascot.id}
+                      initial={{ opacity: 0, x: 8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -8 }}
+                      transition={{ duration: 0.45, ease: 'easeInOut' }}
+                      className="space-y-1"
+                    >
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-600 text-white">
+                          Mascot {showcaseIndex + 1} of {MASCOT_CATALOG.length}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60">
+                          Pose: {currentShowcaseMascot.uniquePose}
+                        </span>
+                      </div>
+                      <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
+                        {currentShowcaseMascot.title}
+                      </h2>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
+                        {currentShowcaseMascot.species} • {currentShowcaseMascot.tagline}
+                      </p>
+                      <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">
+                        {currentShowcaseAccessory.previewEmoji} Wearing: {currentShowcaseAccessory.name}
+                      </p>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              {/* Dots to preview any mascot or watch them fade in and out */}
+              <div className="flex items-center justify-center gap-1.5 mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/70">
+                {MASCOT_CATALOG.map((m, idx) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setShowcaseIndex(idx);
+                    }}
+                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                      idx === showcaseIndex
+                        ? 'w-6 bg-indigo-600 dark:bg-indigo-400'
+                        : 'w-2 bg-slate-300 dark:bg-slate-700 hover:bg-indigo-400'
+                    }`}
+                    title={`Preview ${m.title} (${m.uniquePose})`}
+                    aria-label={`Preview ${m.title}`}
+                  />
+                ))}
+              </div>
+            </div>
 
             {/* Title & Subtitle */}
             <div className="text-center mb-6">

@@ -41,6 +41,9 @@ import {
   Square,
   Music,
   Compass,
+  Coins,
+  Lock,
+  UserCheck,
 } from 'lucide-react';
 import {
   useTheme,
@@ -75,9 +78,12 @@ import { SCHOLAR_AVATARS, AVATAR_BG_GRADIENTS } from './ProfileCustomizationModa
 import {
   MascotAvatar,
   MASCOT_CATALOG,
+  MASCOT_ACCESSORY_CATALOG,
   MASCOT_THEME_CATALOG,
   MascotMood,
   useMascotPreferences,
+  getMascotIconDataUrl,
+  downloadCustomMascotDesktopIcon,
 } from './MascotAvatar';
 
 interface SettingsViewProps {
@@ -170,9 +176,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const {
     mascotCharacter,
     mascotTheme,
+    mascotAccessory,
+    mascotCoins,
+    unlockedMascots,
+    unlockedAccessories,
     currentMascotMeta,
+    currentAccessoryMeta,
     setMascotCharacter,
     setMascotTheme,
+    purchaseMascot,
+    purchaseAccessory,
   } = useMascotPreferences();
 
   // Custom Sound Effects State
@@ -202,8 +215,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [profileHeadline, setProfileHeadline] = useState(userProfile?.headline || 'Lifelong Learner');
   const [profileBio, setProfileBio] = useState(userProfile?.bio || 'Curious mind exploring knowledge across disciplines.');
   const [profileGoal, setProfileGoal] = useState(userProfile?.learningGoal || 'Master core concepts and daily recall.');
-  const [profileAvatarType, setProfileAvatarType] = useState<'google' | 'icon'>(
-    userProfile?.avatarType || (user?.photoURL ? 'google' : 'icon')
+  const [profileAvatarType, setProfileAvatarType] = useState<'google' | 'icon' | 'custom' | 'mascot'>(
+    userProfile?.avatarType || (user?.photoURL ? 'google' : 'mascot')
   );
   const [profileAvatarIcon, setProfileAvatarIcon] = useState(userProfile?.avatarIcon || '🎓');
   const [profileAvatarBg, setProfileAvatarBg] = useState(userProfile?.avatarBg || 'indigo');
@@ -908,19 +921,47 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
             {/* Avatar Selection */}
             <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
                   Avatar Identity
                 </h3>
-                {user?.photoURL && (
-                  <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setProfileAvatarType('mascot');
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                      profileAvatarType === 'mascot'
+                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    My Mascot
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setProfileAvatarType('icon');
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                      profileAvatarType === 'icon'
+                        ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                        : 'text-slate-500'
+                    }`}
+                  >
+                    Emoji Badge
+                  </button>
+                  {user?.photoURL && (
                     <button
                       type="button"
                       onClick={() => {
                         soundFx.playClick();
                         setProfileAvatarType('google');
                       }}
-                      className={`px-2 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
                         profileAvatarType === 'google'
                           ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs'
                           : 'text-slate-500'
@@ -928,22 +969,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     >
                       Google Photo
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        soundFx.playClick();
-                        setProfileAvatarType('icon');
-                      }}
-                      className={`px-2 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                        profileAvatarType === 'icon'
-                          ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-2xs'
-                          : 'text-slate-500'
-                      }`}
-                    >
-                      Scholar Emojis
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
               {profileAvatarType === 'icon' ? (
@@ -1073,44 +1100,55 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Controls Column */}
           <div className="lg:col-span-7 space-y-6">
-            {/* Mascot Companion Character & Aura Studio */}
+            {/* Mascot Companion Character, Unique Poses, Accessories & Desktop/Website Icon Studio */}
             <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-indigo-500" />
-                  <span>Mascot Companion Studio (5 Original Characters)</span>
+                  <span>Mascot & Accessory Boutique (10 Unique Poses)</span>
                 </label>
-                <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
-                  Active: {currentMascotMeta.title}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60">
+                    <Coins className="w-3.5 h-3.5 text-amber-500" />
+                    {mascotCoins} Mascot Coins
+                  </span>
+                </div>
               </div>
 
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Choose your personal study companion. Your selected mascot appears in the top branding bar, quiz rationales, 1-on-1 AI Tutor, diplomas, and floating companion widget.
+                Each mascot has its own unique pose! Earn <strong>Mascot Coins</strong> by scoring 80%+ on quizzes (<strong>100% Perfect = +8 Coins</strong>) to unlock rare mascots and accessories. Your customized mascot also updates your <strong>website tab & desktop app icon</strong> automatically!
               </p>
 
-              {/* 5 Mascot Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+              {/* 10 Mascot Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {MASCOT_CATALOG.map((m) => {
                   const isSelected = mascotCharacter === m.id;
+                  const isUnlocked = unlockedMascots.includes(m.id);
                   return (
                     <button
                       key={m.id}
                       type="button"
                       onClick={() => {
-                        soundFx.playPop();
-                        setMascotCharacter(m.id, true);
-                        triggerSaveNotice(`Switched companion to ${m.title}`);
+                        const res = purchaseMascot(m.id);
+                        if (res.success) {
+                          soundFx.playPop();
+                        } else {
+                          soundFx.playClick();
+                        }
+                        triggerSaveNotice(res.message);
                       }}
-                      className={`p-3 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-2 ${
+                      className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center justify-between gap-1.5 ${
                         isSelected
                           ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/50 ring-2 ring-indigo-500/20 shadow-xs'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/70 dark:bg-slate-850'
+                          : isUnlocked
+                          ? 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/70 dark:bg-slate-850'
+                          : 'border-amber-200/80 dark:border-amber-900/50 bg-amber-50/30 dark:bg-slate-900/40'
                       }`}
                     >
                       <MascotAvatar
                         character={m.id}
                         theme={isSelected ? mascotTheme : m.defaultTheme}
+                        accessory={isSelected ? mascotAccessory : m.defaultAccessory || 'none'}
                         mood={isSelected ? previewMascotMood : 'idle'}
                         size="sm"
                         interactive={false}
@@ -1119,33 +1157,133 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         <div className="text-xs font-extrabold text-slate-900 dark:text-white">
                           {m.name}
                         </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
-                          {m.species}
+                        <div className="text-[9px] text-indigo-600 dark:text-indigo-400 font-bold leading-tight mt-0.5">
+                          {m.uniquePose}
                         </div>
+                        {!isUnlocked ? (
+                          <span className="mt-1 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+                            <Lock className="w-2.5 h-2.5" />
+                            {m.costCoins} Coins
+                          </span>
+                        ) : (
+                          <span className="mt-1 inline-block text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                            {isSelected ? 'Equipped' : 'Unlocked'}
+                          </span>
+                        )}
                       </div>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Active Mascot Details + Color Aura + Mood Tester */}
+              {/* Mascot Accessories Grid */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-2">
+                  <span>Mascot Accessories (Unlock with Mascot Coins)</span>
+                  <span className="text-indigo-600 dark:text-indigo-400">
+                    Wearing: {currentAccessoryMeta.name}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {MASCOT_ACCESSORY_CATALOG.map((acc) => {
+                    const isUnlocked = unlockedAccessories.includes(acc.id);
+                    const isSelected = mascotAccessory === acc.id;
+                    return (
+                      <button
+                        key={acc.id}
+                        type="button"
+                        onClick={() => {
+                          const res = purchaseAccessory(acc.id);
+                          if (res.success) {
+                            soundFx.playPop();
+                          } else {
+                            soundFx.playClick();
+                          }
+                          triggerSaveNotice(res.message);
+                        }}
+                        className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/50 ring-1 ring-indigo-500/30'
+                            : isUnlocked
+                            ? 'border-slate-200 dark:border-slate-800 hover:border-indigo-300'
+                            : 'border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 hover:border-amber-400'
+                        }`}
+                      >
+                        <div className="w-full flex items-center justify-between">
+                          <span className="text-base">{acc.previewEmoji}</span>
+                          {!isUnlocked ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300">
+                              <Coins className="w-2.5 h-2.5 text-amber-500" />
+                              {acc.costCoins}
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                              {isSelected ? 'Equipped' : 'Owned'}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] font-bold text-slate-900 dark:text-white mt-1 truncate max-w-full">
+                          {acc.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Active Mascot Details + Set as Profile Picture + Website/Desktop Icon Sync */}
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex flex-col sm:flex-row items-center gap-4">
                 <div className="shrink-0">
                   <MascotAvatar
                     character={mascotCharacter}
                     theme={mascotTheme}
+                    accessory={mascotAccessory}
                     mood={previewMascotMood}
                     size="md"
                   />
                 </div>
                 <div className="flex-1 space-y-3 text-center sm:text-left w-full">
-                  <div>
-                    <div className="text-sm font-black text-slate-900 dark:text-white">
-                      {currentMascotMeta.title}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-black text-slate-900 dark:text-white">
+                        {currentMascotMeta.title} • {currentMascotMeta.uniquePose}
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        {currentMascotMeta.tagline} • Wearing: {currentAccessoryMeta.name}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {currentMascotMeta.tagline}
-                    </p>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          soundFx.playComplete();
+                          setProfileAvatarType('mascot');
+                          await updateUserProfileInCloud({
+                            avatarType: 'mascot',
+                            mascotCharacter,
+                            mascotTheme,
+                            equippedAccessory: mascotAccessory,
+                          });
+                          triggerSaveNotice(`${currentMascotMeta.title} is now set as your Profile Picture!`);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>{profileAvatarType === 'mascot' ? 'Active Profile Pic' : 'Set as Profile Pic'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          downloadCustomMascotDesktopIcon(mascotCharacter, mascotTheme, mascotAccessory);
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:text-indigo-600 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                        title="Download 512x512 Desktop Icon (.png)"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>App Icon</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Color Aura Swatches */}
@@ -1827,10 +1965,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <div>
                       <span className="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
                         <Music className="w-4 h-4 text-indigo-500" />
-                        <span>Minimal Gamified Background Music</span>
+                        <span>Background Study Music</span>
                       </span>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Gentle, minimal Kahoot!-inspired study groove that plays softly in the background. Toggle off below to completely remove background music.
+                        Light, minimal background music that plays softly while you study or take quizzes. Turn off below anytime to remove it completely.
                       </p>
                     </div>
 
@@ -1847,7 +1985,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                               : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs'
                           }`}
                         >
-                          {isBgMusicPlaying ? 'Pause Groove' : 'Play Minimal Music'}
+                          {isBgMusicPlaying ? 'Pause Music' : 'Play Music'}
                         </button>
                       )}
 
@@ -1858,10 +1996,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           soundFx.setBgMusicEnabled(next);
                           if (next) {
                             soundFx.startBgMusic();
-                            triggerSaveNotice('Minimal Gamified Background Music enabled');
+                            triggerSaveNotice('Background music turned on');
                           } else {
                             soundFx.stopBgMusic();
-                            triggerSaveNotice('Background Music removed & disabled');
+                            triggerSaveNotice('Background music turned off');
                           }
                         }}
                         className={`px-3 py-1.5 rounded-xl border text-xs font-extrabold transition-all cursor-pointer ${
@@ -1870,7 +2008,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             : 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
                         }`}
                       >
-                        {bgMusicEnabled ? 'Remove Background Music' : 'Enable Background Music'}
+                        {bgMusicEnabled ? 'Turn Off Music' : 'Turn On Music'}
                       </button>
                     </div>
                   </div>

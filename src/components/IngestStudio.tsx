@@ -355,14 +355,14 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
       : (['multiple_choice', 'fill_in_blank'] as QuestionType[]);
 
     setIsLoading(true);
-    setGenerationStep('Connecting to Gemini AI Engine...');
+    setGenerationStep('Reading your topic...');
 
     const stepTimer1 = setTimeout(() => {
-      setGenerationStep('Synthesizing pedagogical concepts & Bloom levels...');
+      setGenerationStep('Writing questions and helpful hints...');
     }, 1500);
 
     const stepTimer2 = setTimeout(() => {
-      setGenerationStep('Formatting interactive options & feedback...');
+      setGenerationStep('Getting your quiz ready...');
     }, 3200);
 
     try {
@@ -423,13 +423,13 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   const displayedPresets = showAllPresetsInBuilder ? PRESET_TOPICS : PRESET_TOPICS.slice(0, 4);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 space-y-4">
       {/* Top Studio Header & Segmented Workspace Switcher */}
-      <div className="rounded-3xl p-5 sm:p-6 border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xs relative overflow-hidden transition-all">
+      <div className="rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xs relative overflow-hidden transition-all">
         <div className="absolute -top-16 -right-16 w-64 h-64 bg-gradient-to-bl from-indigo-500/10 via-purple-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3.5 min-w-0">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 relative z-10">
+          <div className="flex items-center gap-3 min-w-0">
             <MascotAvatar
               mood={persona === 'Teacher' ? 'teacher' : 'happy'}
               size="sm"
@@ -437,25 +437,25 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             />
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Create Custom Quizzes in Seconds
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Create a Quiz in Seconds
                 </h2>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80">
                   <Sparkles className="w-3 h-3 text-indigo-500" />
-                  <span>Multi-Modal Studio</span>
+                  <span>Quick Quiz Maker</span>
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                Generate tailored assessments from notes, documents, voice recordings, or curated tracks.
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                Turn any topic, notes, document, or voice memo into an interactive quiz.
               </p>
             </div>
           </div>
 
           {/* Segmented Workspace Switcher (Matches 3-View Clean Organization) */}
-          <div className="flex items-center p-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 self-start lg:self-center shrink-0">
+          <div className="flex items-center p-1 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 self-start lg:self-center shrink-0">
             {[
-              { id: 'builder', label: 'Studio Builder', icon: Sparkles },
-              { id: 'tracks', label: `Curated Tracks (${PRESET_TOPICS.length})`, icon: BookOpen },
+              { id: 'builder', label: 'Make a Quiz', icon: Sparkles },
+              { id: 'tracks', label: `Starter Quizzes (${PRESET_TOPICS.length})`, icon: BookOpen },
               { id: 'recommended', label: 'For You', icon: Compass },
             ].map((view) => {
               const Icon = view.icon;
@@ -638,20 +638,20 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
 
       {/* VIEW 1: Default Studio Builder (12-Column Bento Dashboard Grid) */}
       {studioSection === 'builder' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
           {/* Left Primary Creation Column (8 Cols) */}
           <div
             id="creation-card-main"
-            className="lg:col-span-8 rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-colors"
+            className="lg:col-span-8 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-colors"
           >
             {/* Creation Mode Tabs */}
-            <div className="flex border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 p-2.5 gap-1.5 overflow-x-auto scrollbar-none items-center">
+            <div className="flex border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 p-2 gap-1.5 overflow-x-auto scrollbar-none items-center">
               {[
-                { id: 'text', label: 'Notes & Prompts', icon: FileText },
-                { id: 'file', label: 'Files & Images', icon: Upload },
-                { id: 'audio', label: 'Voice Memo', icon: Mic },
-                { id: 'url', label: 'Web / Video URL', icon: Link2 },
-                { id: 'presets', label: 'Curated Sets', icon: Lightbulb },
+                { id: 'text', label: 'Topic or Notes', icon: FileText },
+                { id: 'file', label: 'Upload File', icon: Upload },
+                { id: 'audio', label: 'Record Voice', icon: Mic },
+                { id: 'url', label: 'Web Link', icon: Link2 },
+                { id: 'presets', label: 'Starter Topics', icon: Lightbulb },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -696,20 +696,20 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             </div>
 
             {/* Tab Body Contents */}
-            <div className="p-5 sm:p-6">
+            <div className="p-4 sm:p-5">
               {/* Tab 1: Popular Starter Topics (Compact 4-Card Featured View inside Builder) */}
               {activeTab === 'presets' && (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <span>Featured Curriculum Tracks</span>
+                        <span>Popular Starter Quizzes</span>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold border border-indigo-200 dark:border-indigo-800">
                           {selectedPreset.title}
                         </span>
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Pick a track below or browse all {PRESET_TOPICS.length} curriculum tracks.
+                        Pick any topic below to start right away.
                       </p>
                     </div>
                     <button
@@ -820,10 +820,10 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
 
           {/* Tab 2: Paste Notes / Text */}
           {activeTab === 'text' && (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <label htmlFor="notes-input" className="block text-sm font-extrabold text-slate-900 dark:text-white">
-                  Enter Subject, Custom Concept, or Lecture Notes
+                  What would you like to be quizzed on?
                 </label>
                 <button
                   type="button"
@@ -834,20 +834,20 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/40 cursor-pointer transition-all"
                 >
                   <Mic className="w-3.5 h-3.5 text-rose-500" />
-                  <span>Or Record Voice Audio</span>
+                  <span>Or Speak Your Topic</span>
                 </button>
               </div>
               <textarea
                 id="notes-input"
-                rows={6}
+                rows={4}
                 value={inputText}
                 onChange={(e) => {
                   setInputText(e.target.value);
                   if (validationWarning) setValidationWarning(null);
                   if (errorMessage) setErrorMessage(null);
                 }}
-                placeholder="Example: Explain the core differences between Monolithic and Microservices architecture with trade-offs in distributed transactions, latency, and observability..."
-                className={`w-full p-4 rounded-2xl border text-sm transition-all focus:outline-none focus:ring-2 ${
+                placeholder="Type any topic or paste your class notes here (for example: Photosynthesis, World War II, Python loops, or Basic Fractions)..."
+                className={`w-full p-3.5 rounded-2xl border text-sm transition-all focus:outline-none focus:ring-2 ${
                   isInputShaking
                     ? 'border-amber-500 bg-amber-50/20 dark:bg-amber-950/20 ring-2 ring-amber-500 animate-shake'
                     : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-indigo-500'
@@ -1008,16 +1008,16 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
         </div>
 
         {/* Assessment Matrix Configuration & Generate Footer */}
-        <div className="p-6 border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="p-4 sm:p-5 border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {/* 1. Number of Questions (Limit Increased to 100) */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Question Count
+                  Questions
                 </label>
                 <span className="text-[11px] font-black px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  {questionCount} Qs {questionCount >= 50 ? '• Marathon' : questionCount >= 25 ? '• Full Exam' : questionCount >= 10 ? '• Assessment' : '• Micro'}
+                  {questionCount} Qs {questionCount >= 50 ? '• Big Test' : questionCount >= 25 ? '• Full Quiz' : questionCount >= 10 ? '• Standard' : '• Quick'}
                 </span>
               </div>
               <div className="grid grid-cols-7 gap-1">
@@ -1078,7 +1078,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             {/* 2. Difficulty */}
             <div>
               <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                Bloom Complexity
+                Difficulty
               </label>
               <div className="grid grid-cols-3 gap-1.5">
                 {(['Beginner', 'Intermediate', 'Advanced'] as DifficultyType[]).map((lvl) => (
@@ -1104,7 +1104,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             {/* 3. Persona Target */}
             <div>
               <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                Pedagogical Lens
+                Mode
               </label>
               <div className="grid grid-cols-2 gap-1.5">
                 <button
@@ -1133,7 +1133,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                       : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
                 >
-                  Instructor
+                  Teacher
                 </button>
               </div>
             </div>
@@ -1220,19 +1220,19 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
           </div>
 
           {/* Unified Collapsible Formats & AI Prompter Directives */}
-          <div className="rounded-2xl border border-indigo-200/70 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 p-3.5 sm:p-4 transition-all">
+          <div className="rounded-2xl border border-indigo-200/70 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 transition-all">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-xs shrink-0">
-                  <SlidersHorizontal className="w-4 h-4" />
+                <div className="w-7 h-7 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                      Question Formats & AI Directives
+                      Question Types & Extra Options
                     </span>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                      {selectedQuestionTypes.length} {selectedQuestionTypes.length === 1 ? 'Format' : 'Formats'}
+                      {selectedQuestionTypes.length} {selectedQuestionTypes.length === 1 ? 'Type' : 'Types'}
                     </span>
                     {(customInstructions.trim() || promptStyle !== 'Standard' || focusSubtopics.trim()) && (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
@@ -1241,7 +1241,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                     )}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                    Configure cognitive question types, target audience, style & domain rules.
+                    Choose question styles, age group, or special instructions.
                   </p>
                 </div>
               </div>
@@ -1501,14 +1501,14 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                 <div className="flex items-center gap-3">
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
                   <div className="text-left">
-                    <span className="block font-black text-sm">{generationStep || 'Synthesizing Custom Assessment...'}</span>
-                    <span className="block text-[11px] font-normal text-white/80">Powered by Google Gemini 3.8 Flash</span>
+                    <span className="block font-black text-sm">{generationStep || 'Building Your Quiz...'}</span>
+                    <span className="block text-[11px] font-normal text-white/80">Ready in just a few seconds</span>
                   </div>
                 </div>
               ) : (
                 <>
                   <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform shrink-0" />
-                  <span>Generate AI Assessment</span>
+                  <span>Start My Quiz</span>
                   <kbd className="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 rounded bg-white/20 text-white ml-2">
                     ⌘ + ↵
                   </kbd>
@@ -1520,15 +1520,15 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
       </div>
 
           {/* Right Bento Widget Column (4 Cols — Matches Gauge & Modular Cards in Reference Images) */}
-          <div className="lg:col-span-4 space-y-5">
+          <div className="lg:col-span-4 space-y-4">
             {/* Bento Card 1: Circular Mastery & Evaluation Gauge */}
-            <div className="rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-xs space-y-4">
+            <div className="rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  Scholar Mastery Gauge
+                  Your Progress
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80">
-                  {persona === 'Teacher' ? '🧑‍🏫 Instructor' : '🎓 Student'}
+                  {persona === 'Teacher' ? '🧑‍🏫 Teacher' : '🎓 Student'}
                 </span>
               </div>
 
@@ -1590,12 +1590,12 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             </div>
 
             {/* Bento Card 2: Quick Topic Starters */}
-            <div className="rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-xs space-y-3">
+            <div className="rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-xs space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Compass className="w-3.5 h-3.5 text-indigo-500" />
                   <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Quick Topic Starters
+                    Quick Topic Ideas
                   </span>
                 </div>
                 <button
@@ -1606,7 +1606,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                   }}
                   className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                 >
-                  All 12 Tracks →
+                  See All 12 →
                 </button>
               </div>
 
@@ -1622,7 +1622,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                       setValidationWarning(null);
                       setErrorMessage(null);
                     }}
-                    className={`flex items-center gap-2 p-2.5 rounded-2xl text-xs font-bold border transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 ${topic.color}`}
+                    className={`flex items-center gap-2 p-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 ${topic.color}`}
                   >
                     <span className="text-base shrink-0">{topic.icon}</span>
                     <span className="truncate">{topic.label}</span>
@@ -1632,23 +1632,23 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             </div>
 
             {/* Bento Card 3: Adaptive AI Recommendations Spotlight */}
-            <div className="rounded-3xl p-5 border border-indigo-200/70 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/30 shadow-xs space-y-3">
+            <div className="rounded-2xl p-4 border border-indigo-200/70 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/30 shadow-xs space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-indigo-500" />
                   <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                    Adaptive AI For You
+                    Picked For You
                   </span>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                  {historyRecords.length} Evaluated
+                  {historyRecords.length} Completed
                 </span>
               </div>
 
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                 {historyRecords.length > 0
-                  ? 'Personalized remediation & progression quizzes synced with your Firestore history.'
-                  : 'Complete your first quiz to unlock tailored weak-spot diagnostics and adaptive tracks.'}
+                  ? 'Practice quizzes picked based on your recent scores and topics.'
+                  : 'Finish your first quiz to get personalized topic suggestions and study tips.'}
               </p>
 
               <div className="flex items-center gap-2 pt-1">

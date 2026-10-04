@@ -544,7 +544,7 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
     .sort((a, b) => b.upvotes - a.upvotes);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6 animate-in fade-in duration-200">
+    <div className="max-w-6xl mx-auto px-4 py-4 space-y-4 animate-in fade-in duration-200">
       {/* Toast Notification */}
       {submitBanner && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl bg-emerald-600 text-white shadow-2xl border border-emerald-400 animate-in slide-in-from-bottom-4 duration-200">
@@ -554,34 +554,34 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
       )}
 
       {/* Hero Header */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="flex items-start sm:items-center gap-4">
+      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
           <div
-            className={`p-4 rounded-2xl ${currentAccentConfig.badgeBg} ${currentAccentConfig.badgeText} border ${currentAccentConfig.border} shadow-xs shrink-0`}
+            className={`p-3 rounded-xl ${currentAccentConfig.badgeBg} ${currentAccentConfig.badgeText} border ${currentAccentConfig.border} shadow-2xs shrink-0`}
           >
-            <Lightbulb className="w-8 h-8" />
+            <Lightbulb className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center flex-wrap gap-2">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-                Suggestions & QoL Hub
+              <h1 className="text-lg sm:text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                Ideas &amp; Study Picks
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800">
-                Smart Picks + Feature Board
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800">
+                Feedback &amp; Topics
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-              Discover personalized AI quiz suggestions tailored to your stats, explore new Quality-of-Life upgrades (Voice Answer Mic, 12 Fonts, Spoiler Shield), and vote on community ideas.
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 max-w-2xl">
+              Send your ideas directly to us, vote on upcoming features, or try quizzes picked just for you.
             </p>
           </div>
         </div>
 
         {/* Sub-navigation Switcher */}
-        <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-stretch md:self-auto">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-stretch md:self-auto">
           {[
-            { id: 'study_picks' as const, label: 'Study Suggestions', icon: Compass },
-            { id: 'qol_lab' as const, label: 'New QoL Features', icon: Zap },
-            { id: 'feature_board' as const, label: 'Idea & Vote Board', icon: MessageSquarePlus },
+            { id: 'feature_board' as const, label: 'Send Idea & Vote', icon: MessageSquarePlus },
+            { id: 'study_picks' as const, label: 'Study Picks', icon: Compass },
+            { id: 'qol_lab' as const, label: 'Helpful Tools', icon: Zap },
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeSubTab === tab.id;
@@ -844,33 +844,33 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
               <div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <Mail className="w-4 h-4 text-indigo-500 shrink-0" />
-                  <span>Email a Suggestion</span>
+                  <span>Send Us an Idea</span>
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Directly dispatches your verified idea to{' '}
+                  Emails your suggestion straight to{' '}
                   <strong className="text-indigo-600 dark:text-indigo-400 font-mono">
                     zanye288@gmail.com
                   </strong>
                 </p>
               </div>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
-                +15 XP & +5 Gems
+                +15 XP &amp; +5 Gems
               </span>
             </div>
 
-            {/* 5-Layer Anti-Spam Premeasures Shield Status */}
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5">
+            {/* Spam Protection Status */}
+            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1">
               <div className="flex items-center justify-between text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300">
                 <span className="flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                  <span>5-Layer Anti-Spam Shield Active</span>
+                  <span>Spam Protection Active</span>
                 </span>
                 <span className="font-mono text-[10px]">
-                  {cooldownSeconds > 0 ? `Cooldown: ${cooldownSeconds}s` : 'Ready'}
+                  {cooldownSeconds > 0 ? `Wait ${cooldownSeconds}s` : 'Ready'}
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                Protected by Honeypot Bot Trap · 45s Rate-Limit Cooldown · Link/Gibberish Filter · Dwell Check · Human Challenge
+                Protected by quick math check, 45-second timer, and spam filter.
               </p>
             </div>
 
@@ -912,7 +912,7 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
                 maxLength={90}
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="e.g., Add Kahoot! Team vs Team Battle Mode"
+                placeholder="e.g., Add a Team vs Team Quiz Mode"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -926,19 +926,19 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
                 onChange={(e) => setNewCategory(e.target.value as SuggestionItem['category'])}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="Quality of Life">Quality of Life (QoL)</option>
-                <option value="Voice & Audio">Voice, Music & Audio</option>
-                <option value="Themes & Fonts">Themes & Fonts</option>
-                <option value="Study & AI">Study Tools & AI</option>
-                <option value="Quiz Topic">New Quiz Topic Request</option>
-                <option value="Multiplayer">Kahoot! Live Battles & Multiplayer</option>
+                <option value="Quality of Life">Helpful Improvements</option>
+                <option value="Voice & Audio">Voice, Music &amp; Sound</option>
+                <option value="Themes & Fonts">Themes &amp; Fonts</option>
+                <option value="Study & AI">Study Tools</option>
+                <option value="Quiz Topic">New Quiz Topic</option>
+                <option value="Multiplayer">Live Games &amp; Multiplayer</option>
               </select>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-bold text-slate-600 dark:text-slate-400">
-                  Details for zanye288@gmail.com (min 12 chars)
+                  Your Idea Details (min 12 chars)
                 </label>
                 <span className="text-[10px] font-mono text-slate-400">
                   {newDescription.length}/600
@@ -951,7 +951,7 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
                 maxLength={600}
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
-                placeholder="Describe your feature idea, Kahoot! upgrade, or quiz topic in detail..."
+                placeholder="Tell us about your feature idea or quiz topic..."
                 className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
               />
             </div>
@@ -961,7 +961,7 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
               <div className="flex items-center justify-between">
                 <label className="text-xs font-extrabold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>Anti-Spam Verification: What is {challengeA} + {challengeB}?</span>
+                  <span>Quick Check: What is {challengeA} + {challengeB}?</span>
                 </label>
                 <button
                   type="button"

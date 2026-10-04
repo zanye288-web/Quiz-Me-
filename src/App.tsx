@@ -31,6 +31,12 @@ import { IntelligentNotesHubView } from './components/IntelligentNotesHubView';
 import { SuggestionsHubView } from './components/SuggestionsHubView';
 import { MusicStudioView } from './components/MusicStudioView';
 import { QuizzieCompanionWidget } from './components/QuizzieCompanionWidget';
+import {
+  calculateQuizMascotCoinsEarned,
+  addMascotCoinsGlobal,
+  getSavedMascotPreferences,
+  syncMascotFaviconAndDesktopIcon,
+} from './components/MascotAvatar';
 import { StarterTutorialModal, STARTER_TUTORIAL_STORAGE_KEY } from './components/StarterTutorialModal';
 import { GraduationCap, Sparkles, BookOpen, Layers, BarChart3, Menu, Share2, Play, X, FileText } from 'lucide-react';
 import { PersonaType, QuizResponse, Question, UserStats, AssessmentConfig } from './types/quiz';
@@ -81,6 +87,12 @@ export default function App() {
     }
     return false;
   });
+
+  // Sync personalized mascot favicon & desktop app icon on load
+  useEffect(() => {
+    const prefs = getSavedMascotPreferences();
+    syncMascotFaviconAndDesktopIcon(prefs.character, prefs.theme, prefs.accessory);
+  }, []);
 
   // Optional profile prompt on first login
   useEffect(() => {
@@ -444,6 +456,15 @@ export default function App() {
       BADGE_CATALOG.filter((b) => b.checkUnlocked(stats)).map((b) => b.id)
     );
 
+    // Award challenging Mascot Coins for 80%+ quiz mastery
+    const coinReward = calculateQuizMascotCoinsEarned(
+      results.score,
+      results.total,
+      results.quiz.difficulty,
+      stats.streak
+    );
+    const updatedCoins = coinReward.coins > 0 ? addMascotCoinsGlobal(coinReward.coins) : getSavedMascotPreferences().coins;
+
     const updatedNewStats: UserStats = {
       ...stats,
       totalCorrect: stats.totalCorrect + results.score,
@@ -451,6 +472,7 @@ export default function App() {
       quizzesCompleted: stats.quizzesCompleted + 1,
       xp: stats.xp + results.xpEarned,
       gems: stats.gems + results.gemsEarned,
+      coins: updatedCoins,
       level: Math.max(1, Math.floor((stats.xp + results.xpEarned) / 150) + 1),
     };
 
@@ -614,7 +636,7 @@ export default function App() {
           <GraduationCap className="w-6 h-6" />
         </div>
         <p className="text-xs font-bold text-slate-400 animate-pulse tracking-wide uppercase">
-          Initializing QuizMe Scholar Studio...
+          Loading QuizMe...
         </p>
       </div>
     );
@@ -626,7 +648,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-50/90 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-row transition-colors duration-200 antialiased selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+    <div className="relative h-screen bg-slate-50/90 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-row transition-colors duration-200 antialiased selection:bg-indigo-500 selection:text-white overflow-hidden">
       {/* Vibrant Ambient Glow Orbs in Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute -top-32 -left-32 w-[450px] h-[450px] bg-gradient-to-br from-indigo-500/15 via-purple-500/15 to-transparent rounded-full blur-3xl animate-float-slow" />
@@ -715,7 +737,7 @@ export default function App() {
       )}
 
       {/* Main Content Workspace */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         {/* Top Bar with Breadcrumbs & Fast Action Controls (Hidden in Focus Mode) */}
         {!isFocusModeActive && (
           <DashboardTopbar
@@ -749,7 +771,7 @@ export default function App() {
         )}
 
         {/* Dashboard Dynamic Content Views */}
-        <main className={isFocusModeActive ? 'flex-1 w-full min-h-screen p-0' : activeTab === 'runner' ? 'flex-1 pb-4' : 'flex-1 pb-24 md:pb-12'}>
+        <main className={isFocusModeActive ? 'flex-1 w-full min-h-screen p-0' : activeTab === 'runner' ? 'flex-1 pb-3' : 'flex-1 pb-16 md:pb-6'}>
           {activeTab === 'studio' && (
             <IngestStudio
               persona={persona}
@@ -869,11 +891,13 @@ export default function App() {
                   const preUnlockedIds = new Set(
                     BADGE_CATALOG.filter((b) => b.checkUnlocked(stats)).map((b) => b.id)
                   );
+                  const updatedCoins = addMascotCoinsGlobal(6);
                   const nextStats: UserStats = {
                     ...stats,
                     quizzesCompleted: stats.quizzesCompleted + 1,
                     xp: stats.xp + xpEarned,
                     gems: stats.gems + gemsEarned,
+                    coins: updatedCoins,
                     level: Math.max(1, Math.floor((stats.xp + xpEarned) / 150) + 1),
                   };
                   setStats(nextStats);

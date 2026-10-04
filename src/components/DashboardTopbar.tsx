@@ -25,6 +25,7 @@ import {
   Radio,
   WifiOff,
   Music,
+  Coins,
 } from 'lucide-react';
 import { DashboardTab } from './DashboardSidebar';
 import { QuizResponse, UserStats, PersonaType } from '../types/quiz';
@@ -34,6 +35,7 @@ import { usePomodoro } from '../context/PomodoroContext';
 import { soundFx } from '../utils/audio';
 import { UserAvatar } from './UserAvatar';
 import { AppLogo } from './AppLogo';
+import { useMascotPreferences, MascotCharacter, MascotColorTheme, MascotAccessory } from './MascotAvatar';
 
 interface DashboardTopbarProps {
   activeTab: DashboardTab;
@@ -72,6 +74,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
 }) => {
   const { resolvedTheme, toggleTheme, currentAccentConfig } = useTheme();
   const { user, userProfile, isFirebaseConnected, logout, switchAccount } = useAuth();
+  const { mascotCoins, mascotCharacter, mascotTheme, mascotAccessory } = useMascotPreferences();
   const {
     isOpen: isPomodoroOpen,
     toggleOpen: togglePomodoro,
@@ -122,73 +125,88 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
     switch (activeTab) {
       case 'studio':
         return {
-          title: 'AI Quiz Studio',
-          subtitle: 'Generate assessments from topics, study notes, documents & audio',
+          title: 'Make a Quiz',
+          subtitle: 'Create a quiz from any topic, notes, document, or voice recording',
+        };
+      case 'notes':
+        return {
+          title: 'Study Guides',
+          subtitle: 'Clear study notes, key takeaways, and quick practice checks',
+        };
+      case 'flashcards':
+        return {
+          title: 'Flashcards',
+          subtitle: 'Flip through smart cards to memorize key facts quickly',
         };
       case 'gamma':
         return {
-          title: 'Gamma Interactive Deck Studio',
-          subtitle: 'Create, present & play interactive slide quizzes with rich educational imagery',
+          title: 'Slide Decks',
+          subtitle: 'Create and play visual study slides with interactive questions',
         };
       case 'curricula':
         return {
           title: 'Quiz Library',
-          subtitle: 'Browse 12+ ready-to-play tracks in science, coding, history & trivia',
+          subtitle: 'Browse 12+ ready-to-play quizzes in science, coding, history & trivia',
         };
       case 'community':
         return {
-          title: 'Community Feed',
-          subtitle: 'Discover, like, and study quizzes created by students and teachers',
+          title: 'Community Quizzes',
+          subtitle: 'Explore and play quizzes shared by students and teachers',
         };
       case 'live':
         return {
-          title: 'Live Battle Rooms',
-          subtitle: 'Synchronous competitive multiplayer assessments with unique room codes',
+          title: 'Live Battles',
+          subtitle: 'Play real-time multiplayer quiz games with a room code',
         };
       case 'music':
         return {
-          title: 'Music & Groove Studio',
-          subtitle: 'Minimal gamified background music, live frequency visualizer, BPM customizer & Kahoot! DJ pads',
+          title: 'Music & Beats',
+          subtitle: 'Background study tracks, live visualizer, tempo controls & soundboard',
         };
       case 'authoring':
         return {
-          title: 'Custom Quiz Builder',
-          subtitle: 'Create and structure custom questions, code snippets & rubrics',
+          title: 'Write Your Own Quiz',
+          subtitle: 'Build custom questions, answers, and explanations from scratch',
         };
       case 'suggestions':
         return {
-          title: 'Suggestions & Ideas Hub',
-          subtitle: 'Personalized AI study recommendations, topic sparks, QoL upgrades & community feedback',
+          title: 'Ideas & Feedback',
+          subtitle: 'Share your ideas, vote on features, or pick a suggested topic to study',
+        };
+      case 'achievements':
+        return {
+          title: 'Achievements & Rewards',
+          subtitle: 'Track your 1,000+ unlockable badges, trophies, and milestones',
         };
       case 'analytics':
         return {
-          title: 'Performance & XP Analytics',
-          subtitle: 'Track your Bloom taxonomy mastery, streaks, accuracy & leaderboard',
+          title: 'My Stats & Progress',
+          subtitle: 'See your accuracy, daily streaks, XP level, and strengths',
         };
       case 'history':
         return {
-          title: 'History & Diplomas',
-          subtitle: 'Review previous attempts, answer breakdowns & verified certificates',
+          title: 'Past Quizzes',
+          subtitle: 'Review your past scores, answers, and printable certificates',
         };
       case 'settings':
         return {
-          title: 'Settings & UI Customization',
-          subtitle: 'Personalize themes, typography, audio synthesis & evaluation modes',
+          title: 'Settings',
+          subtitle: 'Customize colors, animations, background music, and sound effects',
         };
       case 'runner':
         return {
-          title: activeQuiz?.quiz_title || 'Active Assessment',
-          subtitle: `In Progress • ${activeQuiz?.questions?.length || 0} questions • ${activeQuiz?.difficulty || 'Intermediate'}`,
+          title: activeQuiz?.quiz_title || 'Active Quiz',
+          subtitle: `In Progress • ${activeQuiz?.questions?.length || 0} questions • ${activeQuiz?.difficulty || 'Medium'}`,
         };
       case 'complete':
         return {
-          title: 'Evaluation Scorecard',
-          subtitle: 'Detailed performance breakdown, XP gains & concept review',
+          title: 'Quiz Results',
+          subtitle: 'Your score, XP earned, and step-by-step answer review',
         };
       default:
         return {
           title: 'Quiz Me!',
-          subtitle: 'Intelligent Learning Platform',
+          subtitle: 'Smart & Fun Learning',
         };
     }
   };
@@ -206,7 +224,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
 
   return (
     <header className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 transition-colors shadow-2xs">
-      <div className="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
         {/* Left Section: Mobile Menu + Title */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
           <button
@@ -301,14 +319,14 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
             </div>
           )}
 
-          {/* Unified Streak & XP Pill */}
+          {/* Unified Streak, XP & Mascot Coins Pill */}
           <div
             onClick={() => {
               soundFx.playClick();
-              onSelectTab('analytics');
+              onOpenProfileModal ? onOpenProfileModal() : onSelectTab('analytics');
             }}
             className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs text-xs font-black cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
-            title={`${stats.streak} day streak • ${stats.xp} XP • ${stats.gems ?? 0} Gems`}
+            title={`${stats.streak} day streak • ${stats.xp} XP • ${mascotCoins} Mascot Coins (Click to open Mascot & Profile Studio)`}
           >
             <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
               <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
@@ -318,6 +336,11 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
             <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
               <Award className="w-3.5 h-3.5 text-indigo-500" />
               <span>{stats.xp} XP</span>
+            </span>
+            <span className="text-slate-300 dark:text-slate-600">•</span>
+            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+              <Coins className="w-3.5 h-3.5 text-amber-500" />
+              <span>{mascotCoins}</span>
             </span>
           </div>
 
@@ -438,10 +461,17 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
               >
                 <UserAvatar
                   displayName={userProfile?.displayName || user.displayName}
-                  photoURL={userProfile?.avatarType === 'icon' ? null : (userProfile?.photoURL || user.photoURL)}
+                  photoURL={
+                    userProfile?.avatarType === 'icon' || userProfile?.avatarType === 'mascot'
+                      ? null
+                      : userProfile?.photoURL || user.photoURL
+                  }
                   avatarType={userProfile?.avatarType}
                   avatarIcon={userProfile?.avatarIcon}
                   avatarBg={userProfile?.avatarBg}
+                  mascotCharacter={(userProfile?.mascotCharacter as MascotCharacter) || mascotCharacter}
+                  mascotTheme={(userProfile?.mascotTheme as MascotColorTheme) || mascotTheme}
+                  equippedAccessory={(userProfile?.equippedAccessory as MascotAccessory) || mascotAccessory}
                   size="xs"
                 />
                 <span className="hidden xl:inline text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[90px] truncate">

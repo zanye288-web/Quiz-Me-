@@ -29,6 +29,7 @@ import {
   Bot,
   AlertTriangle,
   RefreshCw,
+  Coins,
 } from 'lucide-react';
 import { QuizResponse, PersonaType, UserStats, CognitiveDomain } from '../types/quiz';
 import { soundFx } from '../utils/audio';
@@ -40,7 +41,7 @@ import { FlashcardStudyDeck } from './FlashcardStudyDeck';
 import { PedagogicalSummary } from './PedagogicalSummary';
 import { QuizSummaryCard, QuizSummaryData } from './QuizSummaryCard';
 import { QuizExportModal } from './QuizExportModal';
-import { MascotAvatar } from './MascotAvatar';
+import { MascotAvatar, calculateQuizMascotCoinsEarned } from './MascotAvatar';
 import { classifyAudience, AUDIENCE_TIER_CONFIG } from '../utils/audienceClassifier';
 import { StudyRecommendationsHub } from './StudyRecommendationsHub';
 import { MistakeAnalysisReport, IntelligentNote, MistakeAnalysisItem } from '../types/learningSystem';
@@ -249,7 +250,7 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4 max-w-2xl min-w-0">
             <MascotAvatar
-              mood={isPerfectScore ? 'streak' : accuracy >= 70 ? 'happy' : 'comforting'}
+              mood={isPerfectScore ? 'streak' : accuracy >= 70 ? 'happy' : 'encourage'}
               size="md"
             />
             <div className="space-y-1.5 min-w-0">
@@ -325,15 +326,15 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
       </div>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#46178f] to-[#25076b] border border-purple-500/40 shadow-sm text-center space-y-1 text-white">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-purple-200">
-            Kahoot! Podium
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+        <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/70 shadow-xs text-center space-y-1">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">
+            Podium Rank
           </span>
-          <div className="text-2xl font-black text-amber-300 flex items-center justify-center gap-1.5">
+          <div className="text-2xl font-black text-slate-900 dark:text-white flex items-center justify-center gap-1.5">
             <span>{accuracy >= 90 ? '🥇 1st' : accuracy >= 75 ? '🥈 2nd' : accuracy >= 55 ? '🥉 3rd' : '🏅 Finisher'}</span>
           </div>
-          <p className="text-xs font-bold text-purple-200 font-mono">
+          <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 font-mono">
             {(results.score * 850 + (isPerfectScore ? 1500 : 0)).toLocaleString()} pts
           </p>
         </div>
@@ -370,15 +371,19 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
           <p className="text-xs font-bold text-slate-500">Duration</p>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center space-y-1">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-            Flagged Questions
+        <div className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/70 shadow-xs text-center space-y-1">
+          <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+            Mascot Coins
           </span>
-          <div className="text-2xl font-black text-amber-500 flex items-center justify-center gap-1">
-            <Flag className="w-5 h-5 fill-amber-500" />
-            <span>{flaggedSet.size}</span>
+          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1">
+            <Coins className="w-5 h-5 text-amber-500" />
+            <span>
+              +{calculateQuizMascotCoinsEarned(results.score, results.total, quiz.difficulty, stats.streak).coins}
+            </span>
           </div>
-          <p className="text-xs font-bold text-slate-500">Marked to Review</p>
+          <p className="text-[11px] font-bold text-slate-500">
+            {accuracy >= 80 ? 'Added to Mascot Shop!' : 'Need 80%+ for Coins'}
+          </p>
         </div>
       </div>
 

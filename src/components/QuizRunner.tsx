@@ -1514,11 +1514,11 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
     )}
 
       {/* Main Assessment Layout Grid (Question Jumper Palette + Active Question Canvas) */}
-      <div className={`grid ${isDistractionFree ? 'grid-cols-1 max-w-3xl mx-auto' : 'grid-cols-1 lg:grid-cols-12'} gap-6 items-start`}>
+      <div className={`grid ${isDistractionFree ? 'grid-cols-1 max-w-3xl mx-auto' : 'grid-cols-1 lg:grid-cols-12'} gap-4 items-start`}>
         {/* Left/Sidebar: Question Matrix & Classification Jumper (3 cols) - Hidden in Focus / Zen Mode */}
         {!isDistractionFree && (
-          <div className="lg:col-span-3 space-y-4">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4 transition-colors">
+          <div className="lg:col-span-3 space-y-3">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 transition-colors">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Questions
@@ -1661,8 +1661,8 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
         )}
 
         {/* Right Canvas: Question Evaluation Area (9 cols or full centered width in Focus/Zen Mode) */}
-        <div className={`${isDistractionFree ? 'w-full max-w-3xl mx-auto' : 'lg:col-span-9'} space-y-6`}>
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-xs space-y-6 transition-colors">
+        <div className={`${isDistractionFree ? 'w-full max-w-3xl mx-auto' : 'lg:col-span-9'} space-y-4`}>
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4 transition-colors">
             {/* Challenge Mode Question Countdown Bar */}
             {isChallengeMode && (
               <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 dark:from-amber-950/30 dark:via-orange-950/20 dark:to-slate-900 border border-amber-300/80 dark:border-amber-700/80 space-y-2.5 animate-in fade-in duration-200">
@@ -1741,16 +1741,16 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                   {currentQuestion.points || 20} pts
                 </span>
 
-                {/* Kahoot! Arcade Score & Answer Streak Pill */}
+                {/* Score & Answer Streak Pill */}
                 <span className="text-xs font-mono font-black px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1.5">
                   <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                  <span>{kahootArcadePoints.toLocaleString()} Arcade Pts</span>
+                  <span>{kahootArcadePoints.toLocaleString()} Score</span>
                 </span>
 
                 {kahootStreak >= 2 && (
-                  <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-xs flex items-center gap-1 animate-bounce">
+                  <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-xs flex items-center gap-1">
                     <Flame className="w-3.5 h-3.5 fill-white" />
-                    <span>{kahootStreak} Streak!</span>
+                    <span>{kahootStreak}x Streak</span>
                   </span>
                 )}
               </div>
@@ -2036,7 +2036,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                     <span>Auto-Submit Voice</span>
                   </label>
 
-                  {/* Kahoot! 2x Double Points Power-Up */}
+                  {/* 2x Double Points Booster */}
                   <button
                     type="button"
                     disabled={doublePointsUsed}
@@ -2049,13 +2049,13 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-xs ring-2 ring-amber-400/40'
                         : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100'
                     }`}
-                    title="Kahoot! Power-Up: Double Arcade Points on this question (1 per quiz)"
+                    title="Double your points on this question (1 per quiz)"
                   >
                     <Zap className="w-3 h-3 fill-current" />
-                    <span>{doublePointsArmed ? '2x Armed!' : doublePointsUsed ? '2x Used' : '2x Points'}</span>
+                    <span>{doublePointsArmed ? '2x Active' : doublePointsUsed ? '2x Used' : '2x Boost'}</span>
                   </button>
 
-                  {/* Kahoot! Streak Shield Power-Up */}
+                  {/* Streak Shield Booster */}
                   <button
                     type="button"
                     disabled={streakShieldUsed}
@@ -2068,7 +2068,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         ? 'bg-emerald-600 text-white border-emerald-500 shadow-xs ring-2 ring-emerald-400/40'
                         : 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
                     }`}
-                    title="Kahoot! Power-Up: Protect your Answer Streak if you miss (1 per quiz)"
+                    title="Keep your streak safe even if you miss this question (1 per quiz)"
                   >
                     <Flame className="w-3 h-3" />
                     <span>{streakShieldArmed ? 'Shield ON' : streakShieldUsed ? 'Shield Used' : 'Streak Shield'}</span>
@@ -2083,10 +2083,10 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         onClick={handleFiftyFiftyNarrow}
                         disabled={(eliminatedOptions[currentQuestion.id]?.length || 0) >= 2}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 text-[11px] font-extrabold hover:bg-purple-100 transition-colors cursor-pointer disabled:opacity-40"
-                        title="Eliminate 2 wrong distractors (50/50 Narrow)"
+                        title="Hide 2 wrong choices (50/50)"
                       >
                         <Scissors className="w-3 h-3" />
-                        <span>50/50 Narrow</span>
+                        <span>50/50</span>
                       </button>
                     )}
                 </div>
@@ -2095,25 +2095,24 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
 
             {/* QUESTION INPUT FORMAT: MULTIPLE CHOICE */}
             {currentQuestion.type === 'multiple_choice' && currentQuestion.options && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 {currentQuestion.options.map((option, idx) => {
                   const letter = ['A', 'B', 'C', 'D'][idx] || `${idx + 1}`;
-                  const kahootShape = ['▲', '◆', '●', '■'][idx % 4];
-                  const kahootBadgeColors = [
-                    'bg-rose-600 text-white border-rose-700',
-                    'bg-blue-600 text-white border-blue-700',
-                    'bg-amber-500 text-white border-amber-600',
-                    'bg-emerald-600 text-white border-emerald-700',
+                  const badgeAccent = [
+                    'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+                    'bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800',
+                    'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+                    'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
                   ][idx % 4];
                   const isSelected = selectedOption === option;
                   const isEliminated = (eliminatedOptions[currentQuestion.id] || []).includes(option);
 
-                  let optionStyle = 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-emerald-400 text-slate-900 dark:text-slate-100';
+                  let optionStyle = 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-indigo-400 text-slate-900 dark:text-slate-100';
 
                   if (isEliminated && !isAnswerChecked) {
                     optionStyle = 'opacity-45 border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/40 text-slate-400 line-through';
                   } else if (isSelected) {
-                    optionStyle = 'border-emerald-500 dark:border-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 ring-2 ring-emerald-500/20 font-bold';
+                    optionStyle = 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/30 text-indigo-900 dark:text-indigo-200 ring-2 ring-indigo-500/20 font-bold';
                   }
 
                   if (isAnswerChecked) {
@@ -2144,13 +2143,16 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         soundFx.playClick();
                         setSelectedOption(option);
                       }}
-                      className={`kahoot-tile p-4 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${optionStyle}`}
+                      className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${optionStyle}`}
                     >
                       <span
-                        className={`w-9 h-9 rounded-xl font-black text-xs flex items-center justify-center gap-0.5 shrink-0 border shadow-2xs ${kahootBadgeColors}`}
+                        className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center shrink-0 border shadow-2xs ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : badgeAccent
+                        }`}
                       >
-                        <span>{kahootShape}</span>
-                        <span className="text-[10px] opacity-90">{letter}</span>
+                        {letter}
                       </span>
                       <span className={`${optSizeClass} font-semibold flex-1 leading-snug`}>
                         {option}
@@ -2369,12 +2371,12 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                       </h4>
                       {isCurrentCorrect && lastPointsEarned > 0 && (
                         <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-black bg-emerald-600 text-white shadow-2xs">
-                          +{lastPointsEarned.toLocaleString()} Kahoot! Pts
+                          +{lastPointsEarned.toLocaleString()} pts
                         </span>
                       )}
                       {streakSavedBanner && (
                         <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500 text-slate-950">
-                          🛡️ Streak Shield Saved Your {kahootStreak} Streak!
+                          🛡️ Streak Shield Saved Your {kahootStreak}x Streak!
                         </span>
                       )}
                     </div>
@@ -2386,7 +2388,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                     {!isCurrentCorrect && (
                       <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 pt-1">
                         <span>🌱</span>
-                        <span>Quizzie's Growth Tip: Every mistake helps wire your brain for deeper understanding!</span>
+                        <span>Tip: Every mistake helps you learn the concept even better!</span>
                       </p>
                     )}
                   </div>
@@ -2394,7 +2396,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
 
                 {currentQuestion.pedagogy_note && (
                   <p className="text-[11px] font-semibold text-indigo-900 dark:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40 p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800">
-                    <span className="font-extrabold">Pedagogy Note:</span> {currentQuestion.pedagogy_note}
+                    <span className="font-extrabold">Study Tip:</span> {currentQuestion.pedagogy_note}
                   </p>
                 )}
               </div>

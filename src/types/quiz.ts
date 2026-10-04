@@ -102,6 +102,10 @@ export interface UserStats {
   maxHearts: number;
   xp: number;
   gems: number;
+  coins?: number;
+  unlockedMascots?: string[];
+  unlockedAccessories?: string[];
+  equippedAccessory?: string;
   level: number;
   quizzesCompleted: number;
   totalCorrect: number;
