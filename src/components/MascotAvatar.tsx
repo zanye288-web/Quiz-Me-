@@ -6,6 +6,7 @@ export type MascotMood =
   | 'celebrate'
   | 'thinking'
   | 'encourage'
+  | 'comforting'
   | 'streak'
   | 'teacher'
   | 'trophy';
@@ -50,6 +51,7 @@ export interface MascotCharacterMeta {
   title: string;
   species: string;
   tagline: string;
+  greeting?: string;
   uniquePose: string;
   defaultTheme: MascotColorTheme;
   defaultAccessory?: MascotAccessory;

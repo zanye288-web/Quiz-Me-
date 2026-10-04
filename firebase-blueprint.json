@@ -29,6 +29,7 @@
         "gems": { "type": "number", "minimum": 0, "description": "Gems currency earned" },
         "coins": { "type": "number", "minimum": 0, "description": "Mascot coins earned for mascot & accessory shop" },
         "level": { "type": "number", "minimum": 1, "description": "Current scholar level" },
+        "levelSystemVersion": { "type": "string", "description": "Progression system epoch version for global level resets" },
         "quizzesCompleted": { "type": "number", "minimum": 0, "description": "Total completed quiz sessions" },
         "totalCorrect": { "type": "number", "minimum": 0, "description": "Total correct answers submitted" },
         "totalQuestions": { "type": "number", "minimum": 0, "description": "Total questions answered" },
@@ -76,6 +77,11 @@
         "questions": { "type": "array" },
         "study_guide": { "type": ["object", "null"] },
         "isPublic": { "type": "boolean" },
+        "calculatorEnabled": { "type": "boolean" },
+        "dictionaryEnabled": { "type": "boolean" },
+        "aiVerified": { "type": "boolean" },
+        "aiVerificationScore": { "type": "number" },
+        "aiVerificationSummary": { "type": "string" },
         "likesCount": { "type": "number", "minimum": 0 },
         "commentsCount": { "type": "number", "minimum": 0 },
         "savesCount": { "type": "number", "minimum": 0 },
@@ -84,6 +90,18 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "creatorId", "quiz_title", "questions"]
+    },
+    "CreatorFollow": {
+      "title": "CreatorFollow",
+      "description": "User subscription to a quiz creator.",
+      "type": "object",
+      "properties": {
+        "creatorId": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "followerId": { "type": "string" },
+        "followedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["creatorId", "followerId"]
     },
     "QuizComment": {
       "title": "QuizComment",

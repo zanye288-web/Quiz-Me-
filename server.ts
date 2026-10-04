@@ -22,12 +22,26 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 // Mount API endpoints
 app.use('/api', apiRouter);
 
-// Serve static assets from dist folder
+// Serve static assets from dist folder with proper cache headers
 const distPath = path.join(process.cwd(), 'dist');
-app.use(express.static(distPath));
+app.use(
+  express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('index.html') || filePath.endsWith('sw.js')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      }
+    },
+  })
+);
 
-// SPA fallback to index.html
+// Return 404 for missing static asset files instead of SPA HTML fallback
+app.get(['/assets/*', '*.js', '*.css', '*.map'], (_req, res) => {
+  res.status(404).end();
+});
+
+// SPA fallback to index.html with no-cache header so published updates show immediately
 app.get('*', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(distPath, 'index.html'));
 });
 

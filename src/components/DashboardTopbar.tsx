@@ -29,13 +29,14 @@ import {
 } from 'lucide-react';
 import { DashboardTab } from './DashboardSidebar';
 import { QuizResponse, UserStats, PersonaType } from '../types/quiz';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme, GRAPHICS_MODE_CATALOG } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { usePomodoro } from '../context/PomodoroContext';
 import { soundFx } from '../utils/audio';
 import { UserAvatar } from './UserAvatar';
 import { AppLogo } from './AppLogo';
 import { useMascotPreferences, MascotCharacter, MascotColorTheme, MascotAccessory } from './MascotAvatar';
+import { getLevelProgress, getDailyRetentionCheckIn } from '../utils/levelingSystem';
 
 interface DashboardTopbarProps {
   activeTab: DashboardTab;
@@ -46,6 +47,7 @@ interface DashboardTopbarProps {
   onOpenCommandPalette?: () => void;
   onOpenShortcuts?: () => void;
   onOpenProfileModal?: () => void;
+  onOpenLevelRoadmap?: () => void;
   onOpenUploadQuiz?: () => void;
   activeQuiz: QuizResponse | null;
   stats: UserStats;
@@ -64,6 +66,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
   onOpenCommandPalette,
   onOpenShortcuts,
   onOpenProfileModal,
+  onOpenLevelRoadmap,
   onOpenUploadQuiz,
   activeQuiz,
   stats,
@@ -72,7 +75,18 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
   persona,
   onPersonaChange,
 }) => {
-  const { resolvedTheme, toggleTheme, currentAccentConfig } = useTheme();
+  const {
+    resolvedTheme,
+    toggleTheme,
+    currentAccentConfig,
+    graphicsMode,
+    setGraphicsMode,
+    rtxEnabled,
+    setRtxEnabled,
+    fpsCounterEnabled,
+    setFpsCounterEnabled,
+  } = useTheme();
+  const [isGfxMenuOpen, setIsGfxMenuOpen] = React.useState(false);
   const { user, userProfile, isFirebaseConnected, logout, switchAccount } = useAuth();
   const { mascotCoins, mascotCharacter, mascotTheme, mascotAccessory } = useMascotPreferences();
   const {
@@ -86,6 +100,34 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
 
   const [isOnline, setIsOnline] = React.useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
+  const [regionalClock, setRegionalClock] = React.useState<{ time: string; region: string }>(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+      const shortRegion = tz.split('/').pop()?.replace(/_/g, ' ') || tz;
+      return {
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        region: shortRegion,
+      };
+    } catch {
+      return { time: new Date().toLocaleTimeString(), region: 'Local' };
+    }
+  });
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+        const shortRegion = tz.split('/').pop()?.replace(/_/g, ' ') || tz;
+        setRegionalClock({
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          region: shortRegion,
+        });
+      } catch {
+        // ignore
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   const [isBgMusicPlaying, setIsBgMusicPlaying] = React.useState<boolean>(soundFx.isBgMusicPlaying);
   const [bgMusicEnabled, setBgMusicEnabled] = React.useState<boolean>(soundFx.bgMusicEnabled);
   const profileMenuRef = React.useRef<HTMLDivElement>(null);
@@ -127,6 +169,16 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
         return {
           title: 'Make a Quiz',
           subtitle: 'Create a quiz from any topic, notes, document, or voice recording',
+        };
+      case 'searcher':
+        return {
+          title: 'Quiz Searcher',
+          subtitle: 'Search AI-verified community quizzes, follow creators & explore leaderboards',
+        };
+      case 'games':
+        return {
+          title: 'Games · One by One, Math & Spelling Bee',
+          subtitle: 'Fast-paced educational word-chain challenge, Math Quiz & Spelling Bee',
         };
       case 'notes':
         return {
@@ -255,6 +307,18 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
 
         {/* Right Section: Streamlined Search, Mastery Pill, Mode Selector, Utilities & Profile Menu */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Regional Clock QoL Widget */}
+          <div
+            className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800/80 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 select-none"
+            title={`Regional Clock linked to ${Intl.DateTimeFormat().resolvedOptions().timeZone || 'your region'}`}
+          >
+            <Timer className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+            <span>{regionalClock.time}</span>
+            <span className="text-slate-400">·</span>
+            <span className="font-sans text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 truncate max-w-[90px]">
+              {regionalClock.region}
+            </span>
+          </div>
           {/* Quick Command Palette / Search Trigger */}
           {onOpenCommandPalette && (
             <button
@@ -319,30 +383,47 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
             </div>
           )}
 
-          {/* Unified Streak, XP & Mascot Coins Pill */}
-          <div
-            onClick={() => {
-              soundFx.playClick();
-              onOpenProfileModal ? onOpenProfileModal() : onSelectTab('analytics');
-            }}
-            className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs text-xs font-black cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
-            title={`${stats.streak} day streak • ${stats.xp} XP • ${mascotCoins} Mascot Coins (Click to open Mascot & Profile Studio)`}
-          >
-            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-              <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-              <span>{stats.streak}d</span>
-            </span>
-            <span className="text-slate-300 dark:text-slate-600">•</span>
-            <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
-              <Award className="w-3.5 h-3.5 text-indigo-500" />
-              <span>{stats.xp} XP</span>
-            </span>
-            <span className="text-slate-300 dark:text-slate-600">•</span>
-            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-              <Coins className="w-3.5 h-3.5 text-amber-500" />
-              <span>{mascotCoins}</span>
-            </span>
-          </div>
+          {/* Unified Rank, Streak, XP & Mascot Coins Action Bar */}
+          {(() => {
+            const lvlProg = getLevelProgress(stats.xp || 0, stats.streak || 1);
+            const dailyCheck = getDailyRetentionCheckIn();
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  if (onOpenLevelRoadmap) onOpenLevelRoadmap();
+                  else if (onOpenProfileModal) onOpenProfileModal();
+                  else onSelectTab('analytics');
+                }}
+                className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs text-xs font-black cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+                title={`Lv.${lvlProg.level} ${lvlProg.rank.title} • ${stats.xp} XP (${lvlProg.progressPercent}% to Lv.${lvlProg.level + 1}) • Click for Level Roadmap & Daily Check-In`}
+              >
+                <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                  <span>{lvlProg.rank.badgeEmoji}</span>
+                  <span>Lv.{lvlProg.level}</span>
+                </span>
+                <span className="text-slate-300 dark:text-slate-600">·</span>
+                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                  <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                  <span>{stats.streak}d</span>
+                </span>
+                <span className="text-slate-300 dark:text-slate-600">·</span>
+                <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                  <Award className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>{stats.xp.toLocaleString()} XP</span>
+                </span>
+                <span className="text-slate-300 dark:text-slate-600">·</span>
+                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                  <Coins className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{mascotCoins}</span>
+                </span>
+                {!dailyCheck.claimedToday && (
+                  <span className="ml-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-ping" title="Daily Check-In Reward Available!" />
+                )}
+              </button>
+            );
+          })()}
 
           {/* New Quiz Quick Action Button (Only when not in Studio) */}
           {activeTab !== 'studio' && (
@@ -359,8 +440,112 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
             </button>
           )}
 
-          {/* Compact Utility Group: Pomodoro, Theme, Sound, Settings */}
-          <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
+          {/* Compact Utility Group: Graphics/RTX, Pomodoro, Theme, Sound, Settings */}
+          <div className="relative flex items-center gap-1 p-1 rounded-2xl bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
+            {/* Quick Graphics & RTX Mode Button */}
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                setIsGfxMenuOpen((prev) => !prev);
+              }}
+              className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
+                rtxEnabled && graphicsMode !== 'simple'
+                  ? 'bg-gradient-to-r from-emerald-500/15 to-teal-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-400/40'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
+              title="Switch Graphics Mode (Simple / Medium / Performance 120Hz / Ultra RTX)"
+            >
+              <span>{graphicsMode === 'ultra' ? '💎' : graphicsMode === 'performance' ? '⚡' : graphicsMode === 'medium' ? '⚖️' : '🌿'}</span>
+              <span className="uppercase">{graphicsMode === 'ultra' ? 'RTX' : graphicsMode}</span>
+            </button>
+
+            {isGfxMenuOpen && (
+              <div className="absolute right-0 top-11 z-50 w-72 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl space-y-2.5 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div>
+                    <div className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1">
+                      <span>💎 Graphics & RTX Engine</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Real-time shaders, lighting & frame pacing
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playPop();
+                      const next = !rtxEnabled;
+                      setRtxEnabled(next);
+                      if (next && graphicsMode === 'simple') setGraphicsMode('ultra');
+                    }}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-black cursor-pointer ${
+                      rtxEnabled && graphicsMode !== 'simple'
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {rtxEnabled && graphicsMode !== 'simple' ? 'RTX ON' : 'RTX OFF'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  {GRAPHICS_MODE_CATALOG.map((gm) => (
+                    <button
+                      key={gm.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setGraphicsMode(gm.id);
+                        setIsGfxMenuOpen(false);
+                      }}
+                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                        graphicsMode === gm.id
+                          ? gm.id === 'ultra'
+                            ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/50'
+                            : 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/50'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">{gm.icon}</span>
+                        <span className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400">
+                          {gm.badge}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-black text-slate-900 dark:text-white mt-0.5">
+                        {gm.shortName}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setFpsCounterEnabled(!fpsCounterEnabled);
+                    }}
+                    className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg cursor-pointer ${
+                      fpsCounterEnabled
+                        ? 'bg-slate-900 text-emerald-400'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {fpsCounterEnabled ? '🟢 Live FPS HUD: ON' : 'Show Live FPS HUD'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsGfxMenuOpen(false)}
+                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+
             <button
               type="button"
               id="topbar-pomodoro-toggle-btn"

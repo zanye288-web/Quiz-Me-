@@ -23,12 +23,17 @@ service cloud.firestore {
         request.resource.data.displayName.size() <= 50 &&
         request.resource.data.role in ['Student', 'Teacher'];
 
-      allow update: if isOwner(userId) &&
+      allow update: if (isOwner(userId) &&
         request.resource.data.userId == resource.data.userId &&
         request.resource.data.displayName is string &&
         request.resource.data.displayName.size() > 0 &&
         request.resource.data.displayName.size() <= 50 &&
-        (request.resource.data.role in ['Student', 'Teacher']);
+        (request.resource.data.role in ['Student', 'Teacher'])) ||
+        (isAuthenticated() &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['level', 'xp', 'levelSystemVersion', 'updatedAt']) &&
+         request.resource.data.level == 1 &&
+         request.resource.data.xp == 0 &&
+         request.resource.data.levelSystemVersion == 'v3_revamped');
 
       allow delete: if isOwner(userId);
 
@@ -43,6 +48,11 @@ service cloud.firestore {
       match /savedQuizzes/{quizId} {
         allow read, write: if isOwner(userId);
       }
+
+      match /following/{creatorId} {
+        allow read: if true;
+        allow write: if isOwner(userId);
+      }
     }
 
     // Shared or user-created quizzes collection
@@ -55,7 +65,7 @@ service cloud.firestore {
         request.resource.data.quiz_title.size() <= 300 &&
         request.resource.data.questions is list &&
         request.resource.data.questions.size() > 0 &&
-        request.resource.data.questions.size() <= 50;
+        request.resource.data.questions.size() <= 100;
 
       allow update: if isAuthenticated() && (
         (resource.data.creatorId == request.auth.uid && request.resource.data.creatorId == resource.data.creatorId) ||

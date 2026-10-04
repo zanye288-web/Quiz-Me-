@@ -316,7 +316,7 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                   <div className="space-y-2 w-full">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
-                        {track.badge} · {track.defaultBpm} BPM
+                        {track.badge} · {track.durationFormatted}
                       </span>
                       <div
                         className={`w-7 h-7 rounded-xl bg-gradient-to-tr ${track.accentColor} text-white flex items-center justify-center shadow-xs shrink-0`}
@@ -336,10 +336,19 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                     <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                       {track.subtitle}
                     </p>
+
+                    <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-[11px] space-y-0.5">
+                      <div className="font-bold text-slate-700 dark:text-slate-200">
+                        🎵 Credit: {track.creditArtist}
+                      </div>
+                      <div className="text-slate-500 dark:text-slate-400">
+                        License: {track.creditLicense}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between w-full text-[11px] font-bold">
-                    <span className="text-slate-500 dark:text-slate-400">Vibe: {track.vibe}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Vibe: {track.vibe} · {track.defaultBpm} BPM</span>
                     <span
                       className={
                         isTrackActivePlaying
@@ -353,6 +362,31 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                 </button>
               );
             })}
+          </div>
+
+          {/* Official Song Credits & Public Domain / NoCopyrightSounds Attribution Box */}
+          <div className="p-4 rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/50 dark:from-indigo-950/30 dark:via-slate-900 dark:to-purple-950/20 space-y-2.5">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h3 className="text-xs font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Official Music Credits & Public Domain / NCS Attribution</span>
+              </h3>
+              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                100% Royalty-Free & Properly Credited
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              <strong>Now Playing Credit:</strong> {currentTrackMeta.creditAttributionText} ({currentTrackMeta.creditLicense}).
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              {BG_MUSIC_TRACKS.map((t) => (
+                <div key={t.id} className="p-2 rounded-xl bg-white/80 dark:bg-slate-900/70 border border-slate-200/70 dark:border-slate-800">
+                  <div className="font-bold text-slate-800 dark:text-slate-200">{t.title}</div>
+                  <div>Composer/Inspiration: {t.creditComposer}</div>
+                  <div className="text-[10px] text-indigo-600 dark:text-indigo-400">{t.creditLicense}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

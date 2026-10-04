@@ -19,6 +19,47 @@ export type FontFamilyChoice =
 export type CardCornerRadius = '3xl' | '2xl' | 'xl' | 'md';
 export type UiDensity = 'comfortable' | 'compact';
 export type QuestionLayoutStyle = 'stacked' | 'split' | 'focus';
+export type UiStyleMode = 'default' | '3d' | 'modern' | 'legacy' | 'playful';
+
+export interface UiStyleCatalogItem {
+  id: UiStyleMode;
+  name: string;
+  tagline: string;
+  badge: string;
+}
+
+export const UI_STYLE_CATALOG: UiStyleCatalogItem[] = [
+  {
+    id: 'default',
+    name: 'Default',
+    tagline: 'Balanced academic clarity with crisp borders and smooth responsive elevation.',
+    badge: 'Standard',
+  },
+  {
+    id: '3d',
+    name: '3D Tactile',
+    tagline: 'Deep isometric 3D bevels, physical push-button ledges, and layered spatial depth.',
+    badge: '3D Depth',
+  },
+  {
+    id: 'modern',
+    name: 'Modern Glass',
+    tagline: 'Sleek translucent glassmorphism, hairline specular edges, and ultra-clean hierarchy.',
+    badge: 'Sleek',
+  },
+  {
+    id: 'legacy',
+    name: 'Legacy Classic',
+    tagline: 'Timeless scholarly textbook layout with structured square-edge panels and zero distractions.',
+    badge: 'Classic',
+  },
+  {
+    id: 'playful',
+    name: 'Playful Arcade',
+    tagline: 'Gamified bubbly geometry, bold tactile outlines, and energetic spring physics.',
+    badge: 'Fun',
+  },
+];
 
 export interface FontCatalogItem {
   id: FontFamilyChoice;
@@ -342,6 +383,139 @@ export const THEME_PRESETS: ThemePreset[] = [
 
 export type AnimationStyle = 'bouncy' | 'smooth' | 'snappy' | 'minimal';
 export type AnimationIntensity = 'subtle' | 'normal' | 'extra';
+export type GraphicsQualityMode = 'simple' | 'medium' | 'performance' | 'ultra';
+export type ParticlePresetType =
+  | 'constellation'
+  | 'fireflies'
+  | 'bubbles'
+  | 'scholar_sparks'
+  | 'sakura'
+  | 'snowfall';
+export type ParticleDensityType = 'low' | 'medium' | 'high';
+export type ParticleSpeedType = 'slow' | 'normal' | 'fast';
+
+export interface GraphicsModeMeta {
+  id: GraphicsQualityMode;
+  name: string;
+  shortName: string;
+  tagline: string;
+  badge: string;
+  icon: string;
+  specs: string[];
+}
+
+export const GRAPHICS_MODE_CATALOG: GraphicsModeMeta[] = [
+  {
+    id: 'simple',
+    name: 'Simple Mode',
+    shortName: 'Simple',
+    tagline: 'Clean, distraction-free flat surfaces with zero particles or heavy blur for maximum battery life.',
+    badge: 'Eco / Battery',
+    icon: '🌿',
+    specs: ['0 Particles', 'Flat Crisp Surfaces', 'Minimal GPU Load'],
+  },
+  {
+    id: 'medium',
+    name: 'Medium Balanced',
+    shortName: 'Medium',
+    tagline: 'Balanced frosted glass, smooth transitions, and medium ambient particles for everyday study.',
+    badge: 'Balanced',
+    icon: '⚖️',
+    specs: ['Balanced Glass', 'Medium Particles', 'Smooth 60 FPS'],
+  },
+  {
+    id: 'performance',
+    name: 'Performance 120Hz',
+    shortName: 'Performance',
+    tagline: 'Esports-grade 120FPS responsiveness with hyper-snappy physics and low-latency GPU compositing.',
+    badge: '120 FPS Speed',
+    icon: '⚡',
+    specs: ['Hyper-Snappy Physics', 'Zero Blur Latency', 'High-FPS Frame Pacing'],
+  },
+  {
+    id: 'ultra',
+    name: 'Ultra RTX Mode',
+    shortName: 'Ultra RTX',
+    tagline: 'Full ray-traced cursor illumination, specular glass reflections, volumetric bloom & rich particles.',
+    badge: 'RTX ON',
+    icon: '💎',
+    specs: ['RTX Dynamic Lighting', 'Specular Glass & Bloom', 'High-Density Interactive FX'],
+  },
+];
+
+function safeGetStorage(key: string): string | null {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem(key);
+    }
+  } catch {
+    // Ignore storage access errors in cross-origin iframes or private mode
+  }
+  return null;
+}
+
+function safeSetStorage(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  } catch {
+    // Ignore storage write errors in cross-origin iframes or private mode
+  }
+}
+
+export interface ParticlePresetMeta {
+  id: ParticlePresetType;
+  name: string;
+  tagline: string;
+  icon: string;
+  badge: string;
+}
+
+export const PARTICLE_PRESET_CATALOG: ParticlePresetMeta[] = [
+  {
+    id: 'constellation',
+    name: 'Cosmic Constellation',
+    tagline: 'Starlight nodes linked by dynamic neural lines that react to your cursor.',
+    icon: '✨',
+    badge: 'Default FX',
+  },
+  {
+    id: 'fireflies',
+    name: 'Golden Fireflies',
+    tagline: 'Warm, softly pulsing bioluminescent orbs drifting across your study space.',
+    icon: '萤',
+    badge: 'Cozy Glow',
+  },
+  {
+    id: 'bubbles',
+    name: 'Playful Bubbles',
+    tagline: 'Iridescent floating bubbles that pop and scatter when clicked.',
+    icon: '🫧',
+    badge: 'All Ages Fun',
+  },
+  {
+    id: 'scholar_sparks',
+    name: 'Scholarly Runes & Sparks',
+    tagline: 'Floating quiz glyphs (?, ★, ⚡, π, ∑, 💡) celebrating curiosity.',
+    icon: '⚡',
+    badge: 'Brain Gym',
+  },
+  {
+    id: 'sakura',
+    name: 'Sakura Blossom Drift',
+    tagline: 'Gentle cherry blossom petals carried on a calm spring breeze.',
+    icon: '🌸',
+    badge: 'Zen Focus',
+  },
+  {
+    id: 'snowfall',
+    name: 'Aurora Crystal Snow',
+    tagline: 'Crisp winter starflakes drifting softly through twilight air.',
+    icon: '❄️',
+    badge: 'Chill',
+  },
+];
 
 export const ANIMATION_STYLE_CATALOG: {
   id: AnimationStyle;
@@ -389,6 +563,8 @@ interface ThemeContextType {
   setAccent: (accent: AccentColor) => void;
   fontFamily: FontFamilyChoice;
   setFontFamily: (font: FontFamilyChoice) => void;
+  uiStyle: UiStyleMode;
+  setUiStyle: (style: UiStyleMode) => void;
   uiDensity: UiDensity;
   setUiDensity: (density: UiDensity) => void;
   cardRadius: CardCornerRadius;
@@ -407,6 +583,36 @@ interface ThemeContextType {
   setCardHoverLiftEnabled: (val: boolean) => void;
   confettiEnabled: boolean;
   setConfettiEnabled: (val: boolean) => void;
+  particlesEnabled: boolean;
+  setParticlesEnabled: (val: boolean) => void;
+  particlePreset: ParticlePresetType;
+  setParticlePreset: (preset: ParticlePresetType) => void;
+  particleDensity: ParticleDensityType;
+  setParticleDensity: (density: ParticleDensityType) => void;
+  particleSpeed: ParticleSpeedType;
+  setParticleSpeed: (speed: ParticleSpeedType) => void;
+  particleInteractive: boolean;
+  setParticleInteractive: (val: boolean) => void;
+  ambientOrbsEnabled: boolean;
+  setAmbientOrbsEnabled: (val: boolean) => void;
+  eyeComfortWarmth: number;
+  setEyeComfortWarmth: (val: number) => void;
+  adaptiveDifficultyEnabled: boolean;
+  setAdaptiveDifficultyEnabled: (val: boolean) => void;
+  streakShieldAutoEnabled: boolean;
+  setStreakShieldAutoEnabled: (val: boolean) => void;
+  graphicsMode: GraphicsQualityMode;
+  setGraphicsMode: (mode: GraphicsQualityMode) => void;
+  rtxEnabled: boolean;
+  setRtxEnabled: (val: boolean) => void;
+  rtxGlobalIllumination: boolean;
+  setRtxGlobalIllumination: (val: boolean) => void;
+  rtxReflections: boolean;
+  setRtxReflections: (val: boolean) => void;
+  rtxVolumetricBloom: boolean;
+  setRtxVolumetricBloom: (val: boolean) => void;
+  fpsCounterEnabled: boolean;
+  setFpsCounterEnabled: (val: boolean) => void;
   soundVolume: number;
   setSoundVolume: (vol: number) => void;
   questionLayout: QuestionLayoutStyle;
@@ -421,6 +627,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const THEME_KEY = 'quizme_theme_mode_v3';
+const UI_STYLE_KEY = 'quizme_ui_style_v1';
 const ACCENT_KEY = 'quizme_accent_v3';
 const DENSITY_KEY = 'quizme_density_v3';
 const FONT_KEY = 'quizme_font_v1';
@@ -432,126 +639,184 @@ const ANIM_INTENSITY_KEY = 'quizme_animation_intensity_v1';
 const BTN_BOUNCE_KEY = 'quizme_btn_bounce_v1';
 const CARD_LIFT_KEY = 'quizme_card_lift_v1';
 const CONFETTI_KEY = 'quizme_confetti_enabled_v1';
+const PARTICLES_ENABLED_KEY = 'quizme_particles_enabled_v1';
+const PARTICLE_PRESET_KEY = 'quizme_particle_preset_v1';
+const PARTICLE_DENSITY_KEY = 'quizme_particle_density_v1';
+const PARTICLE_SPEED_KEY = 'quizme_particle_speed_v1';
+const PARTICLE_INTERACTIVE_KEY = 'quizme_particle_interactive_v1';
+const AMBIENT_ORBS_KEY = 'quizme_ambient_orbs_v1';
+const EYE_WARMTH_KEY = 'quizme_eye_warmth_v1';
+const ADAPTIVE_DIFF_KEY = 'quizme_adaptive_diff_v1';
+const STREAK_SHIELD_KEY = 'quizme_streak_shield_v1';
+const GRAPHICS_MODE_KEY = 'quizme_graphics_mode_v1';
+const RTX_ENABLED_KEY = 'quizme_rtx_enabled_v1';
+const RTX_GI_KEY = 'quizme_rtx_gi_v1';
+const RTX_REFLECTIONS_KEY = 'quizme_rtx_reflections_v1';
+const RTX_BLOOM_KEY = 'quizme_rtx_bloom_v1';
+const FPS_COUNTER_KEY = 'quizme_fps_counter_v1';
 const VOLUME_KEY = 'quizme_sound_volume';
 const LAYOUT_KEY = 'quizme_question_layout_v1';
 const AUTOREAD_KEY = 'quizme_auto_read_tts_v1';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(THEME_KEY) as ThemeMode;
-      if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
-    }
+    const saved = safeGetStorage(THEME_KEY) as ThemeMode;
+    if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
     return 'light';
   });
 
   const [accent, setAccentState] = useState<AccentColor>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(ACCENT_KEY) as AccentColor;
-      if (saved && ACCENT_PALETTES[saved]) return saved;
-    }
+    const saved = safeGetStorage(ACCENT_KEY) as AccentColor;
+    if (saved && ACCENT_PALETTES[saved]) return saved;
     return 'indigo';
   });
 
   const [fontFamily, setFontFamilyState] = useState<FontFamilyChoice>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(FONT_KEY) as FontFamilyChoice;
-      if (FONT_CATALOG.some((f) => f.id === saved)) return saved;
-    }
+    const saved = safeGetStorage(FONT_KEY) as FontFamilyChoice;
+    if (FONT_CATALOG.some((f) => f.id === saved)) return saved;
     return 'sans';
   });
 
+  const [uiStyle, setUiStyleState] = useState<UiStyleMode>(() => {
+    const saved = safeGetStorage(UI_STYLE_KEY) as UiStyleMode;
+    if (['default', '3d', 'modern', 'legacy', 'playful'].includes(saved)) return saved;
+    return 'default';
+  });
+
   const [uiDensity, setUiDensityState] = useState<UiDensity>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(DENSITY_KEY) as UiDensity;
-      if (saved === 'compact' || saved === 'comfortable') return saved;
-    }
+    const saved = safeGetStorage(DENSITY_KEY) as UiDensity;
+    if (saved === 'compact' || saved === 'comfortable') return saved;
     return 'comfortable';
   });
 
   const [cardRadius, setCardRadiusState] = useState<CardCornerRadius>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(RADIUS_KEY) as CardCornerRadius;
-      if (['3xl', '2xl', 'xl', 'md'].includes(saved)) return saved;
-    }
+    const saved = safeGetStorage(RADIUS_KEY) as CardCornerRadius;
+    if (['3xl', '2xl', 'xl', 'md'].includes(saved)) return saved;
     return '3xl';
   });
 
   const [highContrast, setHighContrastState] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(CONTRAST_KEY) === 'true';
-    }
-    return false;
+    return safeGetStorage(CONTRAST_KEY) === 'true';
   });
 
   const [reducedMotion, setReducedMotionState] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(MOTION_KEY) === 'true';
-    }
-    return false;
+    return safeGetStorage(MOTION_KEY) === 'true';
   });
 
   const [animationStyle, setAnimationStyleState] = useState<AnimationStyle>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(ANIM_STYLE_KEY) as AnimationStyle;
-      if (['bouncy', 'smooth', 'snappy', 'minimal'].includes(saved)) return saved;
-    }
+    const saved = safeGetStorage(ANIM_STYLE_KEY) as AnimationStyle;
+    if (['bouncy', 'smooth', 'snappy', 'minimal'].includes(saved)) return saved;
     return 'bouncy';
   });
 
   const [animationIntensity, setAnimationIntensityState] = useState<AnimationIntensity>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(ANIM_INTENSITY_KEY) as AnimationIntensity;
-      if (['subtle', 'normal', 'extra'].includes(saved)) return saved;
-    }
+    const saved = safeGetStorage(ANIM_INTENSITY_KEY) as AnimationIntensity;
+    if (['subtle', 'normal', 'extra'].includes(saved)) return saved;
     return 'normal';
   });
 
   const [buttonBounceEnabled, setButtonBounceEnabledState] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(BTN_BOUNCE_KEY) !== 'false';
-    }
-    return true;
+    return safeGetStorage(BTN_BOUNCE_KEY) !== 'false';
   });
 
   const [cardHoverLiftEnabled, setCardHoverLiftEnabledState] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(CARD_LIFT_KEY) !== 'false';
-    }
-    return true;
+    return safeGetStorage(CARD_LIFT_KEY) !== 'false';
   });
 
   const [confettiEnabled, setConfettiEnabledState] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(CONFETTI_KEY) !== 'false';
+    return safeGetStorage(CONFETTI_KEY) !== 'false';
+  });
+
+  const [particlesEnabled, setParticlesEnabledState] = useState<boolean>(() => {
+    return safeGetStorage(PARTICLES_ENABLED_KEY) !== 'false';
+  });
+
+  const [particlePreset, setParticlePresetState] = useState<ParticlePresetType>(() => {
+    const saved = safeGetStorage(PARTICLE_PRESET_KEY) as ParticlePresetType;
+    if (PARTICLE_PRESET_CATALOG.some((p) => p.id === saved)) return saved;
+    return 'constellation';
+  });
+
+  const [particleDensity, setParticleDensityState] = useState<ParticleDensityType>(() => {
+    const saved = safeGetStorage(PARTICLE_DENSITY_KEY) as ParticleDensityType;
+    if (['low', 'medium', 'high'].includes(saved)) return saved;
+    return 'medium';
+  });
+
+  const [particleSpeed, setParticleSpeedState] = useState<ParticleSpeedType>(() => {
+    const saved = safeGetStorage(PARTICLE_SPEED_KEY) as ParticleSpeedType;
+    if (['slow', 'normal', 'fast'].includes(saved)) return saved;
+    return 'normal';
+  });
+
+  const [particleInteractive, setParticleInteractiveState] = useState<boolean>(() => {
+    return safeGetStorage(PARTICLE_INTERACTIVE_KEY) !== 'false';
+  });
+
+  const [ambientOrbsEnabled, setAmbientOrbsEnabledState] = useState<boolean>(() => {
+    return safeGetStorage(AMBIENT_ORBS_KEY) !== 'false';
+  });
+
+  const [eyeComfortWarmth, setEyeComfortWarmthState] = useState<number>(() => {
+    const saved = safeGetStorage(EYE_WARMTH_KEY);
+    if (saved !== null) {
+      const parsed = Number(saved);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 40) return parsed;
     }
-    return true;
+    return 0;
+  });
+
+  const [adaptiveDifficultyEnabled, setAdaptiveDifficultyEnabledState] = useState<boolean>(() => {
+    return safeGetStorage(ADAPTIVE_DIFF_KEY) !== 'false';
+  });
+
+  const [streakShieldAutoEnabled, setStreakShieldAutoEnabledState] = useState<boolean>(() => {
+    return safeGetStorage(STREAK_SHIELD_KEY) !== 'false';
+  });
+
+  const [graphicsMode, setGraphicsModeState] = useState<GraphicsQualityMode>(() => {
+    const saved = safeGetStorage(GRAPHICS_MODE_KEY) as GraphicsQualityMode;
+    if (['simple', 'medium', 'performance', 'ultra'].includes(saved)) return saved;
+    return 'performance';
+  });
+
+  const [rtxEnabled, setRtxEnabledState] = useState<boolean>(() => {
+    return safeGetStorage(RTX_ENABLED_KEY) !== 'false';
+  });
+
+  const [rtxGlobalIllumination, setRtxGlobalIlluminationState] = useState<boolean>(() => {
+    return safeGetStorage(RTX_GI_KEY) !== 'false';
+  });
+
+  const [rtxReflections, setRtxReflectionsState] = useState<boolean>(() => {
+    return safeGetStorage(RTX_REFLECTIONS_KEY) !== 'false';
+  });
+
+  const [rtxVolumetricBloom, setRtxVolumetricBloomState] = useState<boolean>(() => {
+    return safeGetStorage(RTX_BLOOM_KEY) !== 'false';
+  });
+
+  const [fpsCounterEnabled, setFpsCounterEnabledState] = useState<boolean>(() => {
+    return safeGetStorage(FPS_COUNTER_KEY) === 'true';
   });
 
   const [soundVolume, setSoundVolumeState] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(VOLUME_KEY);
-      if (saved !== null) {
-        const parsed = parseFloat(saved);
-        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) return parsed;
-      }
+    const saved = safeGetStorage(VOLUME_KEY);
+    if (saved !== null) {
+      const parsed = parseFloat(saved);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) return parsed;
     }
     return 0.85;
   });
 
   const [questionLayout, setQuestionLayoutState] = useState<QuestionLayoutStyle>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(LAYOUT_KEY) as QuestionLayoutStyle;
-      if (['stacked', 'split', 'focus'].includes(saved)) return saved;
-    }
+    const saved = safeGetStorage(LAYOUT_KEY) as QuestionLayoutStyle;
+    if (['stacked', 'split', 'focus'].includes(saved)) return saved;
     return 'stacked';
   });
 
   const [autoReadQuestions, setAutoReadQuestionsState] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(AUTOREAD_KEY) === 'true';
-    }
-    return false;
+    return safeGetStorage(AUTOREAD_KEY) === 'true';
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
@@ -567,7 +832,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     currentAnimStyle: AnimationStyle = animationStyle,
     currentAnimIntensity: AnimationIntensity = animationIntensity,
     isBtnBounce: boolean = buttonBounceEnabled,
-    isCardLift: boolean = cardHoverLiftEnabled
+    isCardLift: boolean = cardHoverLiftEnabled,
+    currentGfx: GraphicsQualityMode = graphicsMode,
+    isRtx: boolean = rtxEnabled,
+    isRtxGi: boolean = rtxGlobalIllumination,
+    isRtxRefl: boolean = rtxReflections,
+    isRtxBloom: boolean = rtxVolumetricBloom
   ) => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
@@ -588,6 +858,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const effectiveStyle = isReducedMotion ? 'minimal' : currentAnimStyle;
 
     root.setAttribute('data-accent', currentAccent);
+    root.setAttribute('data-ui-style', uiStyle);
     root.setAttribute('data-font', currentFont);
     root.setAttribute('data-density', currentDensity);
     root.setAttribute('data-radius', currentRadius);
@@ -597,6 +868,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.setAttribute('data-animation-intensity', currentAnimIntensity);
     root.setAttribute('data-button-bounce', isBtnBounce && effectiveStyle !== 'minimal' ? 'true' : 'false');
     root.setAttribute('data-card-lift', isCardLift && effectiveStyle !== 'minimal' ? 'true' : 'false');
+    root.setAttribute('data-graphics-mode', currentGfx);
+    root.setAttribute('data-rtx', isRtx && currentGfx !== 'simple' ? 'true' : 'false');
+    root.setAttribute('data-rtx-gi', isRtx && isRtxGi && currentGfx !== 'simple' ? 'true' : 'false');
+    root.setAttribute('data-rtx-reflections', isRtx && isRtxRefl && currentGfx !== 'simple' ? 'true' : 'false');
+    root.setAttribute('data-rtx-bloom', isRtx && isRtxBloom && currentGfx !== 'simple' ? 'true' : 'false');
 
     const palette = ACCENT_PALETTES[currentAccent] || ACCENT_PALETTES.indigo;
     root.style.setProperty('--accent-hex', palette.primaryHex);
@@ -625,7 +901,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         animationStyle,
         animationIntensity,
         buttonBounceEnabled,
-        cardHoverLiftEnabled
+        cardHoverLiftEnabled,
+        graphicsMode,
+        rtxEnabled,
+        rtxGlobalIllumination,
+        rtxReflections,
+        rtxVolumetricBloom
       );
     };
 
@@ -639,6 +920,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => mediaQuery.removeEventListener('change', listener);
   }, [
     theme,
+    uiStyle,
     accent,
     fontFamily,
     uiDensity,
@@ -649,11 +931,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     animationIntensity,
     buttonBounceEnabled,
     cardHoverLiftEnabled,
+    graphicsMode,
+    rtxEnabled,
+    rtxGlobalIllumination,
+    rtxReflections,
+    rtxVolumetricBloom,
   ]);
 
   const setTheme = (newTheme: ThemeMode) => {
     setThemeState(newTheme);
-    localStorage.setItem(THEME_KEY, newTheme);
+    safeSetStorage(THEME_KEY, newTheme);
     const isDark =
       newTheme === 'dark' ||
       (newTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -668,7 +955,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setAccent = (newAccent: AccentColor) => {
     setAccentState(newAccent);
-    localStorage.setItem(ACCENT_KEY, newAccent);
+    safeSetStorage(ACCENT_KEY, newAccent);
     applyThemeToDOM(
       resolvedTheme === 'dark',
       newAccent,
@@ -682,7 +969,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setFontFamily = (newFont: FontFamilyChoice) => {
     setFontFamilyState(newFont);
-    localStorage.setItem(FONT_KEY, newFont);
+    safeSetStorage(FONT_KEY, newFont);
     applyThemeToDOM(
       resolvedTheme === 'dark',
       accent,
@@ -694,9 +981,38 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     );
   };
 
+  const setUiStyle = (newStyle: UiStyleMode) => {
+    setUiStyleState(newStyle);
+    safeSetStorage(UI_STYLE_KEY, newStyle);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-ui-style', newStyle);
+    }
+    if (newStyle === 'playful') {
+      setFontFamily('fredoka');
+      setCardRadius('3xl');
+      setAnimationStyle('bouncy');
+    } else if (newStyle === 'legacy') {
+      setFontFamily('lora');
+      setCardRadius('md');
+      setAnimationStyle('minimal');
+    } else if (newStyle === 'modern') {
+      setFontFamily('sora');
+      setCardRadius('2xl');
+      setAnimationStyle('smooth');
+    } else if (newStyle === '3d') {
+      setFontFamily('outfit');
+      setCardRadius('2xl');
+      setAnimationStyle('snappy');
+    } else {
+      setFontFamily('sans');
+      setCardRadius('3xl');
+      setAnimationStyle('smooth');
+    }
+  };
+
   const setUiDensity = (newDensity: UiDensity) => {
     setUiDensityState(newDensity);
-    localStorage.setItem(DENSITY_KEY, newDensity);
+    safeSetStorage(DENSITY_KEY, newDensity);
     applyThemeToDOM(
       resolvedTheme === 'dark',
       accent,
@@ -710,7 +1026,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setCardRadius = (newRadius: CardCornerRadius) => {
     setCardRadiusState(newRadius);
-    localStorage.setItem(RADIUS_KEY, newRadius);
+    safeSetStorage(RADIUS_KEY, newRadius);
     applyThemeToDOM(
       resolvedTheme === 'dark',
       accent,
@@ -724,7 +1040,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setHighContrast = (val: boolean) => {
     setHighContrastState(val);
-    localStorage.setItem(CONTRAST_KEY, String(val));
+    safeSetStorage(CONTRAST_KEY, String(val));
     applyThemeToDOM(
       resolvedTheme === 'dark',
       accent,
@@ -738,13 +1054,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setReducedMotion = (val: boolean) => {
     setReducedMotionState(val);
-    localStorage.setItem(MOTION_KEY, String(val));
+    safeSetStorage(MOTION_KEY, String(val));
     if (val) {
       setAnimationStyleState('minimal');
-      localStorage.setItem(ANIM_STYLE_KEY, 'minimal');
+      safeSetStorage(ANIM_STYLE_KEY, 'minimal');
     } else if (animationStyle === 'minimal') {
       setAnimationStyleState('bouncy');
-      localStorage.setItem(ANIM_STYLE_KEY, 'bouncy');
+      safeSetStorage(ANIM_STYLE_KEY, 'bouncy');
     }
     applyThemeToDOM(
       resolvedTheme === 'dark',
@@ -763,10 +1079,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setAnimationStyle = (style: AnimationStyle) => {
     setAnimationStyleState(style);
-    localStorage.setItem(ANIM_STYLE_KEY, style);
+    safeSetStorage(ANIM_STYLE_KEY, style);
     const isMin = style === 'minimal';
     setReducedMotionState(isMin);
-    localStorage.setItem(MOTION_KEY, String(isMin));
+    safeSetStorage(MOTION_KEY, String(isMin));
     applyThemeToDOM(
       resolvedTheme === 'dark',
       accent,
@@ -784,7 +1100,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setAnimationIntensity = (intensity: AnimationIntensity) => {
     setAnimationIntensityState(intensity);
-    localStorage.setItem(ANIM_INTENSITY_KEY, intensity);
+    safeSetStorage(ANIM_INTENSITY_KEY, intensity);
     applyThemeToDOM(
       resolvedTheme === 'dark',
       accent,
@@ -802,7 +1118,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setButtonBounceEnabled = (val: boolean) => {
     setButtonBounceEnabledState(val);
-    localStorage.setItem(BTN_BOUNCE_KEY, String(val));
+    safeSetStorage(BTN_BOUNCE_KEY, String(val));
     applyThemeToDOM(
       resolvedTheme === 'dark',
       accent,
@@ -820,7 +1136,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setCardHoverLiftEnabled = (val: boolean) => {
     setCardHoverLiftEnabledState(val);
-    localStorage.setItem(CARD_LIFT_KEY, String(val));
+    safeSetStorage(CARD_LIFT_KEY, String(val));
     applyThemeToDOM(
       resolvedTheme === 'dark',
       accent,
@@ -838,24 +1154,140 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setConfettiEnabled = (val: boolean) => {
     setConfettiEnabledState(val);
-    localStorage.setItem(CONFETTI_KEY, String(val));
+    safeSetStorage(CONFETTI_KEY, String(val));
+  };
+
+  const setParticlesEnabled = (val: boolean) => {
+    setParticlesEnabledState(val);
+    safeSetStorage(PARTICLES_ENABLED_KEY, String(val));
+  };
+
+  const setParticlePreset = (preset: ParticlePresetType) => {
+    setParticlePresetState(preset);
+    safeSetStorage(PARTICLE_PRESET_KEY, preset);
+  };
+
+  const setParticleDensity = (density: ParticleDensityType) => {
+    setParticleDensityState(density);
+    safeSetStorage(PARTICLE_DENSITY_KEY, density);
+  };
+
+  const setParticleSpeed = (speed: ParticleSpeedType) => {
+    setParticleSpeedState(speed);
+    safeSetStorage(PARTICLE_SPEED_KEY, speed);
+  };
+
+  const setParticleInteractive = (val: boolean) => {
+    setParticleInteractiveState(val);
+    safeSetStorage(PARTICLE_INTERACTIVE_KEY, String(val));
+  };
+
+  const setAmbientOrbsEnabled = (val: boolean) => {
+    setAmbientOrbsEnabledState(val);
+    safeSetStorage(AMBIENT_ORBS_KEY, String(val));
+  };
+
+  const setEyeComfortWarmth = (val: number) => {
+    const clamped = Math.max(0, Math.min(40, Math.round(val)));
+    setEyeComfortWarmthState(clamped);
+    safeSetStorage(EYE_WARMTH_KEY, String(clamped));
+  };
+
+  const setAdaptiveDifficultyEnabled = (val: boolean) => {
+    setAdaptiveDifficultyEnabledState(val);
+    safeSetStorage(ADAPTIVE_DIFF_KEY, String(val));
+  };
+
+  const setStreakShieldAutoEnabled = (val: boolean) => {
+    setStreakShieldAutoEnabledState(val);
+    safeSetStorage(STREAK_SHIELD_KEY, String(val));
+  };
+
+  const setGraphicsMode = (mode: GraphicsQualityMode) => {
+    setGraphicsModeState(mode);
+    safeSetStorage(GRAPHICS_MODE_KEY, mode);
+
+    if (mode === 'simple') {
+      setParticlesEnabled(false);
+      setAmbientOrbsEnabled(false);
+      setRtxEnabled(false);
+      setAnimationStyle('smooth');
+      setCardHoverLiftEnabled(false);
+    } else if (mode === 'medium') {
+      setParticlesEnabled(true);
+      setParticleDensity('medium');
+      setParticleSpeed('normal');
+      setAmbientOrbsEnabled(true);
+      setRtxEnabled(false);
+      setAnimationStyle('smooth');
+      setCardHoverLiftEnabled(true);
+    } else if (mode === 'performance') {
+      setParticlesEnabled(true);
+      setParticleDensity('low');
+      setParticleSpeed('fast');
+      setAmbientOrbsEnabled(false);
+      setRtxEnabled(false);
+      setAnimationStyle('snappy');
+      setAnimationIntensity('normal');
+      setButtonBounceEnabled(true);
+      setCardHoverLiftEnabled(true);
+    } else if (mode === 'ultra') {
+      setParticlesEnabled(true);
+      setParticleDensity('high');
+      setParticleSpeed('normal');
+      setParticleInteractive(true);
+      setAmbientOrbsEnabled(true);
+      setRtxEnabled(true);
+      setRtxGlobalIllumination(true);
+      setRtxReflections(true);
+      setRtxVolumetricBloom(true);
+      setAnimationStyle('bouncy');
+      setAnimationIntensity('extra');
+      setButtonBounceEnabled(true);
+      setCardHoverLiftEnabled(true);
+    }
+  };
+
+  const setRtxEnabled = (val: boolean) => {
+    setRtxEnabledState(val);
+    safeSetStorage(RTX_ENABLED_KEY, String(val));
+  };
+
+  const setRtxGlobalIllumination = (val: boolean) => {
+    setRtxGlobalIlluminationState(val);
+    safeSetStorage(RTX_GI_KEY, String(val));
+  };
+
+  const setRtxReflections = (val: boolean) => {
+    setRtxReflectionsState(val);
+    safeSetStorage(RTX_REFLECTIONS_KEY, String(val));
+  };
+
+  const setRtxVolumetricBloom = (val: boolean) => {
+    setRtxVolumetricBloomState(val);
+    safeSetStorage(RTX_BLOOM_KEY, String(val));
+  };
+
+  const setFpsCounterEnabled = (val: boolean) => {
+    setFpsCounterEnabledState(val);
+    safeSetStorage(FPS_COUNTER_KEY, String(val));
   };
 
   const setSoundVolume = (vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
     setSoundVolumeState(clamped);
     soundFx.setVolume(clamped);
-    localStorage.setItem(VOLUME_KEY, String(clamped));
+    safeSetStorage(VOLUME_KEY, String(clamped));
   };
 
   const setQuestionLayout = (layout: QuestionLayoutStyle) => {
     setQuestionLayoutState(layout);
-    localStorage.setItem(LAYOUT_KEY, layout);
+    safeSetStorage(LAYOUT_KEY, layout);
   };
 
   const setAutoReadQuestions = (val: boolean) => {
     setAutoReadQuestionsState(val);
-    localStorage.setItem(AUTOREAD_KEY, String(val));
+    safeSetStorage(AUTOREAD_KEY, String(val));
   };
 
   const applyPreset = (presetId: string) => {
@@ -884,6 +1316,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setButtonBounceEnabled(true);
     setCardHoverLiftEnabled(true);
     setConfettiEnabled(true);
+    setParticlesEnabled(true);
+    setParticlePreset('constellation');
+    setParticleDensity('medium');
+    setParticleSpeed('normal');
+    setParticleInteractive(true);
+    setAmbientOrbsEnabled(true);
+    setEyeComfortWarmth(0);
+    setAdaptiveDifficultyEnabled(true);
+    setStreakShieldAutoEnabled(true);
+    setGraphicsMode('ultra');
+    setRtxEnabled(true);
+    setRtxGlobalIllumination(true);
+    setRtxReflections(true);
+    setRtxVolumetricBloom(true);
+    setFpsCounterEnabled(false);
     setSoundVolume(0.85);
     setQuestionLayout('stacked');
     setAutoReadQuestions(false);
@@ -902,6 +1349,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAccent,
         fontFamily,
         setFontFamily,
+        uiStyle,
+        setUiStyle,
         uiDensity,
         setUiDensity,
         cardRadius,
@@ -920,6 +1369,36 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCardHoverLiftEnabled,
         confettiEnabled,
         setConfettiEnabled,
+        particlesEnabled,
+        setParticlesEnabled,
+        particlePreset,
+        setParticlePreset,
+        particleDensity,
+        setParticleDensity,
+        particleSpeed,
+        setParticleSpeed,
+        particleInteractive,
+        setParticleInteractive,
+        ambientOrbsEnabled,
+        setAmbientOrbsEnabled,
+        eyeComfortWarmth,
+        setEyeComfortWarmth,
+        adaptiveDifficultyEnabled,
+        setAdaptiveDifficultyEnabled,
+        streakShieldAutoEnabled,
+        setStreakShieldAutoEnabled,
+        graphicsMode,
+        setGraphicsMode,
+        rtxEnabled,
+        setRtxEnabled,
+        rtxGlobalIllumination,
+        setRtxGlobalIllumination,
+        rtxReflections,
+        setRtxReflections,
+        rtxVolumetricBloom,
+        setRtxVolumetricBloom,
+        fpsCounterEnabled,
+        setFpsCounterEnabled,
         soundVolume,
         setSoundVolume,
         questionLayout,

@@ -19,8 +19,10 @@ import {
   UserProfileDocument,
   subscribeUserProfile,
   upsertUserProfile,
+  resetAllSignedInUsersLevelsInFirestore,
 } from '../services/firestore';
 import { UserStats, PersonaType, AssessmentConfig } from '../types/quiz';
+import { LEVEL_SYSTEM_VERSION } from '../utils/levelingSystem';
 
 interface AuthContextType {
   user: User | null;
@@ -130,9 +132,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (unsubscribeProfile) unsubscribeProfile();
         unsubscribeProfile = subscribeUserProfile(currentUser.uid, (profile) => {
           if (profile) {
-            setUserProfile(profile);
+            if (profile.levelSystemVersion !== LEVEL_SYSTEM_VERSION) {
+              // Automatically reset signed-in user's level to Level 1 (0 XP) for V3 Revamp
+              const resetProfile: UserProfileDocument = {
+                ...profile,
+                level: 1,
+                xp: 0,
+                levelSystemVersion: LEVEL_SYSTEM_VERSION,
+              };
+              setUserProfile(resetProfile);
+              resetAllSignedInUsersLevelsInFirestore(currentUser.uid).catch(() => {});
+            } else {
+              setUserProfile(profile);
+            }
           }
         });
+
+        // Also sweep all signed-in users in Firestore once to ensure everyone is reset to Level 1
+        resetAllSignedInUsersLevelsInFirestore(currentUser.uid).catch(() => {});
 
         setIsAuthLoading(false);
       } else {
@@ -150,7 +167,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               if (unsubscribeProfile) unsubscribeProfile();
               unsubscribeProfile = subscribeUserProfile(parsed.uid, (profile) => {
                 if (profile) {
-                  setUserProfile(profile);
+                  if (profile.levelSystemVersion !== LEVEL_SYSTEM_VERSION) {
+                    const resetProfile: UserProfileDocument = {
+                      ...profile,
+                      level: 1,
+                      xp: 0,
+                      levelSystemVersion: LEVEL_SYSTEM_VERSION,
+                    };
+                    setUserProfile(resetProfile);
+                    resetAllSignedInUsersLevelsInFirestore(parsed.uid).catch(() => {});
+                  } else {
+                    setUserProfile(profile);
+                  }
                 }
               });
 
@@ -375,6 +403,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         ...(stats.unlockedAccessories ? { unlockedAccessories: stats.unlockedAccessories } : {}),
         ...(stats.equippedAccessory !== undefined ? { equippedAccessory: stats.equippedAccessory } : {}),
         level: stats.level,
+        levelSystemVersion: LEVEL_SYSTEM_VERSION,
         quizzesCompleted: stats.quizzesCompleted,
         totalCorrect: stats.totalCorrect,
         totalQuestions: stats.totalQuestions,

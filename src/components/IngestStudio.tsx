@@ -49,6 +49,7 @@ import { QuizHistoryRecord } from './HistoryView';
 import { QuizTrackDetailDrawer, SelectedTrackInfo } from './QuizTrackDetailDrawer';
 import { SUPPORTED_LANGUAGES, SupportedLanguage, getLanguageByCode } from '../data/languages';
 import { MascotAvatar } from './MascotAvatar';
+import { getLevelProgress, getDailyRetentionCheckIn } from '../utils/levelingSystem';
 
 interface IngestStudioProps {
   persona: PersonaType;
@@ -59,9 +60,12 @@ interface IngestStudioProps {
   errorMessage: string | null;
   setErrorMessage: (err: string | null) => void;
   assessmentConfig: AssessmentConfig;
+  onUpdateAssessmentConfig?: (newConfig: Partial<AssessmentConfig>) => void;
+  onUpdateStats?: (newStats: Partial<UserStats>) => void;
   onOpenRawJsonModal?: (quiz: QuizResponse) => void;
   onOpenUploadQuiz?: () => void;
   onOpenTutor?: (questionId?: number) => void;
+  onOpenLevelRoadmap?: () => void;
   stats?: UserStats;
   historyRecords?: QuizHistoryRecord[];
 }
@@ -75,18 +79,22 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   errorMessage,
   setErrorMessage,
   assessmentConfig,
+  onUpdateAssessmentConfig,
+  onUpdateStats,
   onOpenUploadQuiz,
   onOpenTutor,
+  onOpenLevelRoadmap,
   stats = {
-    streak: 3,
+    streak: 1,
     hearts: 5,
     maxHearts: 5,
-    xp: 320,
-    gems: 40,
-    level: 2,
-    quizzesCompleted: 3,
-    totalCorrect: 11,
-    totalQuestions: 14,
+    xp: 0,
+    gems: 25,
+    coins: 0,
+    level: 1,
+    quizzesCompleted: 0,
+    totalCorrect: 0,
+    totalQuestions: 0,
     badges: [],
   },
   historyRecords = [],
@@ -140,6 +148,47 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
 
   // Enhanced Prompter Flexibility Options (User Request)
   const [showAdvancedPrompter, setShowAdvancedPrompter] = useState<boolean>(false);
+  const [calculatorEnabled, setCalculatorEnabled] = useState<boolean>(true);
+  const [dictionaryEnabled, setDictionaryEnabled] = useState<boolean>(true);
+  const [miniTriviaIndex, setMiniTriviaIndex] = useState<number>(0);
+  const [miniTriviaSelected, setMiniTriviaSelected] = useState<string | null>(null);
+  const [miniTriviaSolvedIds, setMiniTriviaSolvedIds] = useState<number[]>([]);
+
+  const MINI_TRIVIA_QUESTIONS = [
+    {
+      id: 1,
+      badge: '🌍 All-Ages Wonder',
+      q: 'Which planet in our solar system spins clockwise (backwards compared to Earth)?',
+      options: ['Mars', 'Venus', 'Jupiter', 'Saturn'],
+      answer: 'Venus',
+      fact: 'Venus rotates backwards so slowly that one day on Venus is longer than its entire year!',
+    },
+    {
+      id: 2,
+      badge: '🐙 Ocean Mystery',
+      q: 'How many hearts does a giant Pacific octopus have?',
+      options: ['1 Heart', '2 Hearts', '3 Hearts', '8 Hearts'],
+      answer: '3 Hearts',
+      fact: 'Two hearts pump blood to the gills, and a third pumps it to the rest of the body!',
+    },
+    {
+      id: 3,
+      badge: '🧠 Brain Teaser',
+      q: 'What is the only number spelled in English with its letters in alphabetical order?',
+      options: ['Eight', 'Forty', 'Ten', 'Five'],
+      answer: 'Forty',
+      fact: 'F-O-R-T-Y is in exact A-to-Z alphabetical order!',
+    },
+    {
+      id: 4,
+      badge: '⚡ Tech & Science',
+      q: 'Roughly how long does it take sunlight to travel from the Sun to Earth?',
+      options: ['8 Seconds', '8 Minutes', '8 Hours', 'Instant'],
+      answer: '8 Minutes',
+      fact: 'Light travels at ~300,000 km/s, reaching Earth in about 8 minutes and 20 seconds!',
+    },
+  ];
+  const currentMiniTrivia = MINI_TRIVIA_QUESTIONS[miniTriviaIndex % MINI_TRIVIA_QUESTIONS.length];
   const [customInstructions, setCustomInstructions] = useState<string>('');
   const [promptStyle, setPromptStyle] = useState<string>('Standard');
   const [targetAudience, setTargetAudience] = useState<string>('All Ages / Family Fun');
@@ -181,13 +230,78 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   }, [inputText, mediaUrl, uploadedFiles, selectedQuestionTypes, difficulty, questionCount, isLoading]);
 
   const QUICK_STARTER_TOPICS = [
-    { label: 'Quantum Physics', prompt: 'Quantum Physics: Wave-particle duality, superposition, and quantum entanglement', icon: '⚛️', color: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800' },
-    { label: 'DNA & Genetics', prompt: 'Molecular Genetics: DNA replication, transcription, translation, and CRISPR gene editing', icon: '🧬', color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
-    { label: 'Ancient Rome', prompt: 'Roman Republic and Empire: Punic wars, Julius Caesar, Senate politics, and Pax Romana', icon: '🏛️', color: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
-    { label: 'JavaScript Async', prompt: 'JavaScript Asynchronous Programming: Event loop, Promises, async/await, and microtasks', icon: '💻', color: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
-    { label: 'Microeconomics', prompt: 'Microeconomics: Supply and demand elasticity, consumer surplus, and market structures', icon: '📈', color: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
-    { label: 'Cybersecurity', prompt: 'Cybersecurity: Public key cryptography, zero-trust architecture, and common network vulnerabilities', icon: '🛡️', color: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800' },
+    { label: 'Space & Black Holes', prompt: 'Mind-Blowing Space & Black Holes: Supernovas, exoplanets, galaxies, and astronaut life', icon: '🚀', color: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800' },
+    { label: 'World Trivia & Wonders', prompt: 'Amazing World Wonders, Geography, Cultural Traditions, and Record-Breaking Landmarks', icon: '🌍', color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
+    { label: 'Ancient Myths & Legends', prompt: 'Greek, Norse, and Egyptian Mythology: Legendary gods, heroes, creatures, and epic tales', icon: '⚡', color: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
+    { label: 'Brain Riddles & Logic', prompt: 'Clever Brain Teasers, Lateral Thinking Puzzles, Pattern Logic, and Word Riddles for All Ages', icon: '🧩', color: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
+    { label: 'Ocean & Wildlife', prompt: 'Incredible Animals & Deep Ocean Mysteries: Bioluminescent creatures, rainforests, and animal superpowers', icon: '🐬', color: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
+    { label: 'Coding & Tech Future', prompt: 'Modern Computer Science, AI Breakthroughs, Cybersecurity, and Software Engineering Fundamentals', icon: '💻', color: 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800' },
   ];
+
+  const ALL_AGES_EXPERIENCE_MODES = [
+    {
+      id: 'family',
+      label: 'Family Trivia',
+      emoji: '🎮',
+      audience: 'All Ages / Family Fun',
+      diff: 'Beginner' as DifficultyType,
+      prompt: 'Fun Family Trivia Night: Amazing animals, space wonders, inventions, pop culture, and surprising world facts!',
+    },
+    {
+      id: 'kids',
+      label: 'Kids Explorer',
+      emoji: '🦖',
+      audience: 'Elementary / Young Learners',
+      diff: 'Beginner' as DifficultyType,
+      prompt: 'Young Explorer Adventure: Dinosaurs, planets, ocean creatures, and cool everyday science explained simply!',
+    },
+    {
+      id: 'riddles',
+      label: 'Brain Riddles',
+      emoji: '🧠',
+      audience: 'All Ages / Puzzle Lovers',
+      diff: 'Intermediate' as DifficultyType,
+      prompt: 'Clever Brain Teasers, Logic Puzzles, Math Tricks, and Fun Riddles that test creative thinking!',
+    },
+    {
+      id: 'school',
+      label: 'School & AP Prep',
+      emoji: '🎓',
+      audience: 'High School / AP & IB',
+      diff: 'Intermediate' as DifficultyType,
+      prompt: 'High-Yield Academic Review: Biology, World History, Physics, and Critical Reading mastery.',
+    },
+    {
+      id: 'pro',
+      label: 'Pro & Career',
+      emoji: '🏆',
+      audience: 'University / Pro Certification',
+      diff: 'Master' as DifficultyType,
+      prompt: 'Advanced Professional Mastery: System Architecture, Clinical Diagnostics, Economics, and First-Principles Problem Solving.',
+    },
+  ];
+
+  const SURPRISE_TOPICS_POOL = [
+    'Weird & Wonderful Science Facts You Never Learned in School',
+    'Deep Sea Monsters & Bioluminescent Ocean Life',
+    'Legendary Video Games, Animation & Pop Culture History',
+    'How Everyday Inventions Actually Work (Wi-Fi, Planes, Microwaves, GPS)',
+    'Dinosaur Kingdom: T-Rex, Velociraptors & Prehistoric Earth',
+    'Global Street Food, Culinary Secrets & World Flavors',
+    'Detective Logic Mysteries & Deductive Reasoning Challenges',
+    'Space Exploration: Mars Rovers, James Webb Telescope & Alien Worlds',
+    'Human Body Superpowers: Brain Neurons, Immune System & DNA',
+    'Ancient Civilizations: Pyramids, Aztecs, Samurai & Lost Cities',
+  ];
+
+  const handleSurpriseMe = () => {
+    soundFx.playPop();
+    const pick = SURPRISE_TOPICS_POOL[Math.floor(Math.random() * SURPRISE_TOPICS_POOL.length)];
+    setActiveTab('text');
+    setInputText(pick);
+    setValidationWarning(null);
+    setErrorMessage(null);
+  };
 
   const handleCustomizeTopic = (prompt: string, diff: DifficultyType, types: QuestionType[]) => {
     setStudioSection('builder');
@@ -397,7 +511,11 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
       }
 
       soundFx.playComplete();
-      onStartQuiz(data.quiz);
+      onStartQuiz({
+        ...data.quiz,
+        calculatorEnabled,
+        dictionaryEnabled,
+      });
     } catch (err: unknown) {
       clearTimeout(stepTimer1);
       clearTimeout(stepTimer2);
@@ -410,10 +528,10 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
     }
   };
 
-  const xpPerLevel = 150;
-  const currentLevel = stats.level || Math.floor(stats.xp / xpPerLevel) + 1;
-  const currentLevelXp = stats.xp % xpPerLevel;
-  const levelProgressPct = Math.min(100, Math.max(0, Math.round((currentLevelXp / xpPerLevel) * 100)));
+  const lvlInfo = getLevelProgress(stats.xp || 0, stats.streak || 1);
+  const dailyCheckIn = getDailyRetentionCheckIn();
+  const currentLevel = lvlInfo.level;
+  const levelProgressPct = lvlInfo.progressPercent;
   const accuracyPct =
     stats.totalQuestions > 0 ? Math.round((stats.totalCorrect / stats.totalQuestions) * 100) : 100;
   const ringRadius = 26;
@@ -697,6 +815,50 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
 
             {/* Tab Body Contents */}
             <div className="p-4 sm:p-5">
+              {/* All-Ages & Purposes Experience Mode Picker + Surprise Me Button */}
+              <div className="mb-3.5 pb-3 border-b border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">
+                    For Any Age & Goal:
+                  </span>
+                  {ALL_AGES_EXPERIENCE_MODES.map((m) => {
+                    const isPicked = targetAudience === m.audience && difficulty === m.diff;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          soundFx.playSelect();
+                          setTargetAudience(m.audience);
+                          setDifficulty(m.diff);
+                          setActiveTab('text');
+                          if (!inputText.trim()) {
+                            setInputText(m.prompt);
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border ${
+                          isPicked
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-black'
+                            : 'border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:border-indigo-300'
+                        }`}
+                      >
+                        <span>{m.emoji}</span>
+                        <span>{m.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSurpriseMe}
+                  className="px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black shadow-2xs transition-all cursor-pointer flex items-center gap-1"
+                  title="Pick a fun random topic for all ages!"
+                >
+                  <span>🎲</span>
+                  <span>Surprise Me!</span>
+                </button>
+              </div>
               {/* Tab 1: Popular Starter Topics (Compact 4-Card Featured View inside Builder) */}
               {activeTab === 'presets' && (
                 <div className="space-y-3">
@@ -840,9 +1002,10 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
               <textarea
                 id="notes-input"
                 rows={4}
+                maxLength={5000}
                 value={inputText}
                 onChange={(e) => {
-                  setInputText(e.target.value);
+                  setInputText(e.target.value.slice(0, 5000));
                   if (validationWarning) setValidationWarning(null);
                   if (errorMessage) setErrorMessage(null);
                 }}
@@ -854,7 +1017,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                 }`}
               />
               <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-                <span>{inputText.length} characters • Press ⌘+Enter to build</span>
+                <span>{inputText.length} / 5,000 characters • Press Ctrl+Enter to build (Enter moves downwards)</span>
                 {inputText.length > 0 && (
                   <button
                     type="button"
@@ -1219,6 +1382,129 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             </div>
           </div>
 
+          {/* Quiz Timer Range System Bar (Puts a Min–Max Time Range on the Quiz) */}
+          <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-900/60 bg-gradient-to-r from-emerald-50/50 via-white to-teal-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/20 p-3 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider">
+                  ⏱️ Time Range
+                </span>
+                <span className="text-xs font-black text-slate-900 dark:text-white">
+                  Quiz Time Range Window
+                </span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:inline">
+                  {assessmentConfig.timerRangeEnabled
+                    ? `Target: ${assessmentConfig.minTimeMinutes ?? 2}m – ${assessmentConfig.maxTimeMinutes ?? 10}m (+35% Target Range XP)`
+                    : assessmentConfig.timeLimitMinutes > 0
+                    ? `${assessmentConfig.timeLimitMinutes}m Cutoff`
+                    : 'No time limit (Relaxed)'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                {[
+                  { id: 'untimed', label: 'No Timer', min: 0, max: 0 },
+                  { id: 'blitz_1_3', label: '⚡ 1–3m Blitz', min: 1, max: 3 },
+                  { id: 'standard_3_10', label: '🎯 3–10m Gold Range', min: 3, max: 10 },
+                  { id: 'exam_10_25', label: '🏛️ 10–25m Exam', min: 10, max: 25 },
+                  { id: 'custom_range', label: '⚙️ Custom Range', min: assessmentConfig.minTimeMinutes || 2, max: assessmentConfig.maxTimeMinutes || 12 },
+                ].map((tr) => {
+                  const isActive =
+                    tr.id === 'untimed'
+                      ? !assessmentConfig.timerRangeEnabled && assessmentConfig.timeLimitMinutes === 0
+                      : tr.id === 'custom_range'
+                      ? assessmentConfig.timerRangeEnabled && assessmentConfig.timerRangePreset === 'custom_range'
+                      : assessmentConfig.timerRangeEnabled &&
+                        assessmentConfig.minTimeMinutes === tr.min &&
+                        assessmentConfig.maxTimeMinutes === tr.max;
+                  return (
+                    <button
+                      key={tr.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playSelect();
+                        if (!onUpdateAssessmentConfig) return;
+                        if (tr.id === 'untimed') {
+                          onUpdateAssessmentConfig({
+                            timerRangeEnabled: false,
+                            timeLimitMinutes: 0,
+                            timerRangePreset: 'untimed',
+                          });
+                        } else {
+                          onUpdateAssessmentConfig({
+                            timerRangeEnabled: true,
+                            minTimeMinutes: tr.min,
+                            maxTimeMinutes: tr.max,
+                            timeLimitMinutes: tr.max,
+                            timerRangePreset: tr.id as any,
+                          });
+                        }
+                      }}
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
+                      }`}
+                    >
+                      {tr.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {assessmentConfig.timerRangeEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-emerald-200/50 dark:border-emerald-900/40">
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                    Min Pace: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">{assessmentConfig.minTimeMinutes ?? 2}m</strong>
+                  </span>
+                  <input
+                    type="range"
+                    min={1}
+                    max={20}
+                    value={assessmentConfig.minTimeMinutes ?? 2}
+                    onChange={(e) => {
+                      const minVal = Number(e.target.value);
+                      const maxVal = Math.max(minVal + 1, assessmentConfig.maxTimeMinutes ?? 10);
+                      onUpdateAssessmentConfig?.({
+                        timerRangeEnabled: true,
+                        minTimeMinutes: minVal,
+                        maxTimeMinutes: maxVal,
+                        timeLimitMinutes: maxVal,
+                        timerRangePreset: 'custom_range',
+                      });
+                    }}
+                    className="w-full accent-emerald-500 cursor-pointer h-1.5"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                    Max Cutoff: <strong className="text-indigo-600 dark:text-indigo-400 font-mono">{assessmentConfig.maxTimeMinutes ?? 10}m</strong>
+                  </span>
+                  <input
+                    type="range"
+                    min={2}
+                    max={60}
+                    value={assessmentConfig.maxTimeMinutes ?? 10}
+                    onChange={(e) => {
+                      const maxVal = Number(e.target.value);
+                      const minVal = Math.min(maxVal - 1, assessmentConfig.minTimeMinutes ?? 2);
+                      onUpdateAssessmentConfig?.({
+                        timerRangeEnabled: true,
+                        minTimeMinutes: Math.max(1, minVal),
+                        maxTimeMinutes: maxVal,
+                        timeLimitMinutes: maxVal,
+                        timerRangePreset: 'custom_range',
+                      });
+                    }}
+                    className="w-full accent-indigo-600 cursor-pointer h-1.5"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Unified Collapsible Formats & AI Prompter Directives */}
           <div className="rounded-2xl border border-indigo-200/70 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 transition-all">
             <div className="flex items-center justify-between gap-3">
@@ -1321,6 +1607,33 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* Participant Allowed Tools: Calculator & Dictionary */}
+                <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs font-extrabold text-slate-700 dark:text-slate-200">
+                    Allowed Participant Study Tools:
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={calculatorEnabled}
+                        onChange={(e) => setCalculatorEnabled(e.target.checked)}
+                        className="rounded text-indigo-600"
+                      />
+                      <span>🧮 Enable Scientific Calculator</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={dictionaryEnabled}
+                        onChange={(e) => setDictionaryEnabled(e.target.checked)}
+                        className="rounded text-emerald-600"
+                      />
+                      <span>📖 Enable Academic Dictionary</span>
+                    </label>
                   </div>
                 </div>
 
@@ -1521,14 +1834,14 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
 
           {/* Right Bento Widget Column (4 Cols — Matches Gauge & Modular Cards in Reference Images) */}
           <div className="lg:col-span-4 space-y-4">
-            {/* Bento Card 1: Circular Mastery & Evaluation Gauge */}
+            {/* Bento Card 1: Revamped Challenging Level & Retention Card */}
             <div className="rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  Your Progress
+                  {lvlInfo.rank.badgeEmoji} {lvlInfo.rank.title}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80">
-                  {persona === 'Teacher' ? '🧑‍🏫 Teacher' : '🎓 Student'}
+                <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                  {stats.xp.toLocaleString()} XP · {lvlInfo.rank.tierName}
                 </span>
               </div>
 
@@ -1572,21 +1885,38 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
 
                 <div className="flex-1 grid grid-cols-2 gap-2">
                   <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60">
-                    <div className="text-[10px] font-bold text-slate-400">Streak</div>
+                    <div className="text-[10px] font-bold text-slate-400">Streak Boost</div>
                     <div className="text-sm font-black text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-0.5">
                       <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                      <span>{stats.streak}d</span>
+                      <span>{stats.streak}d (+{lvlInfo.streakMultiplierPercent}%)</span>
                     </div>
                   </div>
                   <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60">
-                    <div className="text-[10px] font-bold text-slate-400">Accuracy</div>
-                    <div className="text-sm font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5">
-                      <BarChart3 className="w-3.5 h-3.5 text-emerald-500" />
-                      <span>{accuracyPct}%</span>
+                    <div className="text-[10px] font-bold text-slate-400">Next Level</div>
+                    <div className="text-xs font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-1">
+                      <span>{lvlInfo.xpToNextLevel.toLocaleString()} XP left</span>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {onOpenLevelRoadmap && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    onOpenLevelRoadmap();
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-indigo-950/50 text-xs font-extrabold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-between transition-colors cursor-pointer"
+                >
+                  <span>
+                    {!dailyCheckIn.claimedToday
+                      ? `🎁 Claim Day ${dailyCheckIn.dayIndex} Check-In Reward!`
+                      : '🏆 View Prestige Ranks & Level Chests'}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Bento Card 2: Quick Topic Starters */}
@@ -1631,7 +1961,88 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
               </div>
             </div>
 
-            {/* Bento Card 3: Adaptive AI Recommendations Spotlight */}
+            {/* Bento Card 3: Instant All-Ages Brain Spark Mini-Game */}
+            <div className="rounded-2xl p-4 border border-amber-200/80 dark:border-amber-900/60 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/25 shadow-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white">
+                  {currentMiniTrivia.badge}
+                </span>
+                <span className="text-[10px] font-black text-amber-600 dark:text-amber-400">
+                  +40 XP · +10 Coins
+                </span>
+              </div>
+
+              <div className="text-xs font-black text-slate-900 dark:text-white leading-snug">
+                {currentMiniTrivia.q}
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5">
+                {currentMiniTrivia.options.map((opt) => {
+                  const isPicked = miniTriviaSelected === opt;
+                  const isRight = opt === currentMiniTrivia.answer;
+                  let btnStyle =
+                    'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-amber-400';
+                  if (miniTriviaSelected) {
+                    if (isRight) {
+                      btnStyle =
+                        'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 font-black';
+                    } else if (isPicked) {
+                      btnStyle =
+                        'border-rose-400 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300';
+                    }
+                  }
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      disabled={!!miniTriviaSelected}
+                      onClick={() => {
+                        setMiniTriviaSelected(opt);
+                        if (opt === currentMiniTrivia.answer) {
+                          soundFx.playCorrect();
+                          if (!miniTriviaSolvedIds.includes(currentMiniTrivia.id)) {
+                            setMiniTriviaSolvedIds((prev) => [...prev, currentMiniTrivia.id]);
+                            onUpdateStats?.({
+                              xp: (stats.xp || 0) + 40,
+                              coins: (stats.coins || 0) + 10,
+                            });
+                          }
+                        } else {
+                          soundFx.playIncorrect();
+                        }
+                      }}
+                      className={`p-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer text-left truncate ${btnStyle}`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {miniTriviaSelected && (
+                <div className="p-2.5 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2 animate-in fade-in duration-150">
+                  <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-tight">
+                    <strong className="text-emerald-600 dark:text-emerald-400">
+                      {miniTriviaSelected === currentMiniTrivia.answer ? '🎉 Spot on! +40 XP! ' : `Answer: ${currentMiniTrivia.answer}. `}
+                    </strong>
+                    {currentMiniTrivia.fact}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setMiniTriviaSelected(null);
+                      setMiniTriviaIndex((prev) => prev + 1);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black shrink-0 cursor-pointer"
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Bento Card 4: Adaptive AI Recommendations Spotlight */}
             <div className="rounded-2xl p-4 border border-indigo-200/70 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/30 shadow-xs space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

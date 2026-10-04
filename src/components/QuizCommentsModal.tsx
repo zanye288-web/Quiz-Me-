@@ -61,6 +61,16 @@ export const QuizCommentsModal: React.FC<QuizCommentsModalProps> = ({
   const [commentText, setCommentText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [moderationWarning, setModerationWarning] = useState<{
+    warningMessage: string;
+    violations: string[];
+    severity: string;
+    xpPenalty: number;
+    coinPenalty: number;
+    gmailReportSubject: string;
+    gmailReportBody: string;
+    adminEmail: string;
+  } | null>(null);
 
   // Load initial local comments if any
   const getLocalComments = (): QuizComment[] => {
@@ -142,11 +152,57 @@ export const QuizCommentsModal: React.FC<QuizCommentsModalProps> = ({
 
     soundFx.playClick();
     setIsSubmitting(true);
+    setModerationWarning(null);
 
     const authorName = user?.displayName || 'Active Scholar';
     const authorId = user?.uid || `guest_${Date.now()}`;
     const authorRole = persona || 'Student';
     const authorPhotoURL = user?.photoURL || null;
+
+    try {
+      const modRes = await fetch('/api/moderate-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          authorName,
+          authorId,
+          contextType: 'comment',
+        }),
+      });
+      if (modRes.ok) {
+        const modData = await modRes.json();
+        if (modData.moderation && !modData.moderation.isSafe) {
+          soundFx.playIncorrect();
+          const m = modData.moderation;
+          setModerationWarning({
+            warningMessage: m.warningMessage,
+            violations: m.violations || ['Policy Violation'],
+            severity: m.severity || 'moderate',
+            xpPenalty: m.penaltyApplied?.xpDeducted || 50,
+            coinPenalty: m.penaltyApplied?.coinsDeducted || 25,
+            gmailReportSubject: m.gmailReportPayload?.subject || '[Quiz Me! AI Moderation] Flagged Comment',
+            gmailReportBody: m.gmailReportPayload?.body || text,
+            adminEmail: m.gmailReportPayload?.to || 'zanye288@gmail.com',
+          });
+          // Apply XP penalty to stored stats
+          try {
+            const rawStats = localStorage.getItem('quizme_assessment_stats_v3_revamped');
+            if (rawStats) {
+              const parsedStats = JSON.parse(rawStats);
+              parsedStats.xp = Math.max(0, (parsedStats.xp || 0) - (m.penaltyApplied?.xpDeducted || 50));
+              localStorage.setItem('quizme_assessment_stats_v3_revamped', JSON.stringify(parsedStats));
+            }
+          } catch {
+            // ignore
+          }
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    } catch (modErr) {
+      console.warn('Moderation check fallback:', modErr);
+    }
 
     const newComment: QuizComment = {
       id: `comment_${Date.now()}`,
@@ -397,6 +453,44 @@ export const QuizCommentsModal: React.FC<QuizCommentsModalProps> = ({
           onSubmit={handleSubmitComment}
           className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3"
         >
+          {moderationWarning && (
+            <div className="p-3.5 rounded-2xl border-2 border-rose-500/80 bg-rose-50 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 space-y-2 animate-fade-in">
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-rose-600 text-white">
+                      AI Safety Shield • {moderationWarning.severity.toUpperCase()} WARNING
+                    </span>
+                    <span className="text-[11px] font-black text-rose-700 dark:text-rose-300">
+                      Penalty: -{moderationWarning.xpPenalty} XP · -{moderationWarning.coinPenalty} Coins
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold leading-snug">
+                    {moderationWarning.warningMessage}
+                  </p>
+                  <p className="text-[11px] text-rose-700/90 dark:text-rose-300/90">
+                    Moderation report queued for Admin Gmail ({moderationWarning.adminEmail}) • Violations: {moderationWarning.violations.join(', ')}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModerationWarning(null)}
+                  className="p-1 rounded-lg text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/40 cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <a
+                  href={`mailto:${moderationWarning.adminEmail}?subject=${encodeURIComponent(moderationWarning.gmailReportSubject)}&body=${encodeURIComponent(moderationWarning.gmailReportBody)}`}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-black px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition-colors"
+                >
+                  <span>Dispatch Gmail Incident Report to {moderationWarning.adminEmail}</span>
+                </a>
+              </div>
+            </div>
+          )}
+
           <div className="relative">
             <textarea
               rows={2}

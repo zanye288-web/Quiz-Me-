@@ -22,6 +22,7 @@ import { PersonaType, QuizResponse } from '../types/quiz';
 import { IntelligentNotesViewer } from './IntelligentNotesViewer';
 import { IntelligentNotesGeneratorModal } from './IntelligentNotesGeneratorModal';
 import { IntelligentTutorDrawer } from './IntelligentTutorDrawer';
+import { SummaryStudyGuideStudio } from './SummaryStudyGuideStudio';
 import { soundFx } from '../utils/audio';
 
 interface IntelligentNotesHubViewProps {
@@ -305,6 +306,14 @@ export const IntelligentNotesHubView: React.FC<IntelligentNotesHubViewProps> = (
           </div>
         </div>
       </div>
+
+      {/* Sleek AI Summary & Study Guide Generator Studio */}
+      <SummaryStudyGuideStudio
+        persona={persona}
+        onLaunchQuizFromTopic={(topic) => {
+          if (onStartPracticeQuiz) onStartPracticeQuiz(topic);
+        }}
+      />
 
       {/* Main Layout: Note Reader or Library Grid */}
       {selectedNote ? (

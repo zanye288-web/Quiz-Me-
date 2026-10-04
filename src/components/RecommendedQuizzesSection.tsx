@@ -32,6 +32,7 @@ import { QuizHistoryRecord } from './HistoryView';
 import { QuizTrackDetailDrawer, SelectedTrackInfo } from './QuizTrackDetailDrawer';
 import { MascotAvatar, MascotMood } from './MascotAvatar';
 import { soundFx } from '../utils/audio';
+import { getActiveGenericGoal } from './DailyLearningGoalTracker';
 
 interface RecommendedQuizzesSectionProps {
   persona: PersonaType;
@@ -255,6 +256,7 @@ export const RecommendedQuizzesSection: React.FC<RecommendedQuizzesSectionProps>
           },
           recentQuizzes: payloadQuizzes,
           forceRefresh: refresh,
+          learningGoal: getActiveGenericGoal(),
         }),
       });
 
@@ -358,6 +360,14 @@ export const RecommendedQuizzesSection: React.FC<RecommendedQuizzesSectionProps>
       hasInitialFetchedRef.current = true;
       fetchRecommendations(false);
     }
+  }, [fetchRecommendations]);
+
+  useEffect(() => {
+    const onGoalChanged = () => {
+      fetchRecommendations(false);
+    };
+    window.addEventListener('quizme-goal-updated', onGoalChanged);
+    return () => window.removeEventListener('quizme-goal-updated', onGoalChanged);
   }, [fetchRecommendations]);
 
   // Launch a recommendation

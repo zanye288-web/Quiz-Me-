@@ -88,9 +88,17 @@ function isGenericOrPlaceholder(url: string, title: string): boolean {
     'pixel.gif',
     'spacer.gif',
     'beacon',
+    'watermark',
+    'shutterstock',
+    'gettyimages',
+    'istockphoto',
+    '123rf',
+    'dreamstime',
+    'Portrait_Placeholder',
+    'No_image',
   ];
 
-  return badPatterns.some((pat) => lowerUrl.includes(pat) || lowerTitle.includes(pat));
+  return badPatterns.some((pat) => lowerUrl.includes(pat.toLowerCase()) || lowerTitle.includes(pat.toLowerCase()));
 }
 
 /**
@@ -108,7 +116,7 @@ function scoreImageRelevance(
 
   // Exact phrase matching in title/caption
   if (text.includes(fullQuery)) {
-    score += 55;
+    score += 65;
   }
 
   // Count individual word matches
@@ -116,12 +124,12 @@ function scoreImageRelevance(
   for (const word of queryWords) {
     if (word.length >= 3 && text.includes(word.toLowerCase())) {
       matched++;
-      score += 15;
+      score += 18;
     }
   }
 
   if (queryWords.length > 0 && matched === queryWords.length) {
-    score += 35; // Complete topical alignment
+    score += 40; // Complete topical alignment
   }
 
   // Prioritize diagrams, charts, structures, and educational illustrations
@@ -133,9 +141,18 @@ function scoreImageRelevance(
     text.includes('anatomy') ||
     text.includes('formula') ||
     text.includes('map') ||
-    text.includes('chart')
+    text.includes('chart') ||
+    text.includes('cycle') ||
+    text.includes('process') ||
+    text.includes('labeled') ||
+    text.includes('mechanism')
   ) {
-    score += 20;
+    score += 28;
+  }
+
+  // Penalize generic biographies or unrelated administrative files when searching for concepts
+  if (text.includes('politician') || text.includes('actor') || text.includes('album cover') || text.includes('logo')) {
+    score -= 35;
   }
 
   return score;

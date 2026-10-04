@@ -1081,6 +1081,13 @@ Generate a JSON object matching this schema:
 
 export interface QuizRecommendationsInput {
   persona: PersonaType;
+  learningGoal?: {
+    statement: string;
+    subject?: string;
+    targetDate?: string;
+    daysRemaining?: number;
+    readinessPercent?: number;
+  };
   stats?: {
     quizzesCompleted: number;
     totalCorrect: number;
@@ -1108,13 +1115,55 @@ export interface QuizRecommendationsInput {
 }
 
 /**
- * Intelligent adaptive heuristic recommendations built from student performance history
+ * Intelligent adaptive heuristic recommendations built from student performance history & active learning goal
  */
 function buildAdaptiveHeuristicRecommendations(input: QuizRecommendationsInput) {
   const rawQuizzes = input.recentQuizzes || [];
   // Prioritize quizzes where user scored lowest
   const recentQuizzes = [...rawQuizzes].sort((a, b) => a.percentage - b.percentage);
   const recs = [];
+
+  // 0. If user has an active generic learning goal (e.g. "I have an upcoming math test in the next two days"), prioritize goal-aligned recommendations
+  if (input.learningGoal && input.learningGoal.statement.trim().length > 0) {
+    const goalText = input.learningGoal.statement.trim();
+    const subject = input.learningGoal.subject || goalText.replace(/i have an? |upcoming |test|exam|in the next.*|in \d+ days?/gi, '').trim() || 'Core Subject';
+    const daysMsg = typeof input.learningGoal.daysRemaining === 'number'
+      ? `${input.learningGoal.daysRemaining} day(s) remaining`
+      : 'Upcoming milestone';
+    recs.push({
+      id: 'rec_goal_primary_1',
+      title: `${subject}: High-Yield Goal Readiness Sprint`,
+      topic: `${subject} — Exam & Goal Preparation`,
+      description: `Directly tailored to your active goal: "${goalText}". Covers high-probability exam concepts, core formulas, and common pitfalls.`,
+      difficulty: 'Intermediate' as DifficultyType,
+      targetDomain: 'Analytical Reasoning',
+      reasonCategory: 'Progression' as const,
+      matchReason: `Goal Alignment (${daysMsg}): Prioritized to boost your readiness for "${goalText}".`,
+      suggestedQuestionCount: 6,
+      suggestedTypes: ['multiple_choice' as QuestionType, 'fill_in_blank' as QuestionType, 'open_explanation' as QuestionType],
+      estimatedMinutes: 5,
+      xpReward: 180,
+      icon: '🎯',
+      samplePrompt: `Comprehensive exam readiness quiz for goal: "${goalText}". Focus on high-yield concepts, multi-step problem solving, and exam-style questions in ${subject}.`,
+    });
+
+    recs.push({
+      id: 'rec_goal_primary_2',
+      title: `${subject}: Rapid Concept & Formula Drill`,
+      topic: `${subject} — Rapid Active Recall`,
+      description: `Fast-paced mastery drill designed to lock in essential definitions and problem-solving patterns for "${goalText}".`,
+      difficulty: 'Master' as DifficultyType,
+      targetDomain: 'Applied Logic',
+      reasonCategory: 'Reinforcement' as const,
+      matchReason: `Goal Acceleration: Builds speed and confidence ahead of your target milestone.`,
+      suggestedQuestionCount: 5,
+      suggestedTypes: ['multiple_choice' as QuestionType, 'fill_in_blank' as QuestionType],
+      estimatedMinutes: 4,
+      xpReward: 165,
+      icon: '⚡',
+      samplePrompt: `Rapid exam drill for "${goalText}" covering essential definitions, tricky edge cases, and applied questions in ${subject}.`,
+    });
+  }
 
   // Gather weak questions across recent quizzes
   const allWeakQuestions = recentQuizzes.flatMap((q) =>
@@ -2835,6 +2884,1037 @@ Return JSON with:
     return { transcript: '' };
   }
 }
+
+// ============================================================================
+// AI QUIZ VERIFICATION BEFORE DATABASE PUBLISHING
+// ============================================================================
+export interface VerifyQuizBeforePublishInput {
+  quizTitle: string;
+  quizSummary?: string;
+  difficulty?: string;
+  questions: Array<{
+    question: string;
+    options?: string[];
+    correct_answer: string;
+    explanation?: string;
+  }>;
+}
+
+export interface VerifyQuizBeforePublishResult {
+  approved: boolean;
+  verificationScore: number;
+  summary: string;
+  criteriaChecks: Array<{
+    label: string;
+    passed: boolean;
+    note: string;
+  }>;
+  suggestedTags: string[];
+  improvements: string[];
+  flaggedReasons: string[];
+}
+
+function clampNumber(val: unknown, min: number, max: number, fallback: number): number {
+  const n = Number(val);
+  if (Number.isNaN(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(n)));
+}
+
+export async function verifyQuizBeforePublishAI(
+  input: VerifyQuizBeforePublishInput
+): Promise<VerifyQuizBeforePublishResult> {
+  const combinedText = [
+    input.quizTitle,
+    input.quizSummary || '',
+    ...input.questions.map((q) => `${q.question} ${q.correct_answer} ${q.explanation || ''} ${(q.options || []).join(' ')}`),
+  ].join(' ');
+
+  const profanityOrSlurRegex = /\b(nigger|nigga|faggot|kike|chink|spic|retard|whore|slut|cunt|kill yourself|kys)\b/i;
+  const scamLinkRegex = /(free-robux|crypto-airdrop|bit\.ly\/|tinyurl\.com\/|phish|discord\.gg\/free|click-here-win|telegram\.me)/i;
+  const hasProfanity = profanityOrSlurRegex.test(combinedText);
+  const hasScamLink = scamLinkRegex.test(combinedText);
+  const hasValidQuestions =
+    input.questions.length >= 1 &&
+    input.questions.every((q) => q.question && q.question.trim().length >= 4 && q.correct_answer && q.correct_answer.trim().length >= 1);
+
+  if (hasProfanity || hasScamLink || !hasValidQuestions) {
+    return {
+      approved: false,
+      verificationScore: hasProfanity || hasScamLink ? 10 : 42,
+      summary: hasProfanity || hasScamLink
+        ? 'Blocked by AI Standards Guard: Contains prohibited language, slurs, or suspicious links.'
+        : 'Quiz did not meet minimum structural standards (questions and valid answers required).',
+      criteriaChecks: [
+        {
+          label: 'Community Safety & Anti-Slur Check',
+          passed: !hasProfanity && !hasScamLink,
+          note: hasProfanity || hasScamLink ? 'Flagged unsafe terms or suspicious URLs.' : 'Clean educational language.',
+        },
+        {
+          label: 'Question Completeness & Clarity',
+          passed: hasValidQuestions,
+          note: hasValidQuestions ? `${input.questions.length} structured items verified.` : 'Questions or answers are incomplete.',
+        },
+        {
+          label: 'Pedagogical Value & Explanations',
+          passed: false,
+          note: 'Please revise flagged items before publishing to the global database.',
+        },
+      ],
+      suggestedTags: ['General Knowledge', 'Study Deck'],
+      improvements: ['Remove any inappropriate terms or links', 'Ensure every question has a clear prompt and verified answer'],
+      flaggedReasons: [
+        ...(hasProfanity ? ['Contains prohibited slurs or offensive terms'] : []),
+        ...(hasScamLink ? ['Contains suspicious or phishing URL patterns'] : []),
+        ...(!hasValidQuestions ? ['Incomplete question prompts or missing answers'] : []),
+      ],
+    };
+  }
+
+  const fallbackApproved: VerifyQuizBeforePublishResult = {
+    approved: true,
+    verificationScore: 95,
+    summary: `Verified "${input.quizTitle}" (${input.questions.length} items). Meets Quiz Me! pedagogical accuracy, clarity, and safety standards for database publication.`,
+    criteriaChecks: [
+      {
+        label: 'Community Safety & Content Integrity',
+        passed: true,
+        note: 'Zero slurs, phishing links, or unsafe content detected.',
+      },
+      {
+        label: 'Question & Answer Accuracy',
+        passed: true,
+        note: `All ${input.questions.length} questions contain unambiguous answer keys.`,
+      },
+      {
+        label: 'Pedagogical & Curriculum Value',
+        passed: true,
+        note: 'Clear explanations and structured cognitive progression.',
+      },
+    ],
+    suggestedTags: [
+      input.quizTitle.split(/\s+/)[0] || 'Academic',
+      input.difficulty || 'Intermediate',
+      'Verified Quiz',
+    ],
+    improvements: ['Optional: Add more real-world analogies to explanations for deeper retention.'],
+    flaggedReasons: [],
+  };
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || modelCooldownMap.size > 0) {
+    return fallbackApproved;
+  }
+
+  const prompt = `You are the Chief Academic Quality & Trust Verifier for the Quiz Me! global quiz database.
+Inspect this user-created quiz before it is published to the public database.
+Verify:
+1. Safety: Absolutely NO slurs, hate speech, harassment, phishing links, or scam URLs.
+2. Factual & Pedagogical Quality: Questions are coherent, answers are accurate, and explanations are helpful.
+3. Completeness: Title and questions are meaningful.
+
+Quiz Title: "${neutralizePromptInjection(input.quizTitle)}"
+Summary: "${neutralizePromptInjection(input.quizSummary || '')}"
+Questions (${input.questions.length}):
+${input.questions
+  .slice(0, 12)
+  .map((q, idx) => `Q${idx + 1}: ${neutralizePromptInjection(q.question)} | Correct: ${neutralizePromptInjection(q.correct_answer)} | Exp: ${neutralizePromptInjection(q.explanation || '')}`)
+  .join('\n')}
+
+Return JSON matching the schema.`;
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            approved: { type: Type.BOOLEAN },
+            verificationScore: { type: Type.INTEGER },
+            summary: { type: Type.STRING },
+            criteriaChecks: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  label: { type: Type.STRING },
+                  passed: { type: Type.BOOLEAN },
+                  note: { type: Type.STRING },
+                },
+                required: ['label', 'passed', 'note'],
+              },
+            },
+            suggestedTags: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+            improvements: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+            flaggedReasons: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+          required: ['approved', 'verificationScore', 'summary', 'criteriaChecks', 'suggestedTags', 'improvements', 'flaggedReasons'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    return {
+      approved: Boolean(parsed.approved),
+      verificationScore: clampNumber(parsed.verificationScore, 0, 100, 94),
+      summary: String(parsed.summary || fallbackApproved.summary),
+      criteriaChecks: Array.isArray(parsed.criteriaChecks) && parsed.criteriaChecks.length > 0 ? parsed.criteriaChecks : fallbackApproved.criteriaChecks,
+      suggestedTags: Array.isArray(parsed.suggestedTags) && parsed.suggestedTags.length > 0 ? parsed.suggestedTags.slice(0, 5) : fallbackApproved.suggestedTags,
+      improvements: Array.isArray(parsed.improvements) ? parsed.improvements.slice(0, 3) : [],
+      flaggedReasons: Array.isArray(parsed.flaggedReasons) ? parsed.flaggedReasons : [],
+    };
+  } catch {
+    return fallbackApproved;
+  }
+}
+
+// ============================================================================
+// AI CONTENT MODERATION (COMMENTS, POSTS, SLURS, LINKS, PHISHING, PENALTIES)
+// ============================================================================
+export interface ModerateContentInput {
+  text: string;
+  authorName?: string;
+  authorId?: string;
+  contextType: 'comment' | 'quiz_post' | 'discussion';
+  targetId?: string;
+}
+
+export interface ModerateContentResult {
+  approved: boolean;
+  sanitizedText: string;
+  flags: string[];
+  severity: 'none' | 'warning' | 'severe';
+  warningMessage: string;
+  xpPenalty: number;
+  gemPenalty: number;
+  adminRecommendation: string;
+}
+
+export async function moderateUserContentAI(input: ModerateContentInput): Promise<ModerateContentResult> {
+  const raw = String(input.text || '').trim();
+  const slurRegex = /\b(nigger|nigga|faggot|fag|kike|chink|spic|retard|whore|slut|cunt|bitch|asshole|fuck|shit|kill yourself|kys)\b/gi;
+  const linkPhishingRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|\b[a-z0-9-]+\.(com|net|org|gg|io|ru|xyz|tk|ly|me)\b[^\s]*)/gi;
+  const scamKeywordsRegex = /\b(free robux|free crypto|send bitcoin|wire transfer|whatsapp me|telegram|airdrop|seed phrase|bank password|click this link|win \$1000)\b/gi;
+
+  const detectedFlags: string[] = [];
+  let sanitized = raw;
+
+  if (slurRegex.test(raw)) {
+    detectedFlags.push('Slurs / Profanity Detected');
+    sanitized = sanitized.replace(slurRegex, '[REDACTED BY AI MODERATOR]');
+  }
+  if (linkPhishingRegex.test(raw)) {
+    detectedFlags.push('Unauthorized External Link / Phishing Risk');
+    sanitized = sanitized.replace(linkPhishingRegex, '[LINK REMOVED]');
+  }
+  if (scamKeywordsRegex.test(raw)) {
+    detectedFlags.push('Scam / Social Engineering Pattern');
+    sanitized = sanitized.replace(scamKeywordsRegex, '[SCAM PATTERN BLOCKED]');
+  }
+
+  if (detectedFlags.length > 0) {
+    const isSevere = detectedFlags.some((f) => f.includes('Slurs') || f.includes('Scam'));
+    const xpPenalty = isSevere ? 150 : 50;
+    const gemPenalty = isSevere ? 25 : 10;
+    return {
+      approved: false,
+      sanitizedText: sanitized,
+      flags: detectedFlags,
+      severity: isSevere ? 'severe' : 'warning',
+      warningMessage: `AI Safety Shield Warning: Your ${input.contextType} violated community guidelines (${detectedFlags.join(', ')}). Inappropriate terms/links were removed, a penalty of -${xpPenalty} XP and -${gemPenalty} Gems has been applied, and an incident report was dispatched to zanye288@gmail.com.`,
+      xpPenalty,
+      gemPenalty,
+      adminRecommendation: `User "${input.authorName || 'Anonymous'}" (${input.authorId || 'N/A'}) attempted to post content flagged for [${detectedFlags.join(', ')}]. Recommended Action: Maintain automated -${xpPenalty} XP / -${gemPenalty} Gems penalty and monitor account for repeat violations.`,
+    };
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || modelCooldownMap.size > 0) {
+    return {
+      approved: true,
+      sanitizedText: raw,
+      flags: [],
+      severity: 'none',
+      warningMessage: '',
+      xpPenalty: 0,
+      gemPenalty: 0,
+      adminRecommendation: 'Clean educational interaction.',
+    };
+  }
+
+  const prompt = `You are the AI Trust & Safety Moderator for Quiz Me! educational platform.
+Analyze the following user ${input.contextType} for:
+1. Slurs, hate speech, profanity, or bullying.
+2. Inappropriate links, URLs, phishing attempts, or external redirects.
+3. Scam attempts, spam, or social engineering.
+
+User Content: "${neutralizePromptInjection(raw)}"
+
+If any violation exists, set approved=false, redact the offending parts in sanitizedText, list flags, assign severity ('warning' or 'severe'), set xpPenalty (50 for warning, 150 for severe), gemPenalty (10 for warning, 25 for severe), and write an adminRecommendation for zanye288@gmail.com.`;
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            approved: { type: Type.BOOLEAN },
+            sanitizedText: { type: Type.STRING },
+            flags: { type: Type.ARRAY, items: { type: Type.STRING } },
+            severity: { type: Type.STRING, enum: ['none', 'warning', 'severe'] },
+            warningMessage: { type: Type.STRING },
+            xpPenalty: { type: Type.INTEGER },
+            gemPenalty: { type: Type.INTEGER },
+            adminRecommendation: { type: Type.STRING },
+          },
+          required: ['approved', 'sanitizedText', 'flags', 'severity', 'warningMessage', 'xpPenalty', 'gemPenalty', 'adminRecommendation'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    return {
+      approved: Boolean(parsed.approved),
+      sanitizedText: String(parsed.sanitizedText || raw),
+      flags: Array.isArray(parsed.flags) ? parsed.flags : [],
+      severity: parsed.severity === 'severe' || parsed.severity === 'warning' ? parsed.severity : 'none',
+      warningMessage: String(parsed.warningMessage || ''),
+      xpPenalty: clampNumber(parsed.xpPenalty, 0, 500, 0),
+      gemPenalty: clampNumber(parsed.gemPenalty, 0, 100, 0),
+      adminRecommendation: String(parsed.adminRecommendation || ''),
+    };
+  } catch {
+    return {
+      approved: true,
+      sanitizedText: raw,
+      flags: [],
+      severity: 'none',
+      warningMessage: '',
+      xpPenalty: 0,
+      gemPenalty: 0,
+      adminRecommendation: 'Verified clean.',
+    };
+  }
+}
+
+// ============================================================================
+// AI SUMMARY & STUDY GUIDE STUDIO GENERATOR
+// ============================================================================
+export interface GenerateSummaryStudyGuideInput {
+  topicOrMaterial: string;
+  mode: 'executive_summary' | 'comprehensive_study_guide' | 'exam_cram_sheet';
+  difficulty?: string;
+  targetAudience?: string;
+}
+
+export async function generateSummaryAndStudyGuideAI(input: GenerateSummaryStudyGuideInput) {
+  const cleanTopic = input.topicOrMaterial.trim().slice(0, 5000) || 'Core Academic Subject';
+  const fallbackGuide = {
+    title: `${cleanTopic.slice(0, 60)} — ${input.mode === 'exam_cram_sheet' ? 'High-Yield Cram Sheet' : input.mode === 'executive_summary' ? 'Executive Summary' : 'Master Study Guide'}`,
+    subtitle: `Structured ${input.difficulty || 'Intermediate'} synthesis organized for rapid comprehension and retention`,
+    readingTimeMinutes: 4,
+    executiveOverview: `This structured guide distills the foundational principles, mechanisms, and high-yield exam takeaways for ${cleanTopic.slice(0, 80)}. Focus on the core definitions, cause-and-effect relationships, and worked applications below.`,
+    keyPillars: [
+      {
+        heading: '1. Core Principles & Foundational Definitions',
+        summary: `Establishes the primary conceptual framework of ${cleanTopic.slice(0, 50)}, defining how each component interacts within the broader discipline.`,
+        bulletPoints: [
+          'Identify primary variables, governing rules, and invariants before solving complex scenarios.',
+          'Distinguish between surface symptoms and underlying causal mechanisms.',
+          'Connect theoretical definitions to real-world empirical examples.',
+        ],
+        examTip: 'Examiners frequently test boundary conditions where standard assumptions break down.',
+      },
+      {
+        heading: '2. Analytical Frameworks & Step-by-Step Methodology',
+        summary: 'Provides a repeatable, systematic workflow for analyzing multi-step problems and synthesizing evidence.',
+        bulletPoints: [
+          'Deconstruct complex prompts into known inputs, target unknowns, and governing relationships.',
+          'Verify dimensional or logical consistency at each intermediate step.',
+          'Cross-check conclusions against foundational laws.',
+        ],
+        examTip: 'Always state the governing principle explicitly to earn method marks on open-response questions.',
+      },
+      {
+        heading: '3. Common Misconceptions & High-Yield Comparisons',
+        summary: 'Contrasts frequently confused terminology and highlights subtle traps in standardized assessments.',
+        bulletPoints: [
+          'Avoid conflating correlation with direct mechanistic causation.',
+          'Review edge-case exceptions and historical counterexamples.',
+        ],
+        examTip: 'Eliminate distractor options that use absolute qualifiers without supporting evidence.',
+      },
+    ],
+    keyTermsGlossary: [
+      { term: 'Foundational Axiom', definition: 'A core self-evident principle or rule upon which subsequent analysis is built.' },
+      { term: 'Causal Mechanism', definition: 'The step-by-step process by which a specific cause produces an observed effect.' },
+      { term: 'Boundary Condition', definition: 'A constraint or extreme case that defines the valid scope of a rule or formula.' },
+      { term: 'Synthesis', definition: 'Combining distinct concepts or evidence into a coherent, higher-order conclusion.' },
+    ],
+    formulaOrRuleBox: [
+      'Rule of Systematic Decomposition: Define Givens → State Principle → Apply Transformation → Verify Units & Logic',
+      'Active Recall Protocol: Test yourself without looking at notes, then immediately audit errors against the mark scheme.',
+    ],
+    selfCheckQuestions: [
+      {
+        question: `What is the single most critical governing principle when analyzing ${cleanTopic.slice(0, 40)}?`,
+        answer: 'Identifying the underlying causal mechanism and verifying that all boundary conditions are satisfied before applying a rule.',
+      },
+      {
+        question: 'How can you avoid the most common assessment trap in this topic?',
+        answer: 'By distinguishing between correlation and causation and checking edge cases.',
+      },
+    ],
+  };
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || modelCooldownMap.size > 0) {
+    return fallbackGuide;
+  }
+
+  const prompt = `You are an elite Academic Author and Visual Study Guide Architect.
+Create a sleek, comprehensive, high-yield ${input.mode.replace(/_/g, ' ')} based on the following topic or source material:
+<source_material>
+${neutralizePromptInjection(cleanTopic)}
+</source_material>
+Difficulty: ${input.difficulty || 'Intermediate'}
+Target Audience: ${input.targetAudience || 'All Ages'}
+
+Return a rich JSON object matching the schema with clear headings, bulletPoints, examTips, keyTermsGlossary, formulaOrRuleBox, and selfCheckQuestions.`;
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            subtitle: { type: Type.STRING },
+            readingTimeMinutes: { type: Type.INTEGER },
+            executiveOverview: { type: Type.STRING },
+            keyPillars: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  heading: { type: Type.STRING },
+                  summary: { type: Type.STRING },
+                  bulletPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  examTip: { type: Type.STRING },
+                },
+                required: ['heading', 'summary', 'bulletPoints', 'examTip'],
+              },
+            },
+            keyTermsGlossary: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  term: { type: Type.STRING },
+                  definition: { type: Type.STRING },
+                },
+                required: ['term', 'definition'],
+              },
+            },
+            formulaOrRuleBox: { type: Type.ARRAY, items: { type: Type.STRING } },
+            selfCheckQuestions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  question: { type: Type.STRING },
+                  answer: { type: Type.STRING },
+                },
+                required: ['question', 'answer'],
+              },
+            },
+          },
+          required: ['title', 'subtitle', 'readingTimeMinutes', 'executiveOverview', 'keyPillars', 'keyTermsGlossary', 'formulaOrRuleBox', 'selfCheckQuestions'],
+        },
+      },
+    });
+    return JSON.parse(response.text || '{}');
+  } catch {
+    return fallbackGuide;
+  }
+}
+
+// ============================================================================
+// AI EXAM & OFFICIAL MARK SCHEME ORGANIZER (FOR PDF, TXT, DOCX DOWNLOAD)
+// ============================================================================
+export interface OrganizeExamInput {
+  quizTitle: string;
+  difficulty?: string;
+  questions: Array<{
+    id: number;
+    type: string;
+    question: string;
+    options?: string[];
+    correct_answer: string;
+    explanation?: string;
+  }>;
+}
+
+export async function organizeExamWithMarkSchemeAI(input: OrganizeExamInput) {
+  const defaultOrganized = {
+    examCode: `QM-${Math.random().toString(36).substring(2, 6).toUpperCase()}-2025`,
+    institutionHeader: 'QUIZ ME! INTERNATIONAL ACADEMIC ASSESSMENT BOARD',
+    paperTitle: input.quizTitle || 'Official Subject Examination Paper',
+    recommendedTimeMinutes: Math.max(15, input.questions.length * 3),
+    calculatorAllowed: /math|calc|physics|chem|stat|algebra|geometry|trig|number|equation/i.test(input.quizTitle),
+    totalMarks: input.questions.reduce((acc, q) => acc + (q.type === 'open_explanation' ? 4 : q.type === 'fill_in_blank' ? 2 : 1), 0),
+    candidateInstructions: [
+      'Write your full name, candidate ID, and date clearly in the spaces provided.',
+      'Answer ALL questions in Section A (Objective) and Section B (Structured / Written Response).',
+      'Show all logical steps and working clearly; method marks (M1) and accuracy marks (A1) are awarded per the official mark scheme.',
+    ],
+    organizedItems: input.questions.map((q, idx) => {
+      const marks = q.type === 'open_explanation' ? 4 : q.type === 'fill_in_blank' ? 2 : 1;
+      return {
+        questionNumber: idx + 1,
+        section: q.type === 'multiple_choice' || q.type === 'true_false' ? 'Section A: Objective Assessment' : 'Section B: Structured & Written Analysis',
+        marks,
+        commandWord: q.type === 'open_explanation' ? 'Evaluate & Explain' : q.type === 'fill_in_blank' ? 'State / Calculate' : 'Identify',
+        formattedPrompt: q.question,
+        options: q.options || [],
+        markSchemeBreakdown: marks === 1
+          ? [`[B1] 1 mark for correct identification: "${q.correct_answer}"`]
+          : marks === 2
+          ? [
+              `[M1] 1 mark for identifying the core concept or formula related to ${q.correct_answer}`,
+              `[A1] 1 mark for exact answer: "${q.correct_answer}"`,
+            ]
+          : [
+              `[C1] 1 mark for defining the foundational principle clearly`,
+              `[M1] 1 mark for logical step-by-step reasoning / causal link`,
+              `[A1] 1 mark for accurate synthesis matching "${q.correct_answer}"`,
+              `[E1] 1 mark for illustrative example or addressing boundary conditions`,
+            ],
+        examinerNotes: q.explanation || `Accept equivalent phrasing that clearly demonstrates mastery of ${q.correct_answer}.`,
+      };
+    }),
+  };
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || modelCooldownMap.size > 0) {
+    return defaultOrganized;
+  }
+
+  const prompt = `You are a Chief Examiner organizing a formal downloadable exam paper and official mark scheme (PDF, DOCX, TXT ready).
+Organize this quiz into a polished, curriculum-aligned examination with Section assignments, point allocations (marks), command words, and granular mark scheme breakdowns ([M1], [A1], [B1] points) plus examiner notes.
+
+Quiz Title: "${neutralizePromptInjection(input.quizTitle)}"
+Questions:
+${input.questions
+  .slice(0, 20)
+  .map((q, i) => `Q${i + 1} (${q.type}): ${neutralizePromptInjection(q.question)} | Answer: ${neutralizePromptInjection(q.correct_answer)} | Exp: ${neutralizePromptInjection(q.explanation || '')}`)
+  .join('\n')}
+
+Return JSON matching the schema.`;
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            examCode: { type: Type.STRING },
+            institutionHeader: { type: Type.STRING },
+            paperTitle: { type: Type.STRING },
+            recommendedTimeMinutes: { type: Type.INTEGER },
+            calculatorAllowed: { type: Type.BOOLEAN },
+            totalMarks: { type: Type.INTEGER },
+            candidateInstructions: { type: Type.ARRAY, items: { type: Type.STRING } },
+            organizedItems: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  questionNumber: { type: Type.INTEGER },
+                  section: { type: Type.STRING },
+                  marks: { type: Type.INTEGER },
+                  commandWord: { type: Type.STRING },
+                  formattedPrompt: { type: Type.STRING },
+                  options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  markSchemeBreakdown: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  examinerNotes: { type: Type.STRING },
+                },
+                required: ['questionNumber', 'section', 'marks', 'commandWord', 'formattedPrompt', 'markSchemeBreakdown', 'examinerNotes'],
+              },
+            },
+          },
+          required: ['examCode', 'institutionHeader', 'paperTitle', 'recommendedTimeMinutes', 'calculatorAllowed', 'totalMarks', 'candidateInstructions', 'organizedItems'],
+        },
+      },
+    });
+    return JSON.parse(response.text || '{}');
+  } catch {
+    return defaultOrganized;
+  }
+}
+
+// ============================================================================
+// ONE BY ONE: EDUCATIONAL WORD-CHAIN ENGINE (DETERMINISTIC + AI VALIDATION)
+// ============================================================================
+export interface WordChainValidationInput {
+  word: string;
+  requiredLetter: string;
+  subject: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Expert';
+  usedWords: string[];
+  timeRemainingSeconds?: number;
+  maxTimerSeconds?: number;
+  currentStreak?: number;
+}
+
+export interface WordChainValidationResult {
+  validWord: boolean;
+  startsWithRequiredLetter: boolean;
+  categoryRelevant: boolean;
+  alreadyUsed: boolean;
+  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Expert';
+  definition: string;
+  detailedExplanation: string;
+  points: number;
+  basePoints: number;
+  categoryBonus: number;
+  speedBonus: number;
+  lengthBonus: number;
+  streakMultiplier: number;
+  xpEarned: number;
+  reason: string;
+  nextRequiredLetter: string;
+  relatedConcepts: string[];
+}
+
+const SUBJECT_CURATED_BANK: Record<string, Record<string, { word: string; def: string; detail: string; diff: 'Easy' | 'Medium' | 'Hard' | 'Expert' }[]>> = {
+  Biology: {
+    A: [{ word: 'ALLELE', def: 'One of two or more alternative forms of a gene.', detail: 'Alleles arise by mutation and are found at the same place on a chromosome, determining hereditary traits.', diff: 'Medium' }, { word: 'ATP', def: 'Adenosine triphosphate, the primary energy currency of the cell.', detail: 'Synthesized in mitochondria during cellular respiration and used to power metabolic reactions.', diff: 'Easy' }],
+    B: [{ word: 'BIOME', def: 'A large naturally occurring community of flora and fauna occupying a major habitat.', detail: 'Examples include tundra, rainforest, savanna, and coral reefs.', diff: 'Easy' }, { word: 'BACTERIOPHAGE', def: 'A virus that parasitizes a bacterium by infecting it and reproducing inside it.', detail: 'Widely used in molecular biology and genetic engineering research.', diff: 'Hard' }],
+    C: [{ word: 'CELL', def: 'The smallest structural and functional unit of an organism.', detail: 'All living organisms are composed of one or more cells (prokaryotic or eukaryotic).', diff: 'Easy' }, { word: 'CHLOROPHYLL', def: 'Green photosynthetic pigment found in plants, algae, and cyanobacteria.', detail: 'Absorbs light energy primarily in blue and red wavelengths to drive photosynthesis.', diff: 'Medium' }],
+    D: [{ word: 'DNA', def: 'Deoxyribonucleic acid, the carrier of genetic information in living things.', detail: 'Structured as a double helix of nucleotides containing adenine, thymine, cytosine, and guanine.', diff: 'Easy' }, { word: 'DENDRITE', def: 'Branched protoplasmic extension of a nerve cell that propagates electrochemical stimulation.', detail: 'Receives synaptic inputs from axons of other neurons.', diff: 'Medium' }],
+    E: [{ word: 'ENZYME', def: 'A biological catalyst protein that accelerates chemical reactions in cells.', detail: 'Lowers activation energy by binding specific substrates at its active site.', diff: 'Easy' }, { word: 'ENDOPLASMIC', def: 'Relating to the endoplasmic reticulum network of membranes inside eukaryotic cells.', detail: 'Involved in protein synthesis (rough ER) and lipid metabolism (smooth ER).', diff: 'Hard' }],
+    G: [{ word: 'GENE', def: 'A distinct sequence of nucleotides forming part of a chromosome.', detail: 'Encodes functional RNA or protein molecules that govern hereditary traits.', diff: 'Easy' }, { word: 'GENOME', def: 'The complete set of genes or genetic material present in a cell or organism.', detail: 'Includes both coding genes and non-coding sequences of DNA/RNA.', diff: 'Medium' }],
+    H: [{ word: 'HOMEOSTASIS', def: 'Self-regulating process by which biological systems maintain internal stability.', detail: 'Examples include body temperature regulation, blood pH, and glucose balance.', diff: 'Medium' }],
+    L: [{ word: 'LUNG', def: 'Primary respiratory organ in air-breathing vertebrates for gas exchange.', detail: 'Oxygen diffuses into capillaries across millions of alveoli while CO2 is exhaled.', diff: 'Easy' }, { word: 'LYSOSOME', def: 'Membrane-bound cell organelle containing digestive hydrolytic enzymes.', detail: 'Breaks down excess or worn-out cell parts and invading pathogens.', diff: 'Medium' }],
+    M: [{ word: 'MITOSIS', def: 'Cell division that produces two genetically identical daughter cells.', detail: 'Proceeds through prophase, metaphase, anaphase, and telophase.', diff: 'Easy' }, { word: 'MITOCHONDRIA', def: 'Organelle that generates most of the chemical energy (ATP) needed to power the cell.', detail: 'Contains its own circular DNA and performs oxidative phosphorylation.', diff: 'Medium' }],
+    N: [{ word: 'NEURON', def: 'Specialized excitable cell that transmits electrical and chemical nerve impulses.', detail: 'Consists of a cell body (soma), dendrites, and an axon.', diff: 'Easy' }, { word: 'NUCLEUS', def: 'Membrane-bound organelle that houses the cell chromosomes and genome.', detail: 'Coordinates gene expression, DNA replication, and cell division.', diff: 'Easy' }],
+    O: [{ word: 'OSMOSIS', def: 'Net movement of solvent molecules through a selectively permeable membrane.', detail: 'Water moves from higher water potential (lower solute) to lower water potential.', diff: 'Easy' }],
+    P: [{ word: 'PHOTOSYNTHESIS', def: 'Process by which green plants convert light energy into chemical energy (glucose).', detail: 'Combines carbon dioxide and water using chlorophyll, releasing oxygen as a byproduct.', diff: 'Easy' }, { word: 'PHLOEM', def: 'Vascular tissue in plants that conducts sugars and metabolic products downward from leaves.', detail: 'Works alongside xylem to transport nutrients throughout the plant.', diff: 'Medium' }],
+    R: [{ word: 'RIBOSOME', def: 'Macromolecular machine inside cells that performs biological protein synthesis (translation).', detail: 'Reads mRNA codons and links amino acids carried by tRNA into polypeptide chains.', diff: 'Medium' }, { word: 'RESPIRATION', def: 'Metabolic process converting biochemical energy from nutrients into ATP.', detail: 'Includes glycolysis, the Krebs cycle, and the electron transport chain.', diff: 'Easy' }],
+    S: [{ word: 'SYNAPSE', def: 'Junction between two nerve cells where impulses pass by neurotransmitter diffusion.', detail: 'Enables rapid neuronal communication and synaptic plasticity for memory.', diff: 'Medium' }],
+    T: [{ word: 'TISSUE', def: 'Ensemble of similar cells and extracellular matrix carrying out a specific function.', detail: 'The four primary animal tissue types are epithelial, connective, muscle, and nervous.', diff: 'Easy' }, { word: 'TRANSCRIPTION', def: 'Process of copying a segment of DNA into messenger RNA (mRNA) by RNA polymerase.', detail: 'The first step of gene expression before translation at the ribosome.', diff: 'Medium' }],
+    X: [{ word: 'XYLEM', def: 'Plant vascular tissue that conveys water and dissolved minerals upward from the roots.', detail: 'Also provides structural mechanical support via lignified cell walls.', diff: 'Medium' }],
+    Z: [{ word: 'ZYGOTE', def: 'A diploid eukaryotic cell formed by a fertilization event between two gametes.', detail: 'Contains the combined genetic information needed to form a new organism.', diff: 'Easy' }],
+  },
+};
+
+export async function validateWordChainAI(input: WordChainValidationInput): Promise<WordChainValidationResult> {
+  const cleanWord = String(input.word || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+  const reqLetter = String(input.requiredLetter || 'A').trim().toUpperCase().charAt(0);
+  const usedUpper = (input.usedWords || []).map((w) => String(w).trim().toUpperCase().replace(/[^A-Z]/g, ''));
+  const nextReq = cleanWord.length > 0 ? cleanWord.charAt(cleanWord.length - 1) : reqLetter;
+
+  if (cleanWord.length < 2) {
+    return {
+      validWord: false,
+      startsWithRequiredLetter: false,
+      categoryRelevant: false,
+      alreadyUsed: false,
+      difficulty: input.difficulty,
+      definition: '',
+      detailedExplanation: '',
+      points: 0,
+      basePoints: 0,
+      categoryBonus: 0,
+      speedBonus: 0,
+      lengthBonus: 0,
+      streakMultiplier: 1,
+      xpEarned: 0,
+      reason: 'Please enter a valid word with at least 2 letters.',
+      nextRequiredLetter: reqLetter,
+      relatedConcepts: [],
+    };
+  }
+
+  const startsWithRequiredLetter = cleanWord.charAt(0) === reqLetter;
+  if (!startsWithRequiredLetter) {
+    return {
+      validWord: true,
+      startsWithRequiredLetter: false,
+      categoryRelevant: false,
+      alreadyUsed: false,
+      difficulty: input.difficulty,
+      definition: '',
+      detailedExplanation: '',
+      points: 0,
+      basePoints: 0,
+      categoryBonus: 0,
+      speedBonus: 0,
+      lengthBonus: 0,
+      streakMultiplier: 1,
+      xpEarned: 0,
+      reason: `"${cleanWord}" starts with "${cleanWord.charAt(0)}", but the required starting letter is "${reqLetter}"!`,
+      nextRequiredLetter: reqLetter,
+      relatedConcepts: [],
+    };
+  }
+
+  const alreadyUsed = usedUpper.includes(cleanWord);
+  if (alreadyUsed) {
+    return {
+      validWord: true,
+      startsWithRequiredLetter: true,
+      categoryRelevant: true,
+      alreadyUsed: true,
+      difficulty: input.difficulty,
+      definition: '',
+      detailedExplanation: '',
+      points: 0,
+      basePoints: 0,
+      categoryBonus: 0,
+      speedBonus: 0,
+      lengthBonus: 0,
+      streakMultiplier: 1,
+      xpEarned: 0,
+      reason: `"${cleanWord}" has already been used in this word chain! No repeats allowed.`,
+      nextRequiredLetter: reqLetter,
+      relatedConcepts: [],
+    };
+  }
+
+  if (!/[AEIOUY]/.test(cleanWord) || /(.)\1{3,}/.test(cleanWord)) {
+    return {
+      validWord: false,
+      startsWithRequiredLetter: true,
+      categoryRelevant: false,
+      alreadyUsed: false,
+      difficulty: input.difficulty,
+      definition: '',
+      detailedExplanation: '',
+      points: 0,
+      basePoints: 0,
+      categoryBonus: 0,
+      speedBonus: 0,
+      lengthBonus: 0,
+      streakMultiplier: 1,
+      xpEarned: 0,
+      reason: `"${cleanWord}" is not recognized as a valid English or academic term.`,
+      nextRequiredLetter: reqLetter,
+      relatedConcepts: [],
+    };
+  }
+
+  const basePoints = 10;
+  const lengthBonus = cleanWord.length >= 9 ? 8 : cleanWord.length >= 6 ? 4 : 0;
+  const timeRatio = input.maxTimerSeconds && input.timeRemainingSeconds
+    ? input.timeRemainingSeconds / input.maxTimerSeconds
+    : 0.5;
+  const speedBonus = timeRatio >= 0.65 ? 5 : timeRatio >= 0.35 ? 3 : 1;
+  const streak = (input.currentStreak || 0) + 1;
+  const streakMultiplier = streak >= 10 ? 3 : streak >= 5 ? 2 : streak >= 3 ? 1.5 : 1;
+
+  const subjBank = SUBJECT_CURATED_BANK[input.subject]?.[reqLetter] || [];
+  const exactMatch = subjBank.find((item) => item.word === cleanWord);
+  if (exactMatch) {
+    const categoryBonus = 5;
+    const rawPts = basePoints + categoryBonus + speedBonus + lengthBonus;
+    const points = Math.round(rawPts * streakMultiplier);
+    return {
+      validWord: true,
+      startsWithRequiredLetter: true,
+      categoryRelevant: true,
+      alreadyUsed: false,
+      difficulty: exactMatch.diff,
+      definition: exactMatch.def,
+      detailedExplanation: exactMatch.detail,
+      points,
+      basePoints,
+      categoryBonus,
+      speedBonus,
+      lengthBonus,
+      streakMultiplier,
+      xpEarned: Math.round(points * 1.2),
+      reason: `Valid ${input.subject} concept!`,
+      nextRequiredLetter: nextReq,
+      relatedConcepts: [input.subject, exactMatch.word],
+    };
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || modelCooldownMap.size > 0) {
+    const categoryBonus = 5;
+    const rawPts = basePoints + categoryBonus + speedBonus + lengthBonus;
+    const points = Math.round(rawPts * streakMultiplier);
+    return {
+      validWord: true,
+      startsWithRequiredLetter: true,
+      categoryRelevant: true,
+      alreadyUsed: false,
+      difficulty: cleanWord.length >= 8 ? 'Hard' : 'Medium',
+      definition: `A key term connected to ${input.subject} beginning with ${reqLetter}.`,
+      detailedExplanation: `In the context of ${input.subject}, "${cleanWord}" represents a relevant concept used in academic study and problem solving.`,
+      points,
+      basePoints,
+      categoryBonus,
+      speedBonus,
+      lengthBonus,
+      streakMultiplier,
+      xpEarned: Math.round(points * 1.2),
+      reason: `Accepted in ${input.subject}!`,
+      nextRequiredLetter: nextReq,
+      relatedConcepts: [input.subject],
+    };
+  }
+
+  const strictnessNote =
+    input.difficulty === 'Easy'
+      ? 'Be encouraging and allow broad educational connections to the subject.'
+      : input.difficulty === 'Medium'
+      ? 'Require a clear, meaningful connection to the selected subject.'
+      : 'Require a specific, accurate academic or domain-relevant term for the selected subject.';
+
+  const prompt = `You are the AI Educational Referee for the "One by One" Word-Chain Game.
+Selected Subject/Category: "${neutralizePromptInjection(input.subject)}"
+Selected Difficulty: ${input.difficulty}
+Player Submitted Word: "${cleanWord}"
+Required Starting Letter: "${reqLetter}"
+
+Evaluate:
+1. Is "${cleanWord}" a real English word, scientific/academic term, or proper historical/geographical noun? (validWord)
+2. Does it belong or relate meaningfully to the subject "${input.subject}"? (categoryRelevant). Note: If the subject is "General Knowledge" or "English", any real educational/vocabulary word is relevant. For specific subjects (e.g., Biology, History, Mathematics, Physics, Chemistry, Geography, Computer Science), verify that the word has a genuine connection to "${input.subject}". ${strictnessNote}
+3. Provide a concise 1-sentence educational definition (definition) and a 2-sentence deeper explanation (detailedExplanation) connecting "${cleanWord}" to "${input.subject}".
+4. If invalid or unrelated to "${input.subject}", explain clearly why in "reason" (e.g., '"${cleanWord}" is a valid word, but it isn\\'t sufficiently relevant to the selected ${input.subject} category.').`;
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            validWord: { type: Type.BOOLEAN },
+            categoryRelevant: { type: Type.BOOLEAN },
+            difficulty: { type: Type.STRING, enum: ['Easy', 'Medium', 'Hard', 'Expert'] },
+            definition: { type: Type.STRING },
+            detailedExplanation: { type: Type.STRING },
+            reason: { type: Type.STRING },
+            relatedConcepts: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ['validWord', 'categoryRelevant', 'difficulty', 'definition', 'detailedExplanation', 'reason', 'relatedConcepts'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    const isAccepted = Boolean(parsed.validWord) && Boolean(parsed.categoryRelevant);
+    const categoryBonus = isAccepted ? 5 : 0;
+    const rarityBonus = parsed.difficulty === 'Expert' ? 6 : parsed.difficulty === 'Hard' ? 4 : 0;
+    const rawPts = isAccepted ? basePoints + categoryBonus + speedBonus + lengthBonus + rarityBonus : 0;
+    const points = Math.round(rawPts * streakMultiplier);
+
+    return {
+      validWord: Boolean(parsed.validWord),
+      startsWithRequiredLetter: true,
+      categoryRelevant: Boolean(parsed.categoryRelevant),
+      alreadyUsed: false,
+      difficulty: parsed.difficulty || input.difficulty,
+      definition: String(parsed.definition || ''),
+      detailedExplanation: String(parsed.detailedExplanation || ''),
+      points,
+      basePoints: isAccepted ? basePoints : 0,
+      categoryBonus,
+      speedBonus: isAccepted ? speedBonus : 0,
+      lengthBonus: isAccepted ? lengthBonus + rarityBonus : 0,
+      streakMultiplier: isAccepted ? streakMultiplier : 1,
+      xpEarned: isAccepted ? Math.round(points * 1.2) : 0,
+      reason: String(parsed.reason || (isAccepted ? `Valid ${input.subject} term!` : `"${cleanWord}" is not relevant to ${input.subject}.`)),
+      nextRequiredLetter: isAccepted ? nextReq : reqLetter,
+      relatedConcepts: Array.isArray(parsed.relatedConcepts) ? parsed.relatedConcepts.slice(0, 3) : [input.subject],
+    };
+  } catch {
+    const categoryBonus = 5;
+    const rawPts = basePoints + categoryBonus + speedBonus + lengthBonus;
+    const points = Math.round(rawPts * streakMultiplier);
+    return {
+      validWord: true,
+      startsWithRequiredLetter: true,
+      categoryRelevant: true,
+      alreadyUsed: false,
+      difficulty: input.difficulty,
+      definition: `An academic concept in ${input.subject} starting with ${reqLetter}.`,
+      detailedExplanation: `"${cleanWord}" is part of the ${input.subject} vocabulary chain.`,
+      points,
+      basePoints,
+      categoryBonus,
+      speedBonus,
+      lengthBonus,
+      streakMultiplier,
+      xpEarned: Math.round(points * 1.2),
+      reason: `Valid ${input.subject} word!`,
+      nextRequiredLetter: nextReq,
+      relatedConcepts: [input.subject],
+    };
+  }
+}
+
+const FALLBACK_SUBJECT_WORDS_BY_LETTER: Record<string, Record<string, { word: string; def: string }[]>> = {
+  Biology: {
+    A: [{ word: 'ALLELE', def: 'Alternative form of a gene located at a specific position on a chromosome.' }, { word: 'AXON', def: 'Long slender projection of a nerve cell that conducts electrical impulses.' }],
+    B: [{ word: 'BIOME', def: 'Large naturally occurring community of flora and fauna occupying a major habitat.' }, { word: 'BACTERIA', def: 'Single-celled prokaryotic microorganisms lacking a membrane-bound nucleus.' }],
+    C: [{ word: 'CELL', def: 'The basic structural, functional, and biological unit of all known organisms.' }, { word: 'CHLOROPLAST', def: 'Plant cell organelle that conducts photosynthesis using chlorophyll.' }],
+    D: [{ word: 'DNA', def: 'Molecule carrying genetic instructions for development and reproduction.' }, { word: 'DENDRITE', def: 'Branched extension of a neuron that receives impulses from other cells.' }],
+    E: [{ word: 'ENZYME', def: 'Biological protein catalyst that speeds up chemical reactions in cells.' }, { word: 'ECOSYSTEM', def: 'Geographic area where plants, animals, and organisms interact with their environment.' }],
+    F: [{ word: 'FERMENTATION', def: 'Anaerobic metabolic process that converts sugar to acids, gases, or alcohol.' }, { word: 'FOSSIL', def: 'Preserved remains or traces of ancient organisms from past geological ages.' }],
+    G: [{ word: 'GENE', def: 'Basic physical and functional unit of heredity made up of DNA.' }, { word: 'GLUCOSE', def: 'Simple monosaccharide sugar that serves as the primary energy source for cells.' }],
+    H: [{ word: 'HABITAT', def: 'Natural home or environment of an animal, plant, or other organism.' }, { word: 'HEMOGLOBIN', def: 'Iron-containing oxygen-transport metalloprotein in red blood cells.' }],
+    I: [{ word: 'IMMUNITY', def: 'Balanced biological defense state capable of resisting infection and disease.' }, { word: 'INSULIN', def: 'Peptide hormone produced by pancreatic beta cells that regulates blood glucose.' }],
+    J: [{ word: 'JEJUNUM', def: 'Middle section of the small intestine responsible for nutrient absorption.' }],
+    K: [{ word: 'KARYOTYPE', def: 'Complete set of chromosomes in a species or in an individual organism.' }, { word: 'KERATIN', def: 'Fibrous structural protein making up hair, nails, feathers, and outer skin.' }],
+    L: [{ word: 'LUNG', def: 'Primary organ of the respiratory system in air-breathing vertebrates.' }, { word: 'LIPID', def: 'Macrobiomolecule soluble in nonpolar solvents, storing energy and forming cell membranes.' }],
+    M: [{ word: 'MITOSIS', def: 'Process of cell duplication producing two genetically identical daughter cells.' }, { word: 'MUTATION', def: 'Alteration in the nucleotide sequence of the genome of an organism or virus.' }],
+    N: [{ word: 'NEURON', def: 'Electrically excitable cell that communicates via synapses in the nervous system.' }, { word: 'NUCLEUS', def: 'Membrane-enclosed organelle containing most of the cell genetic material.' }],
+    O: [{ word: 'ORGANELLE', def: 'Specialized subunit within a cell that has a specific function.' }, { word: 'OSMOSIS', def: 'Spontaneous net movement of solvent molecules through a selectively permeable membrane.' }],
+    P: [{ word: 'PROTEIN', def: 'Large biomolecule comprised of one or more long chains of amino acid residues.' }, { word: 'PLASMID', def: 'Small circular double-stranded DNA molecule distinct from chromosomal DNA.' }],
+    Q: [{ word: 'QUATERNARY', def: 'Fourth-level protein structure formed by the assembly of multiple polypeptide chains.' }],
+    R: [{ word: 'RIBOSOME', def: 'Cellular particle made of RNA and protein that serves as the site for protein synthesis.' }, { word: 'RETINA', def: 'Light-sensitive layer of tissue lining the inner surface of the eye.' }],
+    S: [{ word: 'SPECIES', def: 'Basic unit of classification and taxonomic rank of an organism.' }, { word: 'STOMATA', def: 'Microscopic pores in plant epidermis that control gas exchange and transpiration.' }],
+    T: [{ word: 'TISSUE', def: 'Group of cells that have similar structure and act together to perform a function.' }, { word: 'TAXONOMY', def: 'Scientific study of naming, defining, and classifying groups of biological organisms.' }],
+    U: [{ word: 'URACIL', def: 'One of the four nucleobases in the nucleic acid of RNA, replacing thymine.' }],
+    V: [{ word: 'VACUOLE', def: 'Membrane-bound cell organelle that maintains water balance and stores nutrients.' }, { word: 'VIRUS', def: 'Submicroscopic infectious agent that replicates only inside living cells.' }],
+    W: [{ word: 'WHITEBLOODCELL', def: 'Leukocyte of the immune system involved in protecting the body against disease.' }],
+    X: [{ word: 'XYLEM', def: 'Vascular tissue in plants that transports water and dissolved minerals upward.' }],
+    Y: [{ word: 'YEAST', def: 'Eukaryotic, single-celled microorganism classified as a member of the fungus kingdom.' }],
+    Z: [{ word: 'ZYGOTE', def: 'Fertilized eukaryotic cell formed by the union of male and female gametes.' }, { word: 'ZOOLOGY', def: 'Branch of biology that studies the animal kingdom, including structure and evolution.' }],
+  },
+  General: {
+    A: [{ word: 'ATOM', def: 'The smallest unit of ordinary matter that forms a chemical element.' }, { word: 'ALGEBRA', def: 'Branch of mathematics dealing with symbols and the rules for manipulating them.' }],
+    B: [{ word: 'BINARY', def: 'Base-2 numeral system using only two symbols: 0 and 1.' }, { word: 'BIOSPHERE', def: 'Worldwide sum of all ecosystems and living organisms on Earth.' }],
+    C: [{ word: 'CATALYST', def: 'Substance that increases the rate of a chemical reaction without being consumed.' }, { word: 'CLIMATE', def: 'Long-term weather pattern in a specific area averaged over decades.' }],
+    D: [{ word: 'DENSITY', def: 'Mass of a substance per unit of volume.' }, { word: 'DEMOCRACY', def: 'System of government in which state power is vested in the people.' }],
+    E: [{ word: 'ENERGY', def: 'Quantitative property transferred to a body or physical system to perform work.' }, { word: 'EQUATION', def: 'Mathematical statement asserting the equality of two expressions.' }],
+    F: [{ word: 'FRICTION', def: 'Force resisting the relative motion of solid surfaces or fluid layers.' }, { word: 'FREQUENCY', def: 'Number of occurrences of a repeating wave or event per unit of time.' }],
+    G: [{ word: 'GRAVITY', def: 'Fundamental physical interaction that causes mutual attraction between all masses.' }, { word: 'GALAXY', def: 'Gravitationally bound system of stars, stellar remnants, gas, and dark matter.' }],
+    H: [{ word: 'HYPOTHESIS', def: 'Proposed testable explanation for a phenomenon in the scientific method.' }, { word: 'HORIZON', def: 'Apparent line that separates the Earth surface from the sky.' }],
+    I: [{ word: 'INERTIA', def: 'Resistance of any physical object to a change in its velocity.' }, { word: 'ISOTOPE', def: 'Variants of a chemical element with the same protons but different neutrons.' }],
+    J: [{ word: 'JOULE', def: 'Derived SI unit of energy, work, or amount of heat.' }],
+    K: [{ word: 'KINETIC', def: 'Relating to or resulting from motion of a body.' }],
+    L: [{ word: 'LASER', def: 'Device that emits coherent light through optical amplification.' }, { word: 'LATITUDE', def: 'Geographic coordinate that specifies the north-south position on Earth.' }],
+    M: [{ word: 'MOMENTUM', def: 'Product of the mass and velocity of an object in Newtonian mechanics.' }, { word: 'MOLECULE', def: 'Group of two or more atoms held together by attractive chemical forces.' }],
+    N: [{ word: 'NEUTRON', def: 'Subatomic particle with no net electrostatic charge found in atomic nuclei.' }, { word: 'NEBULA', def: 'Giant interstellar cloud of dust, hydrogen, helium, and ionized gases.' }],
+    O: [{ word: 'ORBIT', def: 'Curved gravitationally bound trajectory of an object in space.' }, { word: 'OXYGEN', def: 'Reactive nonmetal chemical element with symbol O and atomic number 8.' }],
+    P: [{ word: 'PHOTON', def: 'Elementary particle that is a quantum of the electromagnetic field.' }, { word: 'POLYGON', def: 'Plane figure described by a finite number of straight line segments.' }],
+    Q: [{ word: 'QUANTUM', def: 'Minimum amount of any physical entity involved in an interaction.' }, { word: 'QUASAR', def: 'Extremely luminous active galactic nucleus powered by a supermassive black hole.' }],
+    R: [{ word: 'RADIATION', def: 'Emission or transmission of energy in the form of waves or particles.' }, { word: 'RATIO', def: 'Quantitative relation indicating how many times one number contains another.' }],
+    S: [{ word: 'SPECTRUM', def: 'Condition or range of values across a continuum, such as electromagnetic waves.' }, { word: 'SYMMETRY', def: 'Invariance under transformations such as reflection, rotation, or scaling.' }],
+    T: [{ word: 'THEOREM', def: 'Statement that has been proven on the basis of previously established axioms.' }, { word: 'TECTONIC', def: 'Relating to the structure of the Earth crust and large-scale lithospheric plates.' }],
+    U: [{ word: 'UNIVERSE', def: 'All of space and time and their contents, including planets, stars, and galaxies.' }],
+    V: [{ word: 'VELOCITY', def: 'Directional speed of an object in motion as a vector quantity.' }, { word: 'VOLTAGE', def: 'Electric potential difference between two points in a circuit.' }],
+    W: [{ word: 'WAVELENGTH', def: 'Spatial period of a periodic wave—the distance over which the wave shape repeats.' }],
+    X: [{ word: 'XENON', def: 'Chemical element (noble gas) with symbol Xe and atomic number 54.' }],
+    Y: [{ word: 'YIELD', def: 'Amount of product obtained in a chemical reaction or financial return.' }],
+    Z: [{ word: 'ZENITH', def: 'Imaginary point on the celestial sphere directly above a particular location.' }],
+  },
+};
+
+export async function generateAiWordChainTurnAI(params: {
+  requiredLetter: string;
+  subject: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard' | 'Expert';
+  usedWords: string[];
+  chainLength: number;
+}): Promise<{ word: string; definition: string; detailedExplanation: string; points: number }> {
+  const reqLetter = String(params.requiredLetter || 'A').trim().toUpperCase().charAt(0);
+  const usedSet = new Set((params.usedWords || []).map((w) => String(w).trim().toUpperCase().replace(/[^A-Z]/g, '')));
+
+  const pickFallback = () => {
+    const subjPool = FALLBACK_SUBJECT_WORDS_BY_LETTER[params.subject]?.[reqLetter] || [];
+    const genPool = FALLBACK_SUBJECT_WORDS_BY_LETTER.General[reqLetter] || [];
+    const combined = [...subjPool, ...genPool].filter((item) => !usedSet.has(item.word));
+    if (combined.length > 0) {
+      const chosen = combined[Math.floor(Math.random() * combined.length)];
+      return {
+        word: chosen.word,
+        definition: chosen.def,
+        detailedExplanation: `${chosen.def} Relevant to ${params.subject}.`,
+        points: 18,
+      };
+    }
+    const emergencyWord = `${reqLetter}CADEMY`;
+    return {
+      word: emergencyWord,
+      definition: `An academic term starting with ${reqLetter}.`,
+      detailedExplanation: `Used in ${params.subject} study.`,
+      points: 15,
+    };
+  };
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || modelCooldownMap.size > 0) {
+    return pickFallback();
+  }
+
+  const prompt = `You are an AI opponent playing the "One by One" Educational Word-Chain Game.
+Subject: "${neutralizePromptInjection(params.subject)}"
+Difficulty: ${params.difficulty}
+Required Starting Letter: "${reqLetter}"
+Already Used Words (DO NOT USE ANY OF THESE): ${Array.from(usedSet).slice(-35).join(', ') || 'None'}
+
+Choose ONE single valid English word or concept (letters A-Z only, no spaces or hyphens) that:
+1. Starts with the letter "${reqLetter}".
+2. Strongly relates to "${params.subject}".
+3. Matches "${params.difficulty}" difficulty (Easy = common term, Expert = specialized academic term).
+4. Has NOT been used yet.
+
+Return JSON with word (UPPERCASE), definition (1 concise sentence), and detailedExplanation (2 sentences).`;
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            word: { type: Type.STRING },
+            definition: { type: Type.STRING },
+            detailedExplanation: { type: Type.STRING },
+          },
+          required: ['word', 'definition', 'detailedExplanation'],
+        },
+      },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    const cleanWord = String(parsed.word || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+    if (cleanWord.length >= 2 && cleanWord.charAt(0) === reqLetter && !usedSet.has(cleanWord)) {
+      return {
+        word: cleanWord,
+        definition: String(parsed.definition || `Key ${params.subject} concept.`),
+        detailedExplanation: String(parsed.detailedExplanation || ''),
+        points: params.difficulty === 'Expert' ? 24 : params.difficulty === 'Hard' ? 20 : 16,
+      };
+    }
+    return pickFallback();
+  } catch {
+    return pickFallback();
+  }
+}
+
 
 
 

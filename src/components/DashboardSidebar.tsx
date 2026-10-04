@@ -24,6 +24,8 @@ import {
   FileText,
   Lightbulb,
   Music,
+  Search,
+  Gamepad2,
 } from 'lucide-react';
 import { PersonaType, UserStats as UserStatsType, QuizResponse } from '../types/quiz';
 import { useTheme } from '../context/ThemeContext';
@@ -34,7 +36,7 @@ import { UserAvatar } from './UserAvatar';
 import { MascotAvatar } from './MascotAvatar';
 import { AppLogo } from './AppLogo';
 
-export type DashboardTab = 'studio' | 'notes' | 'gamma' | 'flashcards' | 'curricula' | 'community' | 'live' | 'music' | 'authoring' | 'suggestions' | 'achievements' | 'analytics' | 'history' | 'settings' | 'runner' | 'complete';
+export type DashboardTab = 'studio' | 'searcher' | 'games' | 'notes' | 'gamma' | 'flashcards' | 'curricula' | 'community' | 'live' | 'music' | 'authoring' | 'suggestions' | 'achievements' | 'analytics' | 'history' | 'settings' | 'runner' | 'complete';
 
 interface DashboardSidebarProps {
   activeTab: DashboardTab;
@@ -125,6 +127,22 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     {
       title: 'Explore & Compete',
       items: [
+        {
+          id: 'searcher' as DashboardTab,
+          label: 'Quiz Searcher',
+          shortLabel: 'Searcher',
+          icon: Search,
+          badge: 'AI Verified',
+          description: 'Search user-generated quizzes, creator leaderboard & AI verification',
+        },
+        {
+          id: 'games' as DashboardTab,
+          label: 'Games · One by One',
+          shortLabel: 'Games',
+          icon: Gamepad2,
+          badge: 'Hot',
+          description: 'One by One Word-Chain, Math Quiz & Spelling Bee',
+        },
         {
           id: 'curricula' as DashboardTab,
           label: 'Quiz Library',

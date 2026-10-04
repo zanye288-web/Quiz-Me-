@@ -61,13 +61,137 @@ export const OfficialCertificateModal: React.FC<OfficialCertificateModalProps> =
   ).toString(36).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
 
   const getMasteryGrade = (pct: number) => {
-    if (pct >= 95) return { grade: 'Distinction Mastery', color: 'text-emerald-700', badge: 'Tier 1 Distinction' };
-    if (pct >= 85) return { grade: 'High Proficiency', color: 'text-indigo-700', badge: 'Tier 2 Proficient' };
-    if (pct >= 70) return { grade: 'Standard Competency', color: 'text-cyan-700', badge: 'Tier 3 Certified' };
-    return { grade: 'Completed Participant', color: 'text-amber-700', badge: 'Assessment Completed' };
+    if (pct >= 90) {
+      return {
+        stars: 5,
+        grade: '5-Star Grandmaster Distinction',
+        color: 'text-amber-600',
+        badge: '★★★★★ Supreme Mastery',
+        subtitle: 'Flawless command of core and advanced domain concepts',
+      };
+    }
+    if (pct >= 75) {
+      return {
+        stars: 4,
+        grade: '4-Star High Proficiency Honors',
+        color: 'text-indigo-700',
+        badge: '★★★★☆ Honors Proficiency',
+        subtitle: 'Strong analytical accuracy and conceptual retention',
+      };
+    }
+    if (pct >= 60) {
+      return {
+        stars: 3,
+        grade: '3-Star Certified Competency',
+        color: 'text-emerald-700',
+        badge: '★★★☆☆ Standard Competency',
+        subtitle: 'Solid foundational grasp of key curriculum objectives',
+      };
+    }
+    if (pct >= 40) {
+      return {
+        stars: 2,
+        grade: '2-Star Developing Scholar',
+        color: 'text-cyan-700',
+        badge: '★★☆☆☆ Developing Foundation',
+        subtitle: 'Active progress toward subject mastery',
+      };
+    }
+    return {
+      stars: 1,
+      grade: '1-Star Participant Challenger',
+      color: 'text-slate-700',
+      badge: '★☆☆☆☆ Assessment Participant',
+      subtitle: 'Completed initial diagnostic exploration',
+    };
   };
 
   const mastery = getMasteryGrade(percentage);
+
+  const handleDownloadPng = () => {
+    soundFx.playSuccess();
+    const canvas = document.createElement('canvas');
+    canvas.width = 1400;
+    canvas.height = 980;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Ivory parchment background
+    const grad = ctx.createRadialGradient(700, 490, 80, 700, 490, 800);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(1, '#f8fafc');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1400, 980);
+
+    // Ornate double border
+    ctx.strokeStyle = '#312e81';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(40, 40, 1320, 900);
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(56, 56, 1288, 868);
+
+    // Header
+    ctx.fillStyle = '#4338ca';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('QUIZ ME! OFFICIAL ACADEMIC CREDENTIAL BOARD', 700, 140);
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 54px serif';
+    ctx.fillText('Certificate of Achievement', 700, 215);
+
+    // 5-Star Rating Crest on Canvas
+    const starText = '★'.repeat(mastery.stars) + '☆'.repeat(5 - mastery.stars);
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = 'bold 56px sans-serif';
+    ctx.fillText(starText, 700, 305);
+
+    ctx.fillStyle = '#b45309';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText(`${mastery.stars} OUT OF 5 STARS — ${mastery.grade.toUpperCase()}`, 700, 348);
+
+    // Recipient
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('THIS OFFICIAL CERTIFICATE IS PROUDLY PRESENTED TO', 700, 420);
+
+    ctx.fillStyle = '#1e1b4b';
+    ctx.font = 'bold 48px serif';
+    ctx.fillText(candidateName || 'Scholar', 700, 485);
+
+    // Divider line under name
+    ctx.strokeStyle = '#c7d2fe';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(400, 505);
+    ctx.lineTo(1000, 505);
+    ctx.stroke();
+
+    // Assessment Title & Score
+    ctx.fillStyle = '#334155';
+    ctx.font = '24px sans-serif';
+    ctx.fillText(`For completing the assessment "${displayTitle.slice(0, 58)}"`, 700, 575);
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText(`Verified Score: ${score} / ${total} (${percentage}% Accuracy)`, 700, 635);
+
+    ctx.fillStyle = '#475569';
+    ctx.font = 'italic 20px sans-serif';
+    ctx.fillText(mastery.subtitle, 700, 680);
+
+    // Footer metadata
+    ctx.fillStyle = '#334155';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(`Issued: ${issueDate}   |   Star Rating: ${mastery.stars}/5   |   ID: ${credentialId}`, 700, 840);
+
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(candidateName || 'scholar').replace(/[^a-z0-9]/gi, '_').toLowerCase()}_5star_certificate.png`;
+    a.click();
+  };
 
   const handlePrint = () => {
     soundFx.playClick();
@@ -77,7 +201,7 @@ export const OfficialCertificateModal: React.FC<OfficialCertificateModalProps> =
   const handleShare = () => {
     soundFx.playClick();
     navigator.clipboard.writeText(
-      `Official Quiz Me! Assessment Certificate\nRecipient: ${candidateName}\nQuiz: ${displayTitle}\nScore: ${score}/${total} (${percentage}%)\nVerification ID: ${credentialId}`
+      `Official Quiz Me! 5-Star Certificate\nRecipient: ${candidateName}\nQuiz: ${displayTitle}\nRating: ${'★'.repeat(mastery.stars)}${'☆'.repeat(5 - mastery.stars)} (${mastery.stars}/5 Stars - ${mastery.grade})\nScore: ${score}/${total} (${percentage}%)\nVerification ID: ${credentialId}`
     );
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2500);
@@ -110,6 +234,15 @@ export const OfficialCertificateModal: React.FC<OfficialCertificateModalProps> =
             >
               {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Share2 className="w-3.5 h-3.5" />}
               <span>{copiedLink ? 'Copied' : 'Share'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPng}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition-colors shadow-xs cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download PNG</span>
             </button>
 
             <button
@@ -182,6 +315,30 @@ export const OfficialCertificateModal: React.FC<OfficialCertificateModalProps> =
                 <h2 className="text-3xl sm:text-4xl font-serif font-black text-slate-900 tracking-tight pt-2">
                   Quiz Me!
                 </h2>
+
+                {/* 5-Star Performance Crest */}
+                <div className="pt-3 flex flex-col items-center gap-1.5">
+                  <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-2xl bg-amber-50 border border-amber-200 shadow-xs">
+                    {[1, 2, 3, 4, 5].map((starNum) => {
+                      const earned = starNum <= mastery.stars;
+                      return (
+                        <span
+                          key={starNum}
+                          className={`text-2xl sm:text-3xl transition-transform ${
+                            earned
+                              ? 'text-amber-500 drop-shadow-[0_2px_6px_rgba(245,158,11,0.45)] scale-110'
+                              : 'text-slate-300'
+                          }`}
+                        >
+                          ★
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div className={`text-xs font-black uppercase tracking-wider ${mastery.color}`}>
+                    {mastery.stars} / 5 Stars • {mastery.grade}
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">

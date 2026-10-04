@@ -3,14 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Flame,
   Zap,
-  Award,
-  Sparkles,
   ChevronRight,
   TrendingUp,
-  Target,
-  Crown,
+  Gift,
 } from 'lucide-react';
 import { UserStats as UserStatsType } from '../types/quiz';
+import { getLevelProgress } from '../utils/levelingSystem';
 
 interface UserStatsProps {
   stats: UserStatsType;
@@ -25,30 +23,23 @@ export const UserStats: React.FC<UserStatsProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
-  // Level Progression Math
-  const XP_PER_LEVEL = 150;
-  const currentLevel = stats.level || Math.floor(stats.xp / XP_PER_LEVEL) + 1;
-  const currentLevelXp = stats.xp % XP_PER_LEVEL;
-  const xpNeeded = XP_PER_LEVEL - currentLevelXp;
-  const progressPercent = Math.min(100, Math.max(0, Math.round((currentLevelXp / XP_PER_LEVEL) * 100)));
+  const progress = getLevelProgress(stats.xp || 0, stats.streak || 1);
+  const {
+    level: currentLevel,
+    currentLevelXp,
+    xpRequiredForNextLevel,
+    xpToNextLevel,
+    progressPercent,
+    rank,
+    nextMilestone,
+    streakMultiplierPercent,
+  } = progress;
 
   // Accuracy calculation
   const accuracyPercent =
     stats.totalQuestions > 0
       ? Math.round((stats.totalCorrect / stats.totalQuestions) * 100)
       : 100;
-
-  // Rank / Title based on level
-  const getRankTitle = (lvl: number) => {
-    if (lvl >= 10) return { title: 'Grandmaster', icon: Crown, color: 'text-amber-500' };
-    if (lvl >= 7) return { title: 'Expert Scholar', icon: Award, color: 'text-purple-500' };
-    if (lvl >= 4) return { title: 'Proficient', icon: Sparkles, color: 'text-indigo-500' };
-    if (lvl >= 2) return { title: 'Apprentice', icon: Zap, color: 'text-blue-500' };
-    return { title: 'Quiz Novice', icon: Target, color: 'text-emerald-500' };
-  };
-
-  const rank = getRankTitle(currentLevel);
-  const RankIcon = rank.icon;
 
   if (isCollapsed) {
     // Collapsed Mode: Compact Circular Progress Ring & Level Indicator
@@ -64,7 +55,6 @@ export const UserStats: React.FC<UserStatsProps> = ({
         onMouseLeave={() => setIsHovered(false)}
       >
         <div className="relative w-12 h-12 flex items-center justify-center">
-          {/* Circular SVG Ring */}
           <svg className="w-12 h-12 -rotate-90" viewBox="0 0 44 44">
             <circle
               cx="22"
@@ -96,7 +86,6 @@ export const UserStats: React.FC<UserStatsProps> = ({
             </defs>
           </svg>
 
-          {/* Level Center Badge */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-[10px] font-black text-slate-900 dark:text-white leading-none">
               L{currentLevel}
@@ -104,7 +93,6 @@ export const UserStats: React.FC<UserStatsProps> = ({
           </div>
         </div>
 
-        {/* Hover Tooltip in collapsed mode */}
         <AnimatePresence>
           {isHovered && (
             <motion.div
@@ -112,18 +100,25 @@ export const UserStats: React.FC<UserStatsProps> = ({
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 10, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute left-16 z-50 w-48 p-3 rounded-2xl bg-slate-900 text-white text-xs shadow-xl border border-slate-700 pointer-events-none"
+              className="absolute left-16 z-50 w-56 p-3 rounded-2xl bg-slate-900 text-white text-xs shadow-xl border border-slate-700 pointer-events-none"
             >
               <div className="flex items-center justify-between font-bold pb-1 border-b border-slate-800">
-                <span className="text-indigo-400">Level {currentLevel} Scholar</span>
-                <span className="text-amber-400">{stats.xp} XP</span>
+                <span className="text-indigo-400">
+                  {rank.badgeEmoji} Lv.{currentLevel} {rank.title}
+                </span>
+                <span className="text-amber-400">{stats.xp.toLocaleString()} XP</span>
               </div>
               <p className="text-[11px] text-slate-300 mt-1.5">
-                {currentLevelXp} / {XP_PER_LEVEL} XP ({progressPercent}%)
+                {currentLevelXp.toLocaleString()} / {xpRequiredForNextLevel.toLocaleString()} XP ({progressPercent}%)
               </p>
               <p className="text-[10px] text-slate-400 mt-0.5">
-                {xpNeeded} XP to Level {currentLevel + 1}
+                {xpToNextLevel.toLocaleString()} XP needed for Level {currentLevel + 1}
               </p>
+              {nextMilestone && (
+                <p className="text-[10px] text-emerald-400 mt-1 font-bold">
+                  {nextMilestone.icon} Next Chest at Lv.{nextMilestone.level}
+                </p>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -141,7 +136,7 @@ export const UserStats: React.FC<UserStatsProps> = ({
       className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs relative overflow-hidden group transition-all hover:border-indigo-300 dark:hover:border-indigo-600/60 cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      title="View Performance & XP Analytics"
+      title="View Progression & Mastery Roadmap"
     >
       <div className="flex items-center gap-3 relative z-10">
         {/* Circular Progress Gauge */}
@@ -189,30 +184,47 @@ export const UserStats: React.FC<UserStatsProps> = ({
         {/* Right Info & Metrics */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1">
-            <span className={`text-[11px] font-black ${rank.color} flex items-center gap-1 truncate`}>
-              <RankIcon className="w-3 h-3 shrink-0" />
+            <span className={`text-[11px] font-black ${rank.colorClass} flex items-center gap-1 truncate`}>
+              <span>{rank.badgeEmoji}</span>
               <span className="truncate">{rank.title}</span>
             </span>
             <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 shrink-0">
-              {stats.xp} XP
+              {stats.xp.toLocaleString()} XP
             </span>
           </div>
 
           <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
-            {xpNeeded} XP to Level {currentLevel + 1}
+            {xpToNextLevel.toLocaleString()} XP to Level {currentLevel + 1}
           </div>
 
-          <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60 text-[10px] font-bold">
-            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+          <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-700/60 text-[10px] font-bold">
+            <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400" title="Daily Streak">
               <Flame className="w-3 h-3 fill-amber-500 text-amber-500 shrink-0" />
               {stats.streak}d
             </span>
-            <span className="text-slate-300 dark:text-slate-600">•</span>
-            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+            {streakMultiplierPercent > 0 && (
+              <>
+                <span className="text-slate-300 dark:text-slate-600">·</span>
+                <span className="flex items-center gap-0.5 text-indigo-600 dark:text-indigo-400" title="Streak Retention XP Boost">
+                  <Zap className="w-2.5 h-2.5 fill-current shrink-0" />
+                  +{streakMultiplierPercent}%
+                </span>
+              </>
+            )}
+            <span className="text-slate-300 dark:text-slate-600">·</span>
+            <span className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400" title="Overall Accuracy">
               <TrendingUp className="w-3 h-3 text-emerald-500 shrink-0" />
               {accuracyPercent}%
             </span>
-            <ChevronRight className="w-3 h-3 text-slate-400 ml-auto group-hover:translate-x-0.5 transition-transform" />
+            {nextMilestone && (
+              <Gift
+                className="w-3 h-3 text-fuchsia-500 ml-auto shrink-0"
+                title={`Next Milestone Chest at Level ${nextMilestone.level}: ${nextMilestone.title}`}
+              />
+            )}
+            {!nextMilestone && (
+              <ChevronRight className="w-3 h-3 text-slate-400 ml-auto group-hover:translate-x-0.5 transition-transform" />
+            )}
           </div>
         </div>
       </div>

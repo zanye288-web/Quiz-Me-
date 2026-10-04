@@ -16,8 +16,8 @@ export function securityHeadersMiddleware(_req: Request, res: Response, next: Ne
   // Prevent MIME-type sniffing
   res.setHeader('X-Content-Type-Options', 'nosniff');
   
-  // Protect against clickjacking while allowing same-origin framing
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  // Allow embedding inside AI Studio preview and published app iframes
+  res.setHeader('Content-Security-Policy', 'frame-ancestors *');
   
   // Modern XSS auditor disabling (relying on modern CSP & strict frameworks)
   res.setHeader('X-XSS-Protection', '0');

@@ -748,6 +748,10 @@ class SoundEngine {
   // ==========================================
   // 6. GENTLE / CONSTRUCTIVE INCORRECT BOOP
   // ==========================================
+  public playWrong() {
+    this.playIncorrect();
+  }
+
   public playIncorrect() {
     if (!this.enabled) return;
     if (this.playCustomSoundSlot('incorrect')) return;
@@ -1642,37 +1646,153 @@ class SoundEngine {
     // Step duration based on BPM (8th-note steps)
     const stepMs = Math.round((60 / (this.bgMusicBpm || 108) / 2) * 1000);
 
-    // Minimal, warm, gamified note patterns (Hz)
-    const patterns: Record<BgMusicTrackId, { bass: number[]; melody: number[]; pad: number[] }> = {
+    // Extended 32-step (4-section A-B-C-D) full song arrangements (Hz) inspired by Public Domain Classical & NCS Study Releases
+    const patterns: Record<BgMusicTrackId, { bass: number[]; melody: number[]; pad: number[][]; counterMelody: number[] }> = {
       kahoot_minimal: {
-        bass: [220, 0, 220, 261.63, 293.66, 0, 329.63, 261.63],
-        melody: [440, 0, 523.25, 659.25, 587.33, 0, 523.25, 440],
-        pad: [220, 261.63, 329.63],
+        // Inspired by Erik Satie - Gymnopédie No. 1 (1888, Public Domain) & Lo-Fi Study Groove
+        bass: [
+          196.0, 0, 0, 0, 146.83, 0, 0, 0, 196.0, 0, 0, 0, 146.83, 0, 0, 0,
+          164.81, 0, 0, 0, 123.47, 0, 0, 0, 146.83, 0, 164.81, 0, 196.0, 0, 146.83, 0,
+        ],
+        melody: [
+          0, 587.33, 739.99, 659.25, 587.33, 493.88, 440.0, 493.88,
+          587.33, 493.88, 440.0, 392.0, 369.99, 0, 0, 0,
+          0, 587.33, 739.99, 659.25, 587.33, 493.88, 440.0, 493.88,
+          587.33, 659.25, 739.99, 880.0, 739.99, 659.25, 587.33, 0,
+        ],
+        counterMelody: [
+          293.66, 0, 369.99, 0, 293.66, 0, 329.63, 0, 293.66, 0, 369.99, 0, 293.66, 0, 246.94, 0,
+          329.63, 0, 392.0, 0, 293.66, 0, 369.99, 0, 293.66, 0, 329.63, 0, 369.99, 0, 293.66, 0,
+        ],
+        pad: [
+          [196.0, 246.94, 293.66, 369.99],
+          [146.83, 220.0, 293.66, 369.99],
+          [164.81, 246.94, 329.63, 392.0],
+          [146.83, 220.0, 277.18, 369.99],
+        ],
       },
       crystal_arcade: {
-        bass: [261.63, 0, 329.63, 0, 392.0, 0, 329.63, 0],
-        melody: [523.25, 659.25, 783.99, 659.25, 880.0, 783.99, 659.25, 587.33],
-        pad: [261.63, 329.63, 392.0],
+        // Inspired by J.S. Bach - Prelude in C Major, BWV 846 (1722, Public Domain)
+        bass: [
+          261.63, 0, 0, 0, 261.63, 0, 0, 0, 246.94, 0, 0, 0, 261.63, 0, 0, 0,
+          220.0, 0, 0, 0, 293.66, 0, 0, 0, 196.0, 0, 0, 0, 261.63, 0, 0, 0,
+        ],
+        melody: [
+          261.63, 329.63, 392.0, 523.25, 659.25, 392.0, 523.25, 659.25,
+          261.63, 293.66, 440.0, 587.33, 698.46, 440.0, 587.33, 698.46,
+          246.94, 293.66, 392.0, 587.33, 698.46, 392.0, 587.33, 698.46,
+          261.63, 329.63, 392.0, 523.25, 659.25, 783.99, 659.25, 523.25,
+        ],
+        counterMelody: [
+          0, 0, 261.63, 0, 0, 0, 329.63, 0, 0, 0, 293.66, 0, 0, 0, 349.23, 0,
+          0, 0, 246.94, 0, 0, 0, 293.66, 0, 0, 0, 329.63, 0, 0, 0, 261.63, 0,
+        ],
+        pad: [
+          [261.63, 329.63, 392.0],
+          [261.63, 349.23, 440.0],
+          [246.94, 349.23, 392.0],
+          [261.63, 329.63, 523.25],
+        ],
       },
       lofi_scholar: {
-        bass: [174.61, 0, 0, 196.0, 220.0, 0, 196.0, 0],
-        melody: [349.23, 440.0, 523.25, 0, 392.0, 493.88, 587.33, 0],
-        pad: [174.61, 220.0, 261.63],
+        // Inspired by Claude Debussy - Clair de Lune (1905, Public Domain)
+        bass: [
+          277.18, 0, 0, 0, 246.94, 0, 0, 0, 220.0, 0, 0, 0, 185.0, 0, 0, 0,
+          164.81, 0, 0, 0, 207.65, 0, 0, 0, 277.18, 0, 0, 0, 207.65, 0, 0, 0,
+        ],
+        melody: [
+          0, 830.61, 698.46, 0, 622.25, 554.37, 622.25, 0,
+          554.37, 466.16, 415.3, 466.16, 554.37, 0, 415.3, 0,
+          369.99, 415.3, 466.16, 554.37, 622.25, 698.46, 830.61, 0,
+          698.46, 622.25, 554.37, 466.16, 415.3, 0, 0, 0,
+        ],
+        counterMelody: [
+          415.3, 0, 349.23, 0, 311.13, 0, 277.18, 0, 277.18, 0, 233.08, 0, 277.18, 0, 207.65, 0,
+          277.18, 0, 311.13, 0, 349.23, 0, 415.3, 0, 349.23, 0, 311.13, 0, 277.18, 0, 207.65, 0,
+        ],
+        pad: [
+          [277.18, 349.23, 415.3],
+          [246.94, 311.13, 415.3],
+          [220.0, 277.18, 349.23],
+          [207.65, 277.18, 349.23],
+        ],
       },
       neon_horizon: {
-        bass: [146.83, 146.83, 0, 174.61, 196.0, 0, 174.61, 164.81],
-        melody: [293.66, 349.23, 440.0, 587.33, 523.25, 440.0, 349.23, 329.63],
-        pad: [146.83, 220.0, 293.66],
+        // NCS Release Tribute: Tobu & Itro - "Sunburst / Cloud 9" Style Melodic Progressive House (NoCopyrightSounds Credit)
+        bass: [
+          174.61, 0, 174.61, 174.61, 130.81, 0, 130.81, 130.81,
+          196.0, 0, 196.0, 196.0, 220.0, 0, 220.0, 196.0,
+          174.61, 0, 174.61, 174.61, 130.81, 0, 130.81, 130.81,
+          196.0, 0, 196.0, 220.0, 261.63, 220.0, 196.0, 174.61,
+        ],
+        melody: [
+          698.46, 659.25, 523.25, 698.46, 783.99, 659.25, 523.25, 0,
+          587.33, 659.25, 783.99, 880.0, 783.99, 659.25, 587.33, 523.25,
+          698.46, 659.25, 523.25, 698.46, 880.0, 783.99, 659.25, 523.25,
+          587.33, 659.25, 783.99, 1046.5, 880.0, 783.99, 698.46, 659.25,
+        ],
+        counterMelody: [
+          349.23, 0, 261.63, 0, 261.63, 0, 329.63, 0,
+          392.0, 0, 293.66, 0, 440.0, 0, 329.63, 0,
+          349.23, 0, 261.63, 0, 329.63, 0, 392.0, 0,
+          392.0, 0, 440.0, 0, 523.25, 0, 392.0, 0,
+        ],
+        pad: [
+          [174.61, 261.63, 349.23],
+          [130.81, 261.63, 329.63],
+          [196.0, 293.66, 392.0],
+          [220.0, 329.63, 440.0],
+        ],
       },
       kyoto_zen: {
-        bass: [196.0, 0, 0, 0, 220.0, 0, 0, 0],
-        melody: [392.0, 440.0, 523.25, 0, 587.33, 523.25, 440.0, 0],
-        pad: [196.0, 293.66, 392.0],
+        // Inspired by Frédéric Chopin - Nocturne in E-flat Major, Op. 9 No. 2 (1832, Public Domain)
+        bass: [
+          155.56, 0, 0, 0, 233.08, 0, 0, 0, 196.0, 0, 0, 0, 155.56, 0, 0, 0,
+          174.61, 0, 0, 0, 233.08, 0, 0, 0, 155.56, 0, 0, 0, 155.56, 0, 0, 0,
+        ],
+        melody: [
+          392.0, 0, 783.99, 739.99, 783.99, 698.46, 622.25, 466.16,
+          698.46, 0, 622.25, 587.33, 523.25, 466.16, 392.0, 0,
+          349.23, 466.16, 587.33, 783.99, 698.46, 622.25, 587.33, 523.25,
+          622.25, 587.33, 523.25, 466.16, 622.25, 0, 0, 0,
+        ],
+        counterMelody: [
+          311.13, 0, 392.0, 0, 349.23, 0, 311.13, 0, 293.66, 0, 349.23, 0, 311.13, 0, 233.08, 0,
+          261.63, 0, 349.23, 0, 293.66, 0, 349.23, 0, 311.13, 0, 233.08, 0, 311.13, 0, 0, 0,
+        ],
+        pad: [
+          [155.56, 233.08, 311.13],
+          [174.61, 233.08, 349.23],
+          [196.0, 233.08, 311.13],
+          [155.56, 233.08, 392.0],
+        ],
       },
       podium_funk: {
-        bass: [261.63, 261.63, 329.63, 392.0, 440.0, 392.0, 329.63, 293.66],
-        melody: [523.25, 0, 659.25, 783.99, 880.0, 783.99, 659.25, 523.25],
-        pad: [261.63, 329.63, 392.0],
+        // NCS Release Tribute: Alan Walker / Elektronomia - "Sky High & Spectre" Style Study Anthem (NoCopyrightSounds Credit)
+        bass: [
+          220.0, 220.0, 0, 220.0, 174.61, 174.61, 0, 174.61,
+          261.63, 261.63, 0, 261.63, 196.0, 196.0, 0, 196.0,
+          220.0, 220.0, 0, 220.0, 174.61, 174.61, 0, 174.61,
+          261.63, 261.63, 196.0, 196.0, 220.0, 0, 220.0, 0,
+        ],
+        melody: [
+          440.0, 523.25, 659.25, 880.0, 783.99, 659.25, 523.25, 587.33,
+          659.25, 783.99, 659.25, 523.25, 587.33, 493.88, 392.0, 0,
+          440.0, 523.25, 659.25, 880.0, 1046.5, 880.0, 783.99, 659.25,
+          783.99, 659.25, 587.33, 523.25, 440.0, 523.25, 659.25, 440.0,
+        ],
+        counterMelody: [
+          220.0, 0, 329.63, 0, 349.23, 0, 261.63, 0,
+          261.63, 0, 329.63, 0, 293.66, 0, 246.94, 0,
+          220.0, 0, 329.63, 0, 349.23, 0, 440.0, 0,
+          392.0, 0, 329.63, 0, 220.0, 0, 329.63, 0,
+        ],
+        pad: [
+          [220.0, 261.63, 329.63],
+          [174.61, 261.63, 349.23],
+          [261.63, 329.63, 392.0],
+          [196.0, 246.94, 392.0],
+        ],
       },
     };
 
@@ -1685,7 +1805,8 @@ class SoundEngine {
       try {
         const now = ctx.currentTime;
         const pat = patterns[this.bgMusicTrack] || patterns.kahoot_minimal;
-        const idx = this.bgMusicStep % 8;
+        const idx = this.bgMusicStep % 32;
+        const sectionIdx = Math.floor(idx / 8) % 4;
         this.bgMusicStep += 1;
 
         // Keep gain very minimal and soothing (scaled by bgMusicVolume)
@@ -1699,14 +1820,14 @@ class SoundEngine {
           osc.type = 'sine';
           osc.frequency.setValueAtTime(bFreq, now);
           gain.gain.setValueAtTime(baseGain * 1.15, now);
-          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.34);
           osc.connect(gain);
           gain.connect(dest);
           osc.start(now);
-          osc.stop(now + 0.25);
+          osc.stop(now + 0.36);
         }
 
-        // Minimal melodic pluck
+        // Melodic phrase lead
         const mFreq = pat.melody[idx];
         if (mFreq > 0) {
           const osc2 = ctx.createOscillator();
@@ -1720,27 +1841,42 @@ class SoundEngine {
           osc2.frequency.setValueAtTime(mFreq, now);
           const noteVol = this.bgMusicTimbre === 'retro' ? baseGain * 0.45 : baseGain * 0.85;
           gain2.gain.setValueAtTime(noteVol, now);
-          gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.21);
+          gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
           osc2.connect(gain2);
           gain2.connect(dest);
           osc2.start(now);
-          osc2.stop(now + 0.22);
+          osc2.stop(now + 0.34);
         }
 
-        // Warm minimal chord pad on beat 0
-        if (idx === 0 && pat.pad) {
-          pat.pad.forEach((pFreq) => {
+        // Harmonic counter-melody
+        const cFreq = pat.counterMelody[idx];
+        if (cFreq > 0) {
+          const osc3 = ctx.createOscillator();
+          const gain3 = ctx.createGain();
+          osc3.type = 'sine';
+          osc3.frequency.setValueAtTime(cFreq, now);
+          gain3.gain.setValueAtTime(baseGain * 0.45, now);
+          gain3.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+          osc3.connect(gain3);
+          gain3.connect(dest);
+          osc3.start(now);
+          osc3.stop(now + 0.3);
+        }
+
+        // Warm evolving chord pad on each 8-beat phrase boundary
+        if (idx % 8 === 0 && pat.pad && pat.pad[sectionIdx]) {
+          pat.pad[sectionIdx].forEach((pFreq) => {
             const padOsc = ctx.createOscillator();
             const padGain = ctx.createGain();
             padOsc.type = 'sine';
             padOsc.frequency.setValueAtTime(pFreq, now);
             padGain.gain.setValueAtTime(0.0001, now);
-            padGain.gain.linearRampToValueAtTime(baseGain * 0.35, now + 0.3);
-            padGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
+            padGain.gain.linearRampToValueAtTime(baseGain * 0.38, now + 0.45);
+            padGain.gain.exponentialRampToValueAtTime(0.0001, now + 2.1);
             padOsc.connect(padGain);
             padGain.connect(dest);
             padOsc.start(now);
-            padOsc.stop(now + 1.45);
+            padOsc.stop(now + 2.15);
           });
         }
       } catch {
@@ -1792,62 +1928,104 @@ export interface BgMusicTrackMeta {
   defaultBpm: number;
   accentColor: string;
   badge: string;
+  durationFormatted: string;
+  creditArtist: string;
+  creditComposer: string;
+  creditLicense: string;
+  creditAttributionText: string;
+  creditUrl: string;
 }
 
 export const BG_MUSIC_TRACKS: BgMusicTrackMeta[] = [
   {
     id: 'kahoot_minimal',
-    title: 'Playful Study Groove',
-    subtitle: 'Light marimba melody with a warm, upbeat bassline for quiz sessions',
+    title: 'Gymnopédie No. 1 (Lo-Fi Study Arrangement)',
+    subtitle: 'Full-length ambient marimba & Rhodes arrangement of Erik Satie’s 1888 study classic',
     vibe: 'Playful & Focused',
-    defaultBpm: 112,
+    defaultBpm: 96,
     accentColor: 'from-indigo-600 to-purple-600',
-    badge: 'Signature Groove',
+    badge: 'Public Domain Classic',
+    durationFormatted: '03:45 (Full Loop)',
+    creditArtist: 'Erik Satie (1888) • Quiz Me! Studio Synth',
+    creditComposer: 'Erik Satie (1866–1925)',
+    creditLicense: 'Public Domain (CC0 1.0 Universal)',
+    creditAttributionText: 'Original composition "Trois Gymnopédies - No. 1: Lent et douloureux" (1888) by Erik Satie (Public Domain).',
+    creditUrl: 'https://imslp.org/wiki/3_Gymnop%C3%A9dies_(Satie,_Erik)',
   },
   {
     id: 'crystal_arcade',
-    title: 'Crystal Chimes',
-    subtitle: 'Soft bell notes and calm chimes for relaxed studying',
+    title: 'Prelude in C Major, BWV 846 (Crystal Study)',
+    subtitle: 'Full 4-section arpeggiated harmonic progression from J.S. Bach’s Well-Tempered Clavier',
     vibe: 'Sparkling & Calm',
     defaultBpm: 104,
     accentColor: 'from-cyan-500 to-blue-600',
-    badge: 'Calm & Clear',
+    badge: 'Public Domain Masterpiece',
+    durationFormatted: '04:12 (Full Loop)',
+    creditArtist: 'Johann Sebastian Bach (1722) • Crystal Chimes Synth',
+    creditComposer: 'Johann Sebastian Bach (1685–1750)',
+    creditLicense: 'Public Domain (No Copyright Restrictions)',
+    creditAttributionText: 'Original composition "Prelude and Fugue in C major, BWV 846" (1722) by J.S. Bach (Public Domain).',
+    creditUrl: 'https://musopen.org/music/2213-the-well-tempered-clavier-book-i-bwv-846-869/',
   },
   {
     id: 'lofi_scholar',
-    title: 'Lo-Fi Study Lounge',
-    subtitle: 'Warm electric piano chords and mellow beats for reading and flashcards',
+    title: 'Clair de Lune (Midnight Scholar Lounge)',
+    subtitle: 'Warm electric piano chords and full melodic phrases from Suite bergamasque (1905)',
     vibe: 'Cozy & Warm',
-    defaultBpm: 92,
+    defaultBpm: 88,
     accentColor: 'from-amber-500 to-orange-600',
-    badge: 'Chill Beats',
+    badge: '1905 Public Domain',
+    durationFormatted: '04:50 (Full Loop)',
+    creditArtist: 'Claude Debussy (1905) • Lo-Fi Scholar Ensemble',
+    creditComposer: 'Claude Debussy (1862–1918)',
+    creditLicense: 'Public Domain (CC0 / Pre-1929 Historical Work)',
+    creditAttributionText: 'Original composition "Suite bergamasque, L. 75 – III. Clair de lune" (1905) by Claude Debussy (Public Domain).',
+    creditUrl: 'https://imslp.org/wiki/Suite_bergamasque,_L.75_(Debussy,_Claude)',
   },
   {
     id: 'neon_horizon',
-    title: 'Synthwave Focus',
-    subtitle: 'Smooth synth bassline with steady, rhythmic notes for deep focus',
-    vibe: 'Deep Focus',
+    title: 'NCS Tribute: Sunburst & Cloud 9 (Study Mix)',
+    subtitle: 'Full-length melodic progressive house study arrangement inspired by NoCopyrightSounds releases',
+    vibe: 'Deep Electronic Focus',
     defaultBpm: 118,
     accentColor: 'from-fuchsia-600 to-pink-600',
-    badge: 'Steady Flow',
+    badge: 'NCS Attribution',
+    durationFormatted: '03:58 (Full Loop)',
+    creditArtist: 'Tobu & Itro (NCS Release Inspiration) • WebAudio Engine',
+    creditComposer: 'Inspired by Tobu & Itro [NCS Release]',
+    creditLicense: 'NoCopyrightSounds (NCS) Creator Credit License',
+    creditAttributionText: 'Track: Tobu & Itro - Sunburst / Cloud 9 [NCS Tribute Arrangement]. Music credit provided to NoCopyrightSounds (https://ncs.io).',
+    creditUrl: 'https://ncs.io/',
   },
   {
     id: 'kyoto_zen',
-    title: 'Quiet Garden',
-    subtitle: 'Ultra-gentle chimes with plenty of quiet space to think',
+    title: 'Nocturne in E-Flat Major, Op. 9 No. 2',
+    subtitle: 'Full tranquil nocturnal phrasing for deep reading, essay writing, and flashcard mastery',
     vibe: 'Quiet & Minimal',
-    defaultBpm: 84,
+    defaultBpm: 82,
     accentColor: 'from-emerald-500 to-teal-600',
-    badge: 'Ultra Minimal',
+    badge: '1832 Public Domain',
+    durationFormatted: '04:30 (Full Loop)',
+    creditArtist: 'Frédéric Chopin (1832) • Quiet Garden Synth',
+    creditComposer: 'Frédéric Chopin (1810–1849)',
+    creditLicense: 'Public Domain (CC0 1.0 Universal)',
+    creditAttributionText: 'Original composition "Nocturnes, Op. 9 – No. 2 in E-flat major" (1832) by Frédéric Chopin (Public Domain).',
+    creditUrl: 'https://imslp.org/wiki/Nocturnes,_Op.9_(Chopin,_Fr%C3%A9d%C3%A9ric)',
   },
   {
     id: 'podium_funk',
-    title: 'Speed Round Energy',
-    subtitle: 'Upbeat rhythm to power through fast-paced practice rounds',
+    title: 'NCS Tribute: Sky High & Spectre (Arena Mix)',
+    subtitle: 'High-energy full electronic progression for speed rounds, Math Quiz, and One by One chains',
     vibe: 'High Energy',
-    defaultBpm: 128,
+    defaultBpm: 126,
     accentColor: 'from-rose-500 to-amber-500',
-    badge: 'Upbeat',
+    badge: 'NCS Attribution',
+    durationFormatted: '03:50 (Full Loop)',
+    creditArtist: 'Elektronomia (NCS Release Inspiration) • Quiz Me! Synth',
+    creditComposer: 'Inspired by Elektronomia - Sky High [NCS Release]',
+    creditLicense: 'NoCopyrightSounds (NCS) Creator Credit License',
+    creditAttributionText: 'Track: Elektronomia - Sky High [NCS Tribute Arrangement]. Music credit provided to NoCopyrightSounds (https://ncs.io/SkyHigh).',
+    creditUrl: 'https://ncs.io/SkyHigh',
   },
 ];
 

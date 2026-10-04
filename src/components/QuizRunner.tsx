@@ -58,6 +58,7 @@ import { MediaAttributionBadge } from './MediaAttributionBadge';
 import { resolveThematicVisual } from '../utils/thematicImages';
 import { MascotAvatar } from './MascotAvatar';
 import { classifyAudience, AUDIENCE_TIER_CONFIG } from '../utils/audienceClassifier';
+import { StudyToolsWidget } from './StudyToolsWidget';
 
 interface QuizRunnerProps {
   quiz: QuizResponse;
@@ -172,10 +173,24 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
   const [streakShieldUsed, setStreakShieldUsed] = useState<boolean>(false);
   const [streakSavedBanner, setStreakSavedBanner] = useState<boolean>(false);
 
-  // Global Timer
+  // Global Timer & Time Range System
   const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
-  const totalTimeLimitSecs = assessmentConfig.timeLimitMinutes * 60;
-  const isTimedExam = assessmentConfig.timeLimitMinutes > 0;
+  const [liveTimeRangeEnabled, setLiveTimeRangeEnabled] = useState<boolean>(
+    Boolean(assessmentConfig.timerRangeEnabled || assessmentConfig.timeLimitMinutes > 0)
+  );
+  const [liveMinMinutes, setLiveMinMinutes] = useState<number>(
+    assessmentConfig.minTimeMinutes ?? (assessmentConfig.timeLimitMinutes > 0 ? Math.max(1, Math.floor(assessmentConfig.timeLimitMinutes * 0.3)) : 2)
+  );
+  const [liveMaxMinutes, setLiveMaxMinutes] = useState<number>(
+    assessmentConfig.maxTimeMinutes || assessmentConfig.timeLimitMinutes || 10
+  );
+  const [showTimeRangePopover, setShowTimeRangePopover] = useState<boolean>(false);
+
+  const minRangeSecs = liveTimeRangeEnabled ? liveMinMinutes * 60 : 0;
+  const totalTimeLimitSecs = liveTimeRangeEnabled ? liveMaxMinutes * 60 : assessmentConfig.timeLimitMinutes * 60;
+  const isTimedExam = liveTimeRangeEnabled || assessmentConfig.timeLimitMinutes > 0;
+  const isInTargetTimeRange =
+    liveTimeRangeEnabled && secondsElapsed >= minRangeSecs && secondsElapsed <= totalTimeLimitSecs;
 
   // Pomodoro Context
   const {
@@ -791,8 +806,8 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
         }
       }
 
-      // Enter key submits or moves next
-      if (e.key === 'Enter') {
+      // Ctrl+Enter (or Cmd+Enter) submits or moves next; Enter alone moves downwards
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         if (!isAnswerChecked && canCheckAnswer()) {
           e.preventDefault();
           handleCheckOrSaveAnswer();
@@ -805,6 +820,26 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
           }
         }
         return;
+      }
+
+      if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+        if (activeTag === 'TEXTAREA') {
+          // Allow default Enter behavior in textarea (moves downwards to new line)
+          return;
+        }
+        if (
+          !isAnswerChecked &&
+          currentQuestion.options &&
+          currentQuestion.options.length > 0
+        ) {
+          e.preventDefault();
+          const opts = currentQuestion.options;
+          const curIdx = selectedOption ? opts.indexOf(selectedOption) : -1;
+          const nextIdx = (curIdx + 1) % opts.length;
+          setSelectedOption(opts[nextIdx]);
+          soundFx.playClick();
+          return;
+        }
       }
 
       if (isTyping) return;
@@ -1099,6 +1134,9 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
     }
 
     const gemsEarned = isChallengeMode ? totalCorrect * 8 : totalCorrect * 5;
+    if (isInTargetTimeRange) {
+      xpEarned = Math.round(xpEarned * 1.35) + 30;
+    }
 
     onFinishQuiz({
       quiz,
@@ -1489,20 +1527,154 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
             <span className="hidden sm:inline">Notes</span>
           </button>
 
-          {/* Overall Time Counter */}
-          <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold ${
-              isTimedExam && totalTimeLimitSecs - secondsElapsed <= 60
-                ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 animate-pulse'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>
-              {isTimedExam
-                ? `${formatSeconds(Math.max(0, totalTimeLimitSecs - secondsElapsed))} left`
-                : formatSeconds(secondsElapsed)}
-            </span>
+          {/* Overall Time Counter + Interactive Time Range Popover */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                setShowTimeRangePopover((prev) => !prev);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold cursor-pointer transition-all ${
+                isTimedExam && totalTimeLimitSecs - secondsElapsed <= 60
+                  ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-800 animate-pulse'
+                  : isInTargetTimeRange
+                  ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                  : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+              }`}
+              title="Click to configure Quiz Time Range (Min – Max Target Window)"
+            >
+              <Clock className={`w-3.5 h-3.5 ${isInTargetTimeRange ? 'text-emerald-500' : 'text-indigo-500'}`} />
+              <span>
+                {liveTimeRangeEnabled
+                  ? `${formatSeconds(secondsElapsed)} / ${liveMinMinutes}m–${liveMaxMinutes}m`
+                  : isTimedExam
+                  ? `${formatSeconds(Math.max(0, totalTimeLimitSecs - secondsElapsed))} left`
+                  : formatSeconds(secondsElapsed)}
+              </span>
+              {isInTargetTimeRange && (
+                <span className="hidden sm:inline px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[9px] font-sans font-black uppercase">
+                  +35% XP Zone
+                </span>
+              )}
+            </button>
+
+            {showTimeRangePopover && (
+              <div className="absolute right-0 top-11 z-50 w-72 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl space-y-2.5 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div>
+                    <div className="text-xs font-black text-slate-900 dark:text-white">
+                      ⏱️ Quiz Time Range
+                    </div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Finish inside the Min–Max window for +35% XP!
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setLiveTimeRangeEnabled((prev) => !prev);
+                    }}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-black cursor-pointer ${
+                      liveTimeRangeEnabled
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {liveTimeRangeEnabled ? 'Range: ON' : 'Range: OFF'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { label: '⚡ 1–3m', min: 1, max: 3 },
+                    { label: '🎯 3–10m', min: 3, max: 10 },
+                    { label: '🏛️ 10–25m', min: 10, max: 25 },
+                  ].map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playSelect();
+                        setLiveTimeRangeEnabled(true);
+                        setLiveMinMinutes(p.min);
+                        setLiveMaxMinutes(p.max);
+                        setShowTimeRangePopover(false);
+                      }}
+                      className={`py-1.5 px-2 rounded-xl border text-[11px] font-black cursor-pointer ${
+                        liveTimeRangeEnabled && liveMinMinutes === p.min && liveMaxMinutes === p.max
+                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                {liveTimeRangeEnabled && (
+                  <div className="space-y-2 pt-1">
+                    <div>
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span>Min Target Time</span>
+                        <span className="font-mono font-black text-emerald-600">{liveMinMinutes} min</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1}
+                        max={20}
+                        value={liveMinMinutes}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setLiveMinMinutes(v);
+                          if (liveMaxMinutes <= v) setLiveMaxMinutes(v + 2);
+                        }}
+                        className="w-full accent-emerald-500 cursor-pointer h-1.5"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span>Max Cutoff Time</span>
+                        <span className="font-mono font-black text-indigo-600">{liveMaxMinutes} min</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={2}
+                        max={60}
+                        value={liveMaxMinutes}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setLiveMaxMinutes(v);
+                          if (liveMinMinutes >= v) setLiveMinMinutes(Math.max(1, v - 1));
+                        }}
+                        className="w-full accent-indigo-600 cursor-pointer h-1.5"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playPop();
+                      setLiveMaxMinutes((prev) => prev + 2);
+                    }}
+                    className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                  >
+                    +2 Min Extra Time
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTimeRangePopover(false)}
+                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Progress Indicator */}
@@ -1512,6 +1684,48 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
         </div>
       </div>
     )}
+
+      {/* Live Quiz Time Range Progress Bar (Displays when Time Range is active) */}
+      {liveTimeRangeEnabled && totalTimeLimitSecs > 0 && (
+        <div className="bg-white/95 dark:bg-slate-900/95 rounded-2xl px-4 py-2.5 border border-emerald-200/80 dark:border-emerald-900/60 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider">
+              ⏱️ Time Range: {liveMinMinutes}m – {liveMaxMinutes}m
+            </span>
+            <span className="font-bold text-slate-700 dark:text-slate-200">
+              {secondsElapsed < minRangeSecs
+                ? `Warm-Up Pace (${formatSeconds(minRangeSecs - secondsElapsed)} until Gold Target Window)`
+                : isInTargetTimeRange
+                ? `🎯 In Gold Target Range! Finish within ${formatSeconds(Math.max(0, totalTimeLimitSecs - secondsElapsed))} for +35% XP!`
+                : 'Time limit reached'}
+            </span>
+          </div>
+
+          <div className="relative w-full sm:w-64 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200/70 dark:border-slate-700">
+            {/* Highlight Gold Target Zone between Min and Max */}
+            <div
+              className="absolute top-0 bottom-0 bg-emerald-500/20 border-l-2 border-emerald-500"
+              style={{
+                left: `${Math.min(95, Math.round((minRangeSecs / Math.max(1, totalTimeLimitSecs)) * 100))}%`,
+                right: '0%',
+              }}
+              title={`Target Window: ${liveMinMinutes}m to ${liveMaxMinutes}m`}
+            />
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                totalTimeLimitSecs - secondsElapsed <= 60
+                  ? 'bg-gradient-to-r from-rose-500 to-amber-500'
+                  : isInTargetTimeRange
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                  : 'bg-gradient-to-r from-indigo-500 to-purple-500'
+              }`}
+              style={{
+                width: `${Math.min(100, Math.round((secondsElapsed / Math.max(1, totalTimeLimitSecs)) * 100))}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Main Assessment Layout Grid (Question Jumper Palette + Active Question Canvas) */}
       <div className={`grid ${isDistractionFree ? 'grid-cols-1 max-w-3xl mx-auto' : 'grid-cols-1 lg:grid-cols-12'} gap-4 items-start`}>
@@ -2143,6 +2357,13 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         soundFx.playClick();
                         setSelectedOption(option);
                       }}
+                      onDoubleClick={() => {
+                        if (isAnswerChecked || isEliminated) return;
+                        soundFx.playSelect();
+                        setSelectedOption(option);
+                        handleVoiceDirectCheck(option);
+                      }}
+                      title="Click to select, or Double-Tap / Double-Click to lock in as your answer"
                       className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${optionStyle}`}
                     >
                       <span
@@ -2230,10 +2451,11 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                 {!currentQuestion.blank_context?.word_bank && !isAnswerChecked && (
                   <input
                     type="text"
+                    maxLength={5000}
                     value={fillBlankAnswer}
                     disabled={isAnswerChecked}
                     onChange={(e) => setFillBlankAnswer(e.target.value)}
-                    placeholder="Type the exact missing term or phrase..."
+                    placeholder="Type the exact missing term or phrase (Ctrl+Enter to submit)..."
                     className="w-full p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-slate-100 focus:border-emerald-500 focus:outline-none"
                   />
                 )}
@@ -2243,19 +2465,26 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
             {/* QUESTION INPUT FORMAT: OPEN EXPLANATION */}
             {currentQuestion.type === 'open_explanation' && (
               <div className="space-y-4 pt-2">
-                <textarea
-                  rows={4}
-                  value={openTextAnswer}
-                  disabled={isAnswerChecked}
-                  onChange={(e) => setOpenTextAnswer(e.target.value)}
-                  placeholder="Explain your reasoning or describe the solution steps in full..."
-                  className="w-full p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:outline-none resize-none leading-relaxed"
-                />
+                <div className="space-y-1.5">
+                  <textarea
+                    rows={4}
+                    maxLength={5000}
+                    value={openTextAnswer}
+                    disabled={isAnswerChecked}
+                    onChange={(e) => setOpenTextAnswer(e.target.value)}
+                    placeholder="Explain your reasoning or describe the solution steps in full... (Enter moves downwards, Ctrl+Enter to submit)"
+                    className="w-full p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-slate-100 focus:border-indigo-500 focus:outline-none resize-none leading-relaxed"
+                  />
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold px-1">
+                    <span>Enter = Move Downwards · Ctrl + Enter = Submit Response</span>
+                    <span>{openTextAnswer.length} / 5000 characters</span>
+                  </div>
+                </div>
 
-                {/* Rubric Guidance */}
-                {currentQuestion.rubric && (
-                  <div className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs text-indigo-950 dark:text-indigo-200">
-                    <span className="font-extrabold block mb-1">Evaluation Criteria:</span>
+                {/* Rubric Guidance — Strictly visible ONLY after the question has been answered */}
+                {isAnswerChecked && currentQuestion.rubric && (
+                  <div className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs text-indigo-950 dark:text-indigo-200 animate-in fade-in duration-200">
+                    <span className="font-extrabold block mb-1">Post-Answer Evaluation Criteria:</span>
                     <ul className="list-disc list-inside space-y-0.5 text-[11px] text-slate-600 dark:text-slate-400">
                       {currentQuestion.rubric.map((r, rIdx) => (
                         <li key={rIdx}>{r}</li>
@@ -2302,6 +2531,12 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                           onClick={() => {
                             soundFx.playSelect();
                             setSelectedOption(option);
+                          }}
+                          onDoubleClick={() => {
+                            if (isAnswerChecked) return;
+                            soundFx.playSelect();
+                            setSelectedOption(option);
+                            handleVoiceDirectCheck(option);
                           }}
                           className={`p-4 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${optionStyle}`}
                         >
@@ -2430,6 +2665,19 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                 <MessageSquare className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                 <span>Ask AI Tutor</span>
               </button>
+
+              <StudyToolsWidget
+                calculatorEnabled={
+                  quiz.calculatorEnabled ??
+                  assessmentConfig.calculatorEnabled ??
+                  true
+                }
+                dictionaryEnabled={
+                  quiz.dictionaryEnabled ??
+                  assessmentConfig.dictionaryEnabled ??
+                  true
+                }
+              />
             </div>
 
             {/* Right Action: Step Verification & Next/Prev */}

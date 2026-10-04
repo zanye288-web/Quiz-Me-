@@ -1,134 +1,337 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { QuizResponse, Question } from '../types/quiz';
 import {
   X,
   Printer,
+  Download,
   FileText,
   CheckCircle2,
-  BookOpen,
+  GraduationCap,
   Sparkles,
-  Sliders,
+  FileCode,
+  ClipboardCheck,
+  Calculator,
+  Clock,
   Award,
-  Layers,
-  Copy,
-  Check,
 } from 'lucide-react';
-import { QuizResponse, Question } from '../types/quiz';
 import { soundFx } from '../utils/audio';
 
 interface ExamWorksheetModalProps {
-  quiz: QuizResponse | null;
-  isOpen: boolean;
+  quiz: QuizResponse;
   onClose: () => void;
 }
 
-export const ExamWorksheetModal: React.FC<ExamWorksheetModalProps> = ({
-  quiz,
-  isOpen,
-  onClose,
-}) => {
-  const [worksheetType, setWorksheetType] = useState<'student' | 'solution'>('student');
-  const [fontSize, setFontSize] = useState<'compact' | 'normal' | 'large'>('normal');
-  const [includeExplanations, setIncludeExplanations] = useState<boolean>(true);
-  const [includeHeader, setIncludeHeader] = useState<boolean>(true);
-  const [copiedText, setCopiedText] = useState<boolean>(false);
+interface OrganizedExamData {
+  examCode: string;
+  institutionHeader: string;
+  paperTitle: string;
+  recommendedTimeMinutes: number;
+  calculatorAllowed: boolean;
+  totalMarks: number;
+  candidateInstructions: string[];
+  organizedItems: Array<{
+    questionNumber: number;
+    section: string;
+    marks: number;
+    commandWord: string;
+    formattedPrompt: string;
+    options?: string[];
+    markSchemeBreakdown: string[];
+    examinerNotes: string;
+  }>;
+}
 
-  if (!isOpen || !quiz) return null;
+export const ExamWorksheetModal: React.FC<ExamWorksheetModalProps> = ({ quiz, onClose }) => {
+  const [worksheetType, setWorksheetType] = useState<'student' | 'solution' | 'both'>('both');
+  const [institutionName, setInstitutionName] = useState('Quiz Me! International Examination Board');
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState(Math.max(15, quiz.questions.length * 3));
+  const [includeExplanations, setIncludeExplanations] = useState(true);
+  const [aiOrganizing, setAiOrganizing] = useState(false);
+  const [organizedExam, setOrganizedExam] = useState<OrganizedExamData | null>(null);
 
-  const handlePrint = () => {
+  const runAiExamOrganizer = async () => {
+    setAiOrganizing(true);
+    soundFx.playClick();
+    try {
+      const res = await fetch('/api/organize-exam', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quizTitle: quiz.quiz_title,
+          difficulty: quiz.difficulty || 'Intermediate',
+          questions: quiz.questions,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.organizedExam) {
+        setOrganizedExam(data.organizedExam);
+        if (data.organizedExam.recommendedTimeMinutes) {
+          setTimeLimitMinutes(data.organizedExam.recommendedTimeMinutes);
+        }
+        soundFx.playSuccess();
+      }
+    } catch {
+      // Fallback handled automatically
+    } finally {
+      setAiOrganizing(false);
+    }
+  };
+
+  useEffect(() => {
+    runAiExamOrganizer();
+  }, [quiz.quiz_title]);
+
+  const handlePrintPdf = () => {
     soundFx.playClick();
     window.print();
   };
 
-  const handleCopyRaw = () => {
-    soundFx.playClick();
-    let text = `${quiz.quiz_title.toUpperCase()}\n`;
-    text += `Topic: ${quiz.topic || 'General'} | Difficulty: ${quiz.difficulty || 'Intermediate'}\n`;
-    text += `Total Questions: ${quiz.questions.length}\n`;
-    text += `========================================\n\n`;
-
-    quiz.questions.forEach((q, idx) => {
-      text += `Question ${idx + 1}: ${q.question}\n`;
-      if (q.code_snippet) {
-        text += `\nCode (${q.language || 'text'}):\n${q.code_snippet}\n\n`;
-      }
-      if (q.options && q.options.length > 0) {
-        q.options.forEach((opt, optIdx) => {
-          text += `  [${String.fromCharCode(65 + optIdx)}] ${opt}\n`;
-        });
-      }
-
-      if (worksheetType === 'solution') {
-        text += `\n✓ Correct Answer: ${q.correct_answer}\n`;
-        if (q.explanation) {
-          text += `Explanation: ${q.explanation}\n`;
-        }
-      }
-      text += `\n----------------------------------------\n\n`;
-    });
-
-    navigator.clipboard.writeText(text);
-    setCopiedText(true);
-    setTimeout(() => setCopiedText(false), 2000);
+  const getItemMarks = (idx: number, q: Question) => {
+    const org = organizedExam?.organizedItems?.[idx];
+    if (org?.marks) return org.marks;
+    return q.type === 'open_explanation' ? 4 : q.type === 'fill_in_blank' ? 2 : 1;
   };
 
-  const getFontSizeClasses = () => {
-    switch (fontSize) {
-      case 'compact':
-        return 'text-xs leading-normal';
-      case 'large':
-        return 'text-base leading-relaxed';
-      default:
-        return 'text-sm leading-relaxed';
+  const getItemMarkScheme = (idx: number, q: Question): string[] => {
+    const org = organizedExam?.organizedItems?.[idx];
+    if (org?.markSchemeBreakdown && org.markSchemeBreakdown.length > 0) {
+      return org.markSchemeBreakdown;
     }
+    const marks = getItemMarks(idx, q);
+    if (marks === 1) return [`[B1] 1 mark for correct identification: "${q.correct_answer}"`];
+    if (marks === 2) {
+      return [
+        `[M1] 1 mark for identifying core principle or method`,
+        `[A1] 1 mark for exact answer: "${q.correct_answer}"`,
+      ];
+    }
+    return [
+      `[C1] 1 mark for clear conceptual definition`,
+      `[M1] 1 mark for step-by-step analytical reasoning`,
+      `[A1] 1 mark for accurate synthesis: "${q.correct_answer}"`,
+      `[E1] 1 mark for relevant example or boundary check`,
+    ];
+  };
+
+  const totalPossibleMarks =
+    organizedExam?.totalMarks ||
+    quiz.questions.reduce((acc, q, idx) => acc + getItemMarks(idx, q), 0);
+
+  const handleDownloadTxt = () => {
+    soundFx.playClick();
+    const lines: string[] = [];
+    lines.push('============================================================================');
+    lines.push(institutionName.toUpperCase());
+    lines.push(`OFFICIAL EXAMINATION PAPER: ${quiz.quiz_title.toUpperCase()}`);
+    lines.push(`PAPER CODE: ${organizedExam?.examCode || 'QM-EXAM-2025'} | TIME ALLOWED: ${timeLimitMinutes} MINS | TOTAL MARKS: ${totalPossibleMarks}`);
+    lines.push('============================================================================\n');
+
+    if (worksheetType === 'student' || worksheetType === 'both') {
+      lines.push('CANDIDATE NAME: ___________________________   DATE: _______________');
+      lines.push('CANDIDATE ID:   ___________________________   SCORE: ____ / ' + totalPossibleMarks + '\n');
+      lines.push('CANDIDATE INSTRUCTIONS:');
+      (organizedExam?.candidateInstructions || [
+        'Answer ALL questions in the spaces provided.',
+        'Show all working clearly to earn method marks [M1] and accuracy marks [A1].',
+      ]).forEach((inst, i) => lines.push(`  ${i + 1}. ${inst}`));
+      lines.push('\n----------------------------------------------------------------------------');
+      lines.push('SECTION 1: EXAMINATION QUESTIONS');
+      lines.push('----------------------------------------------------------------------------\n');
+
+      quiz.questions.forEach((q: Question, idx: number) => {
+        const marks = getItemMarks(idx, q);
+        const orgItem = organizedExam?.organizedItems?.[idx];
+        lines.push(`Question ${idx + 1} [${marks} ${marks === 1 ? 'mark' : 'marks'}] (${orgItem?.section || q.domain || 'Core Assessment'}):`);
+        lines.push(`${orgItem?.formattedPrompt || q.question}\n`);
+        if (q.code_snippet) {
+          lines.push('--- Code / Reference Block ---');
+          lines.push(q.code_snippet);
+          lines.push('------------------------------\n');
+        }
+        if (q.options && q.options.length > 0) {
+          q.options.forEach((opt, oIdx) => {
+            const letter = String.fromCharCode(65 + oIdx);
+            lines.push(`   [ ${letter} ] ${opt}`);
+          });
+          lines.push('');
+        } else {
+          lines.push('   Working / Written Answer: _______________________________________________');
+          lines.push('   _________________________________________________________________________\n');
+        }
+      });
+    }
+
+    if (worksheetType === 'solution' || worksheetType === 'both') {
+      lines.push('\n============================================================================');
+      lines.push('OFFICIAL EXAMINER MARK SCHEME & GRADING RUBRIC');
+      lines.push('============================================================================\n');
+      quiz.questions.forEach((q: Question, idx: number) => {
+        const marks = getItemMarks(idx, q);
+        const breakdown = getItemMarkScheme(idx, q);
+        lines.push(`Q${idx + 1} (${marks} ${marks === 1 ? 'mark' : 'marks'}) — Verified Answer: ${q.correct_answer}`);
+        breakdown.forEach((b) => lines.push(`   • ${b}`));
+        if (includeExplanations && q.explanation) {
+          lines.push(`   Examiner Rationale: ${q.explanation}`);
+        }
+        lines.push('');
+      });
+    }
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${quiz.quiz_title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_exam_${worksheetType}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadDocx = () => {
+    soundFx.playClick();
+    const htmlContent = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"><title>${quiz.quiz_title} - Exam & Mark Scheme</title>
+      <style>
+        body { font-family: 'Calibri', 'Arial', sans-serif; color: #111827; line-height: 1.5; padding: 24px; }
+        h1 { font-size: 20pt; margin-bottom: 4px; color: #1e1b4b; }
+        h2 { font-size: 14pt; margin-top: 20px; border-bottom: 2px solid #1e1b4b; padding-bottom: 4px; }
+        .meta { font-size: 10pt; color: #4b5563; margin-bottom: 16px; }
+        .question-box { margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
+        .marks { font-weight: bold; color: #4338ca; float: right; }
+        .mark-scheme { background-color: #f0fdf4; border: 1px solid #86efac; padding: 10px; margin-top: 8px; }
+      </style>
+      </head>
+      <body>
+        <div style="text-align:center; border-bottom: 3px double #111827; padding-bottom: 12px; margin-bottom: 20px;">
+          <div style="font-size: 10pt; font-weight: bold; letter-spacing: 2px;">${institutionName.toUpperCase()}</div>
+          <h1>${quiz.quiz_title}</h1>
+          <div class="meta">Paper Code: ${organizedExam?.examCode || 'QM-2025'} | Time Allowed: ${timeLimitMinutes} Minutes | Total Marks: ${totalPossibleMarks}</div>
+        </div>
+        ${
+          worksheetType === 'student' || worksheetType === 'both'
+            ? `
+          <p><strong>Candidate Name:</strong> ____________________________ &nbsp;&nbsp; <strong>Candidate ID:</strong> ________________</p>
+          <h2>Section I: Examination Paper</h2>
+          ${quiz.questions
+            .map((q, idx) => {
+              const marks = getItemMarks(idx, q);
+              return `
+                <div class="question-box">
+                  <p><strong>Question ${idx + 1} (${marks} ${marks === 1 ? 'mark' : 'marks'}):</strong> ${q.question}</p>
+                  ${
+                    q.options && q.options.length > 0
+                      ? `<ul>${q.options.map((opt, i) => `<li><strong>${String.fromCharCode(65 + i)}.</strong> ${opt}</li>`).join('')}</ul>`
+                      : `<p><em>Answer / Working:</em><br/>________________________________________________________________________<br/>________________________________________________________________________</p>`
+                  }
+                </div>
+              `;
+            })
+            .join('')}
+        `
+            : ''
+        }
+        ${
+          worksheetType === 'solution' || worksheetType === 'both'
+            ? `
+          <br style="page-break-before: always;" />
+          <h2>Section II: Official Examiner Mark Scheme</h2>
+          ${quiz.questions
+            .map((q, idx) => {
+              const marks = getItemMarks(idx, q);
+              const breakdown = getItemMarkScheme(idx, q);
+              return `
+                <div class="mark-scheme">
+                  <p><strong>Q${idx + 1} [${marks} ${marks === 1 ? 'mark' : 'marks'}] — Verified Answer:</strong> ${q.correct_answer}</p>
+                  <ul>${breakdown.map((b) => `<li>${b}</li>`).join('')}</ul>
+                  ${includeExplanations && q.explanation ? `<p><em>Examiner Rationale:</em> ${q.explanation}</p>` : ''}
+                </div>
+              `;
+            })
+            .join('')}
+        `
+            : ''
+        }
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff', htmlContent], {
+      type: 'application/msword;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${quiz.quiz_title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_exam_${worksheetType}.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl border border-slate-200/80 dark:border-slate-800/80 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-        {/* Modal Toolbar Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-50/70 dark:bg-slate-850/70">
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+        {/* Top Modal Control Bar */}
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950/60 print:hidden">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900 shadow-2xs">
-              <FileText className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md">
+              <GraduationCap className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-                Exam Worksheet & Study Guide Generator
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                  AI Exam Generator & Official Mark Scheme
+                </h2>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase">
+                  PDF • DOC • TXT Ready
+                </span>
+              </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Print or export clean formatted paper tests and answer keys
+                AI-organized examination paper with point allocations ([M1], [A1], [B1]) and official grading rubric
               </p>
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={handleCopyRaw}
-              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              onClick={runAiExamOrganizer}
+              disabled={aiOrganizing}
+              className="px-3 py-2 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 border border-purple-500/30 text-xs font-black flex items-center gap-1.5 cursor-pointer"
             >
-              {copiedText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedText ? 'Copied!' : 'Copy Text'}</span>
+              <Sparkles className={`w-3.5 h-3.5 ${aiOrganizing ? 'animate-spin' : ''}`} />
+              <span>{aiOrganizing ? 'AI Organizing...' : 'AI Re-Organize Exam'}</span>
             </button>
 
             <button
               type="button"
-              onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+              onClick={handleDownloadTxt}
+              className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>TXT</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadDocx}
+              className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <FileCode className="w-3.5 h-3.5" />
+              <span>DOC / Word</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintPdf}
+              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Worksheet</span>
+              <span>PDF / Print</span>
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                soundFx.playClick();
-                onClose();
-              }}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              aria-label="Close"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -136,197 +339,192 @@ export const ExamWorksheetModal: React.FC<ExamWorksheetModalProps> = ({
         </div>
 
         {/* Configuration Bar */}
-        <div className="px-6 py-3 border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-100/50 dark:bg-slate-800/40 flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Student vs Instructor toggle */}
-          <div className="flex items-center bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                setWorksheetType('student');
-              }}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                worksheetType === 'student'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Student Exam Sheet
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                setWorksheetType('solution');
-              }}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                worksheetType === 'solution'
-                  ? 'bg-indigo-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Teacher Solution Key
-            </button>
+        <div className="px-5 py-3 bg-slate-100/70 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: 'both', label: 'Exam + Mark Scheme Bundle' },
+              { id: 'student', label: 'Candidate Exam Paper Only' },
+              { id: 'solution', label: 'Official Mark Scheme Only' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setWorksheetType(tab.id as any)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  worksheetType === tab.id
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          {/* Controls: Font Size & Header */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-500 dark:text-slate-400 font-medium">Text Size:</span>
-              <div className="flex items-center bg-white dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                {(['compact', 'normal', 'large'] as const).map((sz) => (
-                  <button
-                    key={sz}
-                    type="button"
-                    onClick={() => setFontSize(sz)}
-                    className={`px-2 py-1 rounded text-[11px] font-bold capitalize cursor-pointer ${
-                      fontSize === sz
-                        ? 'bg-indigo-600 text-white'
-                        : 'text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {sz}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <label className="flex items-center gap-2 cursor-pointer select-none">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <input
+              type="text"
+              value={institutionName}
+              onChange={(e) => setInstitutionName(e.target.value)}
+              className="px-3 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-800 dark:text-slate-200"
+              placeholder="Institution Header"
+            />
+            <label className="flex items-center gap-1.5 font-bold text-slate-600 dark:text-slate-300">
               <input
                 type="checkbox"
-                checked={includeHeader}
-                onChange={(e) => setIncludeHeader(e.target.checked)}
-                className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                checked={includeExplanations}
+                onChange={(e) => setIncludeExplanations(e.target.checked)}
+                className="rounded accent-indigo-600"
               />
-              <span className="text-slate-600 dark:text-slate-300 font-medium">Header Box</span>
+              <span>Examiner Notes</span>
             </label>
           </div>
         </div>
 
-        {/* Printable Worksheet Preview Canvas */}
-        <div className="p-6 sm:p-8 overflow-y-auto bg-slate-50/30 dark:bg-slate-950/40">
-          <div
-            id="printable-exam-sheet"
-            className={`max-w-3xl mx-auto bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-8 sm:p-10 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md space-y-6 ${getFontSizeClasses()}`}
-          >
-            {/* Header section for Student info */}
-            {includeHeader && (
-              <div className="border-b-2 border-slate-900 dark:border-slate-100 pb-5 space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-                      Assessment Examination Sheet
-                    </span>
-                    <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                      {quiz.quiz_title}
-                    </h1>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Subject: {quiz.topic || 'General Science'} • Difficulty: {quiz.difficulty || 'Intermediate'} • Total Questions: {quiz.questions.length}
-                    </p>
-                  </div>
-
-                  {worksheetType === 'solution' && (
-                    <span className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 font-black text-xs">
-                      INSTRUCTOR ANSWER KEY
-                    </span>
-                  )}
-                </div>
-
-                {worksheetType === 'student' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs">
-                    <div className="p-2 border border-slate-300 dark:border-slate-700 rounded-lg">
-                      <span className="font-bold text-slate-500">Student Name:</span>
-                    </div>
-                    <div className="p-2 border border-slate-300 dark:border-slate-700 rounded-lg">
-                      <span className="font-bold text-slate-500">Date:</span>
-                    </div>
-                    <div className="p-2 border border-slate-300 dark:border-slate-700 rounded-lg">
-                      <span className="font-bold text-slate-500">Score / Grade:</span>
-                    </div>
-                  </div>
-                )}
+        {/* Printable Exam & Mark Scheme Preview */}
+        <div className="flex-1 overflow-y-auto p-6 sm:p-10 bg-slate-50 dark:bg-slate-950">
+          <div className="max-w-3xl mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-10 shadow-sm space-y-8 print:shadow-none print:border-0 print:p-0">
+            {/* Official Exam Cover Banner */}
+            <div className="border-b-2 border-slate-900 dark:border-slate-100 pb-6 space-y-4">
+              <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                <span>{institutionName}</span>
+                <span>PAPER CODE: {organizedExam?.examCode || 'QM-2025-STD'}</span>
               </div>
-            )}
 
-            {/* Questions List */}
-            <div className="space-y-6 pt-2">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                {organizedExam?.paperTitle || quiz.quiz_title}
+              </h1>
+
+              <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-600 dark:text-slate-300">
+                <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Time Allowed: {timeLimitMinutes} Minutes</span>
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center gap-1.5">
+                  <Award className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Total Marks: {totalPossibleMarks} Marks</span>
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center gap-1.5">
+                  <Calculator className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>
+                    Calculator: {organizedExam?.calculatorAllowed || quiz.calculatorEnabled ? 'Permitted' : 'Not Required'}
+                  </span>
+                </span>
+              </div>
+
+              {worksheetType !== 'solution' && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
+                  <div className="p-2.5 rounded-xl border border-slate-300 dark:border-slate-700">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Candidate Name</span>
+                    <div className="h-5 border-b border-dotted border-slate-300 dark:border-slate-700 mt-1" />
+                  </div>
+                  <div className="p-2.5 rounded-xl border border-slate-300 dark:border-slate-700">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Candidate ID / Seat</span>
+                    <div className="h-5 border-b border-dotted border-slate-300 dark:border-slate-700 mt-1" />
+                  </div>
+                  <div className="p-2.5 rounded-xl border border-slate-300 dark:border-slate-700">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Examiner Score</span>
+                    <div className="h-5 font-mono font-black text-right text-slate-500 mt-1">
+                      _____ / {totalPossibleMarks}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Questions & Mark Scheme Items */}
+            <div className="space-y-6">
               {quiz.questions.map((q: Question, idx: number) => {
+                const orgItem = organizedExam?.organizedItems?.[idx];
+                const marks = getItemMarks(idx, q);
+                const scheme = getItemMarkScheme(idx, q);
+
                 return (
-                  <div key={q.id || idx} className="space-y-3 pb-6 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                  <div
+                    key={q.id || idx}
+                    className="space-y-3 pb-6 border-b border-slate-200 dark:border-slate-800 last:border-0"
+                  >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-2">
-                        <span className="font-mono font-black text-indigo-600 dark:text-indigo-400 shrink-0">
-                          {idx + 1}.
+                      <div className="flex items-start gap-2.5">
+                        <span className="px-2 py-0.5 rounded-lg bg-indigo-600 text-white font-mono font-black text-xs shrink-0 mt-0.5">
+                          Q{idx + 1}
                         </span>
-                        <div className="font-bold text-slate-900 dark:text-white">
-                          {q.question}
+                        <div className="space-y-1">
+                          <div className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                            {orgItem?.section || q.domain || 'Section A'} • Command: {orgItem?.commandWord || 'Analyze'}
+                          </div>
+                          <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
+                            {orgItem?.formattedPrompt || q.question}
+                          </div>
                         </div>
                       </div>
-                      {q.domain && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 shrink-0">
-                          {q.domain}
-                        </span>
-                      )}
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono font-black text-xs shrink-0">
+                        [{marks} {marks === 1 ? 'mark' : 'marks'}]
+                      </span>
                     </div>
 
-                    {/* Code Snippet if present */}
                     {q.code_snippet && (
                       <pre className="p-3 rounded-xl bg-slate-950 text-slate-100 font-mono text-xs overflow-x-auto border border-slate-800">
                         <code>{q.code_snippet}</code>
                       </pre>
                     )}
 
-                    {/* Options (MCQ) */}
-                    {q.options && q.options.length > 0 && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-5 pt-1">
+                    {/* Options for Objective Questions */}
+                    {worksheetType !== 'solution' && q.options && q.options.length > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8 pt-1">
                         {q.options.map((opt, optIdx) => {
                           const letter = String.fromCharCode(65 + optIdx);
-                          const isCorrect =
-                            worksheetType === 'solution' &&
-                            opt.trim().toLowerCase() === q.correct_answer.trim().toLowerCase();
-
                           return (
                             <div
                               key={optIdx}
-                              className={`p-2.5 rounded-xl border flex items-start gap-2 text-xs transition-colors ${
-                                isCorrect
-                                  ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 font-bold'
-                                  : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40'
-                              }`}
+                              className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 flex items-start gap-2 text-xs"
                             >
                               <span className="w-5 h-5 rounded-md border border-slate-300 dark:border-slate-600 flex items-center justify-center font-mono font-bold text-[10px] shrink-0 bg-white dark:bg-slate-700">
                                 {letter}
                               </span>
                               <span className="flex-1">{opt}</span>
-                              {isCorrect && (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                              )}
                             </div>
                           );
                         })}
                       </div>
                     )}
 
-                    {/* Free response line for student sheet if no options */}
-                    {worksheetType === 'student' && (!q.options || q.options.length === 0) && (
-                      <div className="pl-5 pt-2 space-y-3">
+                    {/* Written answer lines for Student Paper */}
+                    {worksheetType !== 'solution' && (!q.options || q.options.length === 0) && (
+                      <div className="pl-8 pt-2 space-y-3">
+                        <div className="h-6 border-b border-dashed border-slate-300 dark:border-slate-700" />
                         <div className="h-6 border-b border-dashed border-slate-300 dark:border-slate-700" />
                         <div className="h-6 border-b border-dashed border-slate-300 dark:border-slate-700" />
                       </div>
                     )}
 
-                    {/* Solution & Explanation Box for Teacher mode */}
-                    {worksheetType === 'solution' && (
-                      <div className="mt-2 pl-5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs space-y-1.5">
-                        <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-300">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Correct Answer: {q.correct_answer}</span>
+                    {/* Official Mark Scheme Box */}
+                    {(worksheetType === 'solution' || worksheetType === 'both') && (
+                      <div className="ml-8 mt-3 p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-xs space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-black text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                            <ClipboardCheck className="w-4 h-4" />
+                            <span>OFFICIAL MARK SCHEME — Target Answer: {q.correct_answer}</span>
+                          </span>
+                          <span className="font-mono font-bold text-[11px] text-emerald-700 dark:text-emerald-400">
+                            Max: {marks} {marks === 1 ? 'pt' : 'pts'}
+                          </span>
                         </div>
-                        {q.explanation && includeExplanations && (
-                          <p className="text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Rationale: </span>
-                            {q.explanation}
-                          </p>
+
+                        <ul className="space-y-1 pl-1">
+                          {scheme.map((criterion, cIdx) => (
+                            <li key={cIdx} className="flex items-start gap-1.5 text-slate-700 dark:text-slate-200">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                              <span>{criterion}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        {includeExplanations && (orgItem?.examinerNotes || q.explanation) && (
+                          <div className="pt-1.5 border-t border-emerald-200/60 dark:border-emerald-800/50 text-[11px] text-slate-600 dark:text-slate-300">
+                            <strong className="font-bold">Examiner Guidance: </strong>
+                            {orgItem?.examinerNotes || q.explanation}
+                          </div>
                         )}
                       </div>
                     )}
@@ -334,26 +532,6 @@ export const ExamWorksheetModal: React.FC<ExamWorksheetModalProps> = ({
                 );
               })}
             </div>
-
-            {/* Answer Grid at end if student sheet */}
-            {worksheetType === 'student' && (
-              <div className="pt-6 border-t-2 border-slate-900 dark:border-slate-100">
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                  Answer Record Grid
-                </h3>
-                <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-                  {quiz.questions.map((_, i) => (
-                    <div
-                      key={i}
-                      className="border border-slate-300 dark:border-slate-700 rounded p-1 text-center text-xs"
-                    >
-                      <div className="font-bold text-[10px] text-slate-400">{i + 1}</div>
-                      <div className="h-4" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

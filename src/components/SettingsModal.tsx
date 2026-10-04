@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Sun, Moon, Monitor, Sliders, Volume2, VolumeX, ShieldCheck, Check, Clock, Sparkles, Zap, Timer, Flame, Headphones, ChevronRight, Save, Music } from 'lucide-react';
-import { useTheme, ANIMATION_STYLE_CATALOG } from '../context/ThemeContext';
+import { useTheme, ANIMATION_STYLE_CATALOG, PARTICLE_PRESET_CATALOG, GRAPHICS_MODE_CATALOG } from '../context/ThemeContext';
 import { AssessmentConfig } from '../types/quiz';
 import { soundFx, SOUND_PROFILES, SoundProfileType } from '../utils/audio';
 import { VoiceSettingsModal } from './VoiceSettingsModal';
@@ -30,7 +30,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onUpdateAssessmentConfig,
   onOpenFullSettings,
 }) => {
-  const { theme, setTheme, animationStyle, setAnimationStyle } = useTheme();
+  const {
+    theme,
+    setTheme,
+    animationStyle,
+    setAnimationStyle,
+    particlesEnabled,
+    setParticlesEnabled,
+    particlePreset,
+    setParticlePreset,
+    graphicsMode,
+    setGraphicsMode,
+    rtxEnabled,
+    setRtxEnabled,
+    fpsCounterEnabled,
+    setFpsCounterEnabled,
+  } = useTheme();
   const [showVoiceSettings, setShowVoiceSettings] = useState<boolean>(false);
   const [savedNotice, setSavedNotice] = useState<boolean>(false);
   const {
@@ -194,6 +209,69 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
+          {/* Graphics Mode & RTX Engine Quick Switcher */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <span>💎 Graphics Mode & RTX Engine</span>
+              </label>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setFpsCounterEnabled(!fpsCounterEnabled);
+                  }}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-black cursor-pointer transition-colors ${
+                    fpsCounterEnabled
+                      ? 'bg-slate-900 text-emerald-400 border border-emerald-500/40'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {fpsCounterEnabled ? 'FPS: ON' : 'FPS HUD'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playPop();
+                    const next = !rtxEnabled;
+                    setRtxEnabled(next);
+                    if (next && graphicsMode === 'simple') setGraphicsMode('ultra');
+                  }}
+                  className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black cursor-pointer transition-colors ${
+                    rtxEnabled && graphicsMode !== 'simple'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-2xs'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {rtxEnabled && graphicsMode !== 'simple' ? 'RTX: ON' : 'RTX: OFF'}
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
+              {GRAPHICS_MODE_CATALOG.map((gm) => (
+                <button
+                  key={gm.id}
+                  type="button"
+                  onClick={() => {
+                    soundFx.playPop();
+                    setGraphicsMode(gm.id);
+                  }}
+                  className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                    graphicsMode === gm.id
+                      ? gm.id === 'ultra'
+                        ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/50 text-emerald-900 dark:text-emerald-200 font-black ring-2 ring-emerald-500/20'
+                        : 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/50 text-indigo-900 dark:text-indigo-200 font-black ring-2 ring-indigo-500/20'
+                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  <div className="text-base">{gm.icon}</div>
+                  <div className="text-[10px] font-extrabold truncate mt-0.5">{gm.shortName}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Theme Mode */}
           <div className="space-y-3">
             <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -232,6 +310,58 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>Dark Mode</span>
               </button>
             </div>
+          </div>
+
+          {/* Particle Visual Effects Quick Switcher (Removable in Settings) */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Particle Visual Effects</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setParticlesEnabled(!particlesEnabled);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-colors cursor-pointer ${
+                  particlesEnabled
+                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                {particlesEnabled ? 'Active (Click to Remove)' : 'Removed (Click to Enable)'}
+              </button>
+            </div>
+
+            {particlesEnabled && (
+              <div className="grid grid-cols-3 gap-1.5">
+                {PARTICLE_PRESET_CATALOG.map((p) => {
+                  const isSelected = particlePreset === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setParticlePreset(p.id);
+                      }}
+                      className={`p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center gap-0.5 ${
+                        isSelected
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 font-black'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      <span className="text-sm">{p.icon}</span>
+                      <span className="text-[10px] font-bold truncate max-w-full">
+                        {p.name.split(' ')[0]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Animation Physics Quick Switcher */}

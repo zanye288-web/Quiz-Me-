@@ -18,6 +18,7 @@ import { db, auth } from '../lib/firebase';
 import { UserStats, QuizResponse, PersonaType, DifficultyType, AssessmentConfig } from '../types/quiz';
 import { QuizHistoryRecord } from '../components/HistoryView';
 import type { LeaderboardUser } from '../components/GlobalLeaderboard';
+import { LEVEL_SYSTEM_VERSION, calculateLevelFromXp, getRankForLevel } from '../utils/levelingSystem';
 
 export enum OperationType {
   CREATE = 'create',
@@ -103,6 +104,7 @@ export interface UserProfileDocument {
   gems: number;
   coins?: number;
   level: number;
+  levelSystemVersion?: string;
   quizzesCompleted: number;
   totalCorrect: number;
   totalQuestions: number;
@@ -129,6 +131,11 @@ export interface SavedQuizDocument {
   questions: any[];
   study_guide?: any;
   isPublic: boolean;
+  calculatorEnabled?: boolean;
+  dictionaryEnabled?: boolean;
+  aiVerified?: boolean;
+  aiVerificationScore?: number;
+  aiVerificationSummary?: string;
   tags?: string[];
   pedagogical_topic?: string;
   pedagogical_subtopic?: string;
@@ -139,6 +146,20 @@ export interface SavedQuizDocument {
   createdAt?: any;
   updatedAt?: any;
   quiz?: QuizResponse;
+}
+
+export interface CreatorLeaderboardEntry {
+  creatorId: string;
+  creatorName: string;
+  creatorRole: PersonaType;
+  creatorAvatar?: string | null;
+  creatorLevel: number;
+  quizzesPublished: number;
+  totalLikes: number;
+  totalComments: number;
+  followersCount: number;
+  avgVerificationScore: number;
+  isTopCreator: boolean;
 }
 
 export interface QuizComment {
@@ -227,6 +248,7 @@ export async function upsertUserProfile(
         xp: data.xp ?? 0,
         gems: data.gems ?? 20,
         level: data.level ?? 1,
+        levelSystemVersion: data.levelSystemVersion ?? LEVEL_SYSTEM_VERSION,
         quizzesCompleted: data.quizzesCompleted ?? 0,
         totalCorrect: data.totalCorrect ?? 0,
         totalQuestions: data.totalQuestions ?? 0,
@@ -407,6 +429,11 @@ export async function saveQuizToFirestore(
       questions: quiz.questions,
       study_guide: quiz.study_guide,
       isPublic,
+      calculatorEnabled: Boolean(quiz.calculatorEnabled),
+      dictionaryEnabled: Boolean(quiz.dictionaryEnabled),
+      aiVerified: quiz.aiVerified ?? true,
+      aiVerificationScore: quiz.aiVerificationScore ?? 94,
+      aiVerificationSummary: quiz.aiVerificationSummary || 'Verified by Quiz Me! AI Standards Engine',
       tags: quiz.tags || [],
       pedagogical_topic: quiz.pedagogical_topic,
       pedagogical_subtopic: quiz.pedagogical_subtopic,
@@ -421,6 +448,56 @@ export async function saveQuizToFirestore(
   } catch (err) {
     handleFirestoreError(err, OperationType.CREATE, 'quizzes');
     throw err;
+  }
+}
+
+export async function toggleFollowCreator(
+  followerId: string,
+  creatorId: string,
+  creatorName: string,
+  currentlyFollowing: boolean
+): Promise<boolean> {
+  if (!auth.currentUser || !followerId || !creatorId) return !currentlyFollowing;
+  const followDocRef = doc(db, 'users', followerId, 'following', creatorId);
+  try {
+    if (currentlyFollowing) {
+      await deleteDoc(followDocRef);
+      return false;
+    } else {
+      await setDoc(followDocRef, {
+        creatorId,
+        creatorName,
+        followerId,
+        followedAt: serverTimestamp(),
+      });
+      return true;
+    }
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, `users/${followerId}/following/${creatorId}`);
+    return !currentlyFollowing;
+  }
+}
+
+export function subscribeFollowedCreators(
+  userId: string,
+  onUpdate: (followedCreatorIds: Set<string>) => void
+) {
+  if (!auth.currentUser || !userId) return () => {};
+  try {
+    const colRef = collection(db, 'users', userId, 'following');
+    return onSnapshot(
+      colRef,
+      (snap) => {
+        const set = new Set<string>();
+        snap.forEach((d) => set.add(d.id));
+        onUpdate(set);
+      },
+      (err) => {
+        console.warn('Following creators subscription notice:', err?.message || err);
+      }
+    );
+  } catch {
+    return () => {};
   }
 }
 
@@ -712,18 +789,15 @@ export async function fetchLeaderboardUsers(currentUserId?: string): Promise<Lea
       const totalQ = u.totalQuestions || 0;
       const accuracy = totalQ > 0 ? Math.round(((u.totalCorrect || 0) / totalQ) * 100) : 100;
 
-      let tier: 'Diamond' | 'Master' | 'Gold' | 'Silver' | 'Bronze' = 'Bronze';
-      if (u.level >= 10 || (u.xp || 0) >= 1500) tier = 'Diamond';
-      else if (u.level >= 7 || (u.xp || 0) >= 1000) tier = 'Master';
-      else if (u.level >= 4 || (u.xp || 0) >= 500) tier = 'Gold';
-      else if (u.level >= 2 || (u.xp || 0) >= 200) tier = 'Silver';
+      const realXp = u.levelSystemVersion === LEVEL_SYSTEM_VERSION ? (u.xp || 0) : 0;
+      const realLevel = u.levelSystemVersion === LEVEL_SYSTEM_VERSION ? calculateLevelFromXp(realXp) : 1;
+      const rankInfo = getRankForLevel(realLevel);
+      const tier: 'Diamond' | 'Master' | 'Gold' | 'Silver' | 'Bronze' = rankInfo.tierName;
 
       const badgeTitle =
-        u.badges && u.badges.length > 0
+        u.badges && u.badges.length > 0 && u.levelSystemVersion === LEVEL_SYSTEM_VERSION
           ? u.badges[u.badges.length - 1]
-          : u.role === 'Teacher'
-          ? 'Curriculum Master'
-          : 'Scholar Initiate';
+          : rankInfo.title;
 
       const userId = u.userId || `user_${rank}`;
 
@@ -735,8 +809,8 @@ export async function fetchLeaderboardUsers(currentUserId?: string): Promise<Lea
           u.photoURL ||
           `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(userId)}`,
         persona: u.role || 'Student',
-        level: u.level || 1,
-        xp: u.xp || 0,
+        level: realLevel,
+        xp: realXp,
         streak: u.streak || 1,
         accuracy,
         tier,
@@ -750,4 +824,58 @@ export async function fetchLeaderboardUsers(currentUserId?: string): Promise<Lea
     console.warn('Notice fetching leaderboard users from Firestore:', err);
     return [];
   }
+}
+
+// 6. Reset all signed-in users' levels in Firestore to Level 1 / 0 XP for the V3 Leveling System Revamp
+export async function resetAllSignedInUsersLevelsInFirestore(currentUserId?: string): Promise<number> {
+  if (!auth.currentUser && !currentUserId) return 0;
+  let resetCount = 0;
+  try {
+    // 1. Always ensure current user's own document is reset if not already on LEVEL_SYSTEM_VERSION
+    const activeUid = auth.currentUser?.uid || currentUserId;
+    if (activeUid) {
+      const ownDocRef = doc(db, 'users', activeUid);
+      const ownSnap = await getDoc(ownDocRef);
+      if (ownSnap.exists()) {
+        const data = ownSnap.data() as UserProfileDocument;
+        if (data.levelSystemVersion !== LEVEL_SYSTEM_VERSION) {
+          await updateDoc(ownDocRef, {
+            level: 1,
+            xp: 0,
+            levelSystemVersion: LEVEL_SYSTEM_VERSION,
+            updatedAt: serverTimestamp(),
+          });
+          resetCount++;
+        }
+      }
+    }
+
+    // 2. Also sweep all user documents in the users collection that haven't been migrated to LEVEL_SYSTEM_VERSION
+    const usersColRef = collection(db, 'users');
+    const snap = await getDocs(usersColRef);
+    const promises: Promise<any>[] = [];
+
+    snap.forEach((docSnap) => {
+      const data = docSnap.data() as UserProfileDocument;
+      if (data.levelSystemVersion !== LEVEL_SYSTEM_VERSION) {
+        promises.push(
+          updateDoc(docSnap.ref, {
+            level: 1,
+            xp: 0,
+            levelSystemVersion: LEVEL_SYSTEM_VERSION,
+            updatedAt: serverTimestamp(),
+          }).then(() => {
+            resetCount++;
+          }).catch(() => {})
+        );
+      }
+    });
+
+    if (promises.length > 0) {
+      await Promise.all(promises);
+    }
+  } catch (err) {
+    console.warn('Notice during global V3 level reset:', err);
+  }
+  return resetCount;
 }

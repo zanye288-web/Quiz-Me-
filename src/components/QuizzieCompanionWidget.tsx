@@ -36,6 +36,7 @@ interface QuizzieCompanionWidgetProps {
   stats: UserStatsType;
   persona: PersonaType;
   soundEnabled: boolean;
+  isQuizRunning?: boolean;
   onToggleSound: () => void;
   onOpenShortcuts: () => void;
   onOpenTutor: () => void;
@@ -57,6 +58,7 @@ export const QuizzieCompanionWidget: React.FC<QuizzieCompanionWidgetProps> = ({
   stats,
   persona,
   soundEnabled,
+  isQuizRunning = false,
   onToggleSound,
   onOpenShortcuts,
   onOpenTutor,
@@ -116,9 +118,13 @@ export const QuizzieCompanionWidget: React.FC<QuizzieCompanionWidgetProps> = ({
 
   const isMascotProfileActive = userProfile?.avatarType === 'mascot';
 
+  const positionClasses = isQuizRunning
+    ? 'fixed bottom-24 left-4 z-30 pointer-events-none'
+    : 'fixed bottom-4 left-4 md:left-auto md:right-5 z-30 pointer-events-none';
+
   if (isMinimized) {
     return (
-      <div className="fixed bottom-4 right-4 z-40 animate-in fade-in slide-in-from-bottom-3 duration-300">
+      <div className={`${positionClasses} animate-in fade-in slide-in-from-bottom-3 duration-300`}>
         <button
           type="button"
           onClick={() => {
@@ -126,7 +132,7 @@ export const QuizzieCompanionWidget: React.FC<QuizzieCompanionWidgetProps> = ({
             setIsMinimized(false);
             setIsOpen(true);
           }}
-          className="flex items-center gap-2 px-3 py-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/90 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105 group cursor-pointer"
+          className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/90 dark:border-slate-800/90 rounded-full shadow-md hover:shadow-lg transition-all hover:scale-105 group cursor-pointer"
           title={`Open ${currentMascotMeta.title}`}
         >
           <MascotAvatar mood={mascotMood} size="xs" interactive={false} />
@@ -143,10 +149,10 @@ export const QuizzieCompanionWidget: React.FC<QuizzieCompanionWidgetProps> = ({
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end">
+    <div className={`${positionClasses} flex flex-col ${isQuizRunning ? 'items-start' : 'items-start md:items-end'}`}>
       {/* Expanded Companion Card */}
       {isOpen && (
-        <div className="mb-3 w-84 sm:w-[410px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800/90 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-300">
+        <div className="pointer-events-auto mb-3 w-84 sm:w-[410px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800/90 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-300">
           {/* Card Top Banner */}
           <div className="relative p-3.5 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-sky-500/10 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -606,38 +612,37 @@ export const QuizzieCompanionWidget: React.FC<QuizzieCompanionWidgetProps> = ({
       )}
 
       {/* Floating Companion Trigger Button */}
-      <button
-        type="button"
-        onClick={() => {
-          soundFx.playClick?.();
-          setIsOpen((prev) => !prev);
-        }}
-        className="flex items-center gap-2.5 pl-2 pr-3.5 py-1.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800/90 rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 group cursor-pointer"
-        title={`${currentMascotMeta.title} Companion`}
-      >
-        <div className="relative">
-          <MascotAvatar mood={mascotMood} size="sm" interactive={false} />
-          {stats.streak > 2 && (
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center animate-pulse">
-              <span className="w-1.5 h-1.5 bg-white rounded-full" />
-            </span>
-          )}
-        </div>
-        <div className="text-left">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-black text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-              {currentMascotMeta.name}
-            </span>
-            <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
-              <Coins className="w-3 h-3 text-amber-500" />
-              {mascotCoins}
-            </span>
+      <div className="pointer-events-auto flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            soundFx.playClick?.();
+            setIsOpen((prev) => !prev);
+          }}
+          className="flex items-center gap-2 pl-2 pr-3 py-1 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800/90 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 active:scale-95 group cursor-pointer"
+          title={`${currentMascotMeta.title} Companion`}
+        >
+          <div className="relative">
+            <MascotAvatar mood={mascotMood} size="xs" interactive={false} />
+            {stats.streak > 2 && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center animate-pulse">
+                <span className="w-1 h-1 bg-white rounded-full" />
+              </span>
+            )}
           </div>
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-            {currentMascotMeta.uniquePose}
-          </p>
-        </div>
-      </button>
+          <div className="text-left">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-black text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                {currentMascotMeta.name}
+              </span>
+              <span className="text-[10px] font-extrabold text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
+                <Coins className="w-2.5 h-2.5 text-amber-500" />
+                {mascotCoins}
+              </span>
+            </div>
+          </div>
+        </button>
+      </div>
     </div>
   );
 };

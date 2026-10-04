@@ -13,6 +13,12 @@ import {
   tutorInteractiveSessionAI,
   analyzeQuizMistakesAI,
   transcribeSpokenAnswerAI,
+  verifyQuizBeforePublishAI,
+  moderateUserContentAI,
+  generateSummaryAndStudyGuideAI,
+  organizeExamWithMarkSchemeAI,
+  validateWordChainAI,
+  generateAiWordChainTurnAI,
 } from './geminiService';
 import { searchAllImages, searchWebImages, searchWikimediaImages } from './imageService';
 import { resolveThematicVisual, THEMATIC_VISUAL_ASSETS } from '../src/utils/thematicImages';
@@ -222,7 +228,7 @@ apiRouter.post('/generate-flashcards', aiGenerationRateLimiter, async (req: Requ
 apiRouter.post('/evaluate-answer', searchRateLimiter, async (req: Request, res: Response) => {
   try {
     const { question, correctAnswer, userAnswer, explanation, persona, rubric } = req.body;
-    const sanitizedUserAnswer = sanitizeString(userAnswer, 3_000);
+    const sanitizedUserAnswer = sanitizeString(userAnswer, 5_000);
     const result = await evaluateAnswerAI({
       question: sanitizeString(question, 1_000),
       correctAnswer: sanitizeString(correctAnswer, 1_000),
@@ -486,9 +492,16 @@ apiRouter.post('/quiz-summary', searchRateLimiter, async (req: Request, res: Res
 // 8. Recommended Quizzes
 apiRouter.post('/recommended-quizzes', searchRateLimiter, async (req: Request, res: Response) => {
   try {
-    const { persona, stats, recentQuizzes, forceRefresh } = req.body;
+    const { persona, stats, recentQuizzes, forceRefresh, learningGoal } = req.body;
     const result = await generateQuizRecommendationsAI({
       persona: persona === 'Teacher' ? 'Teacher' : 'Student',
+      learningGoal: learningGoal && typeof learningGoal === 'object' ? {
+        statement: sanitizeString(learningGoal.statement, 300),
+        subject: learningGoal.subject ? sanitizeString(learningGoal.subject, 100) : undefined,
+        targetDate: learningGoal.targetDate ? sanitizeString(learningGoal.targetDate, 50) : undefined,
+        daysRemaining: typeof learningGoal.daysRemaining === 'number' ? learningGoal.daysRemaining : undefined,
+        readinessPercent: typeof learningGoal.readinessPercent === 'number' ? learningGoal.readinessPercent : undefined,
+      } : undefined,
       stats,
       recentQuizzes: Array.isArray(recentQuizzes) ? recentQuizzes.slice(0, 10) : [],
       forceRefresh: Boolean(forceRefresh),
@@ -1076,6 +1089,263 @@ apiRouter.get('/suggestions/dispatches', (_req: Request, res: Response) => {
     dispatches: dispatchedSuggestionEmails.slice(0, 20),
   });
 });
+
+// ============================================================================
+// 15. AI QUIZ VERIFICATION BEFORE PUBLISHING TO DATABASE
+// ============================================================================
+apiRouter.post('/verify-quiz', searchRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { quizTitle, quizSummary, difficulty, questions } = req.body || {};
+    const safeQuestions = Array.isArray(questions)
+      ? questions.slice(0, 60).map((q: any) => ({
+          question: sanitizeString(q.question, 600),
+          options: Array.isArray(q.options) ? q.options.slice(0, 8).map((o: any) => sanitizeString(o, 250)) : undefined,
+          correct_answer: sanitizeString(q.correct_answer, 400),
+          explanation: q.explanation ? sanitizeString(q.explanation, 600) : undefined,
+        }))
+      : [];
+
+    const verification = await verifyQuizBeforePublishAI({
+      quizTitle: sanitizeString(quizTitle, 200, 'Untitled Quiz'),
+      quizSummary: quizSummary ? sanitizeString(quizSummary, 600) : undefined,
+      difficulty: difficulty ? sanitizeString(difficulty, 40) : 'Intermediate',
+      questions: safeQuestions,
+    });
+
+    res.json({ success: true, verification });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to verify quiz standards.'),
+    });
+  }
+});
+
+// ============================================================================
+// 16. AI CONTENT MODERATION + AUTOMATED GMAIL RECOMMENDATION DISPATCH
+// ============================================================================
+const moderationIncidentLogs: Array<{
+  incidentId: string;
+  recipient: string;
+  authorName: string;
+  authorId: string;
+  contextType: string;
+  flags: string[];
+  severity: string;
+  xpPenalty: number;
+  gemPenalty: number;
+  adminRecommendation: string;
+  createdAt: string;
+  gmailUrl: string;
+}> = [];
+
+apiRouter.post('/moderate-content', searchRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { text, authorName, authorId, contextType, targetId } = req.body || {};
+    const cleanText = sanitizeString(text, 5_000);
+    const cleanAuthor = sanitizeString(authorName, 80, 'Scholar');
+    const cleanAuthorId = sanitizeString(authorId, 80, 'anon');
+    const safeContext = ['comment', 'quiz_post', 'discussion'].includes(contextType) ? contextType : 'comment';
+
+    const moderation = await moderateUserContentAI({
+      text: cleanText,
+      authorName: cleanAuthor,
+      authorId: cleanAuthorId,
+      contextType: safeContext,
+      targetId: targetId ? sanitizeString(targetId, 100) : undefined,
+    });
+
+    let incidentReceipt = null;
+    if (!moderation.approved || moderation.flags.length > 0) {
+      const incidentId = `MOD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+      const createdAt = new Date().toISOString();
+      const subject = encodeURIComponent(
+        `[Quiz Me! AI Moderation Alert #${incidentId}] ${moderation.severity.toUpperCase()}: ${moderation.flags.join(', ')}`
+      );
+      const body = encodeURIComponent(
+        `AI Moderation Recommendation for ${SUGGESTION_TARGET_EMAIL}:\n\n` +
+          `• Incident ID: ${incidentId}\n` +
+          `• User: ${cleanAuthor} (ID: ${cleanAuthorId})\n` +
+          `• Context: ${safeContext}\n` +
+          `• Flags Triggered: ${moderation.flags.join(', ')}\n` +
+          `• Automated Penalty Applied: -${moderation.xpPenalty} XP, -${moderation.gemPenalty} Gems\n` +
+          `• AI Recommendation: ${moderation.adminRecommendation}\n` +
+          `• Sanitized Output: "${moderation.sanitizedText}"\n` +
+          `• Timestamp: ${createdAt}`
+      );
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${SUGGESTION_TARGET_EMAIL}&su=${subject}&body=${body}`;
+
+      // Best-effort relay to zanye288@gmail.com
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2500);
+        await fetch(`https://formsubmit.co/ajax/${SUGGESTION_TARGET_EMAIL}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            _subject: `[Quiz Me! AI Moderation #${incidentId}] ${moderation.flags.join(', ')}`,
+            incident_id: incidentId,
+            user: `${cleanAuthor} (${cleanAuthorId})`,
+            flags: moderation.flags.join(', '),
+            penalty_applied: `-${moderation.xpPenalty} XP / -${moderation.gemPenalty} Gems`,
+            ai_recommendation: moderation.adminRecommendation,
+            sanitized_content: moderation.sanitizedText,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+      } catch {
+        // Non-blocking relay fallback
+      }
+
+      incidentReceipt = {
+        incidentId,
+        recipient: SUGGESTION_TARGET_EMAIL,
+        authorName: cleanAuthor,
+        authorId: cleanAuthorId,
+        contextType: safeContext,
+        flags: moderation.flags,
+        severity: moderation.severity,
+        xpPenalty: moderation.xpPenalty,
+        gemPenalty: moderation.gemPenalty,
+        adminRecommendation: moderation.adminRecommendation,
+        createdAt,
+        gmailUrl,
+      };
+      moderationIncidentLogs.unshift(incidentReceipt);
+      if (moderationIncidentLogs.length > 50) moderationIncidentLogs.pop();
+    }
+
+    res.json({
+      success: true,
+      moderation,
+      incidentReceipt,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to moderate content.'),
+    });
+  }
+});
+
+// ============================================================================
+// 17. SUMMARY GENERATOR & STUDY GUIDE STUDIO ENDPOINT
+// ============================================================================
+apiRouter.post('/summary-study-guide', aiGenerationRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { topicOrMaterial, mode, difficulty, targetAudience } = req.body || {};
+    const validModes = ['executive_summary', 'comprehensive_study_guide', 'exam_cram_sheet'];
+    const safeMode = validModes.includes(mode) ? mode : 'comprehensive_study_guide';
+    const guide = await generateSummaryAndStudyGuideAI({
+      topicOrMaterial: sanitizeString(topicOrMaterial, 5_000, 'Foundational Academic Concepts'),
+      mode: safeMode,
+      difficulty: difficulty ? sanitizeString(difficulty, 40) : 'Intermediate',
+      targetAudience: targetAudience ? sanitizeString(targetAudience, 80) : 'All Ages',
+    });
+    res.json({ success: true, guide });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to generate study guide.'),
+    });
+  }
+});
+
+// ============================================================================
+// 18. AI EXAM & OFFICIAL MARK SCHEME ORGANIZER ENDPOINT
+// ============================================================================
+apiRouter.post('/organize-exam', searchRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { quizTitle, difficulty, questions } = req.body || {};
+    const safeQuestions = Array.isArray(questions)
+      ? questions.slice(0, 50).map((q: any, i: number) => ({
+          id: Number(q.id) || i + 1,
+          type: sanitizeString(q.type, 40, 'multiple_choice'),
+          question: sanitizeString(q.question, 600),
+          options: Array.isArray(q.options) ? q.options.slice(0, 8).map((o: any) => sanitizeString(o, 250)) : undefined,
+          correct_answer: sanitizeString(q.correct_answer, 400),
+          explanation: q.explanation ? sanitizeString(q.explanation, 600) : undefined,
+        }))
+      : [];
+
+    const organizedExam = await organizeExamWithMarkSchemeAI({
+      quizTitle: sanitizeString(quizTitle, 200, 'Official Subject Examination'),
+      difficulty: difficulty ? sanitizeString(difficulty, 40) : 'Intermediate',
+      questions: safeQuestions,
+    });
+
+    res.json({ success: true, organizedExam });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to organize exam and mark scheme.'),
+    });
+  }
+});
+
+// ============================================================================
+// 19. ONE BY ONE: EDUCATIONAL WORD-CHAIN GAME ENDPOINTS
+// ============================================================================
+apiRouter.post('/one-by-one/validate', searchRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const {
+      word,
+      requiredLetter,
+      subject,
+      difficulty,
+      usedWords,
+      timeRemainingSeconds,
+      maxTimerSeconds,
+      currentStreak,
+    } = req.body || {};
+
+    const validDiffs = ['Easy', 'Medium', 'Hard', 'Expert'];
+    const safeDiff = validDiffs.includes(difficulty) ? difficulty : 'Medium';
+
+    const validation = await validateWordChainAI({
+      word: sanitizeString(word, 60),
+      requiredLetter: sanitizeString(requiredLetter, 5, 'A'),
+      subject: sanitizeString(subject, 80, 'General Knowledge'),
+      difficulty: safeDiff,
+      usedWords: Array.isArray(usedWords) ? usedWords.slice(0, 200).map((w: any) => sanitizeString(w, 60)) : [],
+      timeRemainingSeconds: typeof timeRemainingSeconds === 'number' ? timeRemainingSeconds : undefined,
+      maxTimerSeconds: typeof maxTimerSeconds === 'number' ? maxTimerSeconds : undefined,
+      currentStreak: typeof currentStreak === 'number' ? currentStreak : 0,
+    });
+
+    res.json({ success: true, validation });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to validate word chain entry.'),
+    });
+  }
+});
+
+apiRouter.post('/one-by-one/ai-turn', searchRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { requiredLetter, subject, difficulty, usedWords, chainLength } = req.body || {};
+    const validDiffs = ['Easy', 'Medium', 'Hard', 'Expert'];
+    const safeDiff = validDiffs.includes(difficulty) ? difficulty : 'Medium';
+
+    const aiMove = await generateAiWordChainTurnAI({
+      requiredLetter: sanitizeString(requiredLetter, 5, 'A'),
+      subject: sanitizeString(subject, 80, 'General Knowledge'),
+      difficulty: safeDiff,
+      usedWords: Array.isArray(usedWords) ? usedWords.slice(0, 200).map((w: any) => sanitizeString(w, 60)) : [],
+      chainLength: clampInteger(chainLength, 0, 500, 1),
+    });
+
+    res.json({ success: true, aiMove });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to generate AI word turn.'),
+    });
+  }
+});
+
 
 
 

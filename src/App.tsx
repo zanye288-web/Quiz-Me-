@@ -30,6 +30,8 @@ import { LiveSessionData } from './types/liveSession';
 import { IntelligentNotesHubView } from './components/IntelligentNotesHubView';
 import { SuggestionsHubView } from './components/SuggestionsHubView';
 import { MusicStudioView } from './components/MusicStudioView';
+import { QuizSearcherView } from './components/QuizSearcherView';
+import { GamesArenaView } from './components/GamesArenaView';
 import { QuizzieCompanionWidget } from './components/QuizzieCompanionWidget';
 import {
   calculateQuizMascotCoinsEarned,
@@ -38,6 +40,17 @@ import {
   syncMascotFaviconAndDesktopIcon,
 } from './components/MascotAvatar';
 import { StarterTutorialModal, STARTER_TUTORIAL_STORAGE_KEY } from './components/StarterTutorialModal';
+import { ParticleBackgroundCanvas } from './components/ParticleBackgroundCanvas';
+import { RtxLightingOverlay } from './components/RtxLightingOverlay';
+import { LevelRoadmapModal } from './components/LevelRoadmapModal';
+import {
+  LEVEL_SYSTEM_VERSION,
+  LEVEL_RESET_STORAGE_KEY,
+  calculateLevelFromXp,
+  calculateRetentionQuizRewards,
+  createFreshResetStats,
+} from './utils/levelingSystem';
+import { useTheme } from './context/ThemeContext';
 import { GraduationCap, Sparkles, BookOpen, Layers, BarChart3, Menu, Share2, Play, X, FileText } from 'lucide-react';
 import { PersonaType, QuizResponse, Question, UserStats, AssessmentConfig } from './types/quiz';
 import { BadgeDefinition, BADGE_CATALOG } from './types/badges';
@@ -53,16 +66,18 @@ import {
   saveQuizToFirestore,
   deleteQuizFromFirestore,
   getQuizFromFirestore,
+  resetAllSignedInUsersLevelsInFirestore,
   SavedQuizDocument,
 } from './services/firestore';
 import { detectSharedQuizInUrl, clearSharedQuizParamsFromUrl } from './utils/shareUtils';
 
-const STATS_STORAGE_KEY = 'quizme_assessment_stats_v2';
+const STATS_STORAGE_KEY = 'quizme_assessment_stats_v3_revamped';
 const CONFIG_STORAGE_KEY = 'quizme_assessment_config_v1';
 const HISTORY_STORAGE_KEY = 'quizme_assessment_history_v1';
 
 export default function App() {
   const { user, userProfile, isAuthLoading, syncStatsToCloud, syncAssessmentConfigToCloud } = useAuth();
+  const { ambientOrbsEnabled } = useTheme();
 
   // Navigation & Workspace View State
   const [activeTab, setActiveTab] = useState<DashboardTab>('studio');
@@ -79,6 +94,7 @@ export default function App() {
 
   // Profile Customization Modal & Optional Onboarding State
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isLevelRoadmapOpen, setIsLevelRoadmapOpen] = useState<boolean>(false);
   const [isOptionalOnboarding, setIsOptionalOnboarding] = useState<boolean>(false);
   const [hasPromptedProfile, setHasPromptedProfile] = useState<boolean>(false);
   const [isStarterTutorialOpen, setIsStarterTutorialOpen] = useState<boolean>(() => {
@@ -142,34 +158,33 @@ export default function App() {
     };
   });
 
-  // User Performance Diagnostics & Benchmark Metrics
+  // User Performance Diagnostics & Benchmark Metrics (V3 Revamped Progression)
   const [stats, setStats] = useState<UserStats>(() => {
     if (typeof window !== 'undefined') {
+      const hasResetV3 = localStorage.getItem(LEVEL_RESET_STORAGE_KEY) === 'true';
+      if (!hasResetV3) {
+        localStorage.setItem(LEVEL_RESET_STORAGE_KEY, 'true');
+        localStorage.removeItem('quizme_assessment_stats_v2');
+        const fresh = createFreshResetStats();
+        localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(fresh));
+        return fresh;
+      }
       const saved = localStorage.getItem(STATS_STORAGE_KEY);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          // If this was the legacy hardcoded mock stats template, discard it
-          if (parsed && !(parsed.quizzesCompleted === 6 && parsed.xp === 450 && parsed.totalCorrect === 28)) {
-            return parsed;
+          if (parsed) {
+            return {
+              ...parsed,
+              level: calculateLevelFromXp(parsed.xp || 0),
+            };
           }
         } catch {
           // fallback
         }
       }
     }
-    return {
-      streak: 1,
-      hearts: 5,
-      maxHearts: 5,
-      xp: 0,
-      gems: 20,
-      level: 1,
-      quizzesCompleted: 0,
-      totalCorrect: 0,
-      totalQuestions: 0,
-      badges: [],
-    };
+    return createFreshResetStats();
   });
 
   // Assessment History Logs
@@ -282,27 +297,43 @@ export default function App() {
     localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(historyRecords));
   }, [historyRecords]);
 
-  // Sync state from cloud userProfile when authenticated
+  // Sync state from cloud userProfile when authenticated & enforce V3 Level Reset
   useEffect(() => {
     if (userProfile) {
-      setStats((prev) => ({
-        ...prev,
-        streak: userProfile.streak ?? prev.streak,
-        hearts: userProfile.hearts ?? prev.hearts,
-        maxHearts: userProfile.maxHearts ?? prev.maxHearts,
-        xp: userProfile.xp ?? prev.xp,
-        gems: userProfile.gems ?? prev.gems,
-        level: userProfile.level ?? prev.level,
-        quizzesCompleted: userProfile.quizzesCompleted ?? prev.quizzesCompleted,
-        totalCorrect: userProfile.totalCorrect ?? prev.totalCorrect,
-        totalQuestions: userProfile.totalQuestions ?? prev.totalQuestions,
-        badges: userProfile.badges ?? prev.badges,
-      }));
+      if (userProfile.levelSystemVersion !== LEVEL_SYSTEM_VERSION) {
+        const resetUserStats = createFreshResetStats({
+          gems: userProfile.gems ?? 25,
+          coins: userProfile.coins ?? 0,
+          unlockedMascots: userProfile.unlockedMascots,
+          unlockedAccessories: userProfile.unlockedAccessories,
+          equippedAccessory: userProfile.equippedAccessory,
+        });
+        setStats(resetUserStats);
+        if (user) {
+          syncStatsToCloud(resetUserStats);
+          resetAllSignedInUsersLevelsInFirestore(user.uid).catch(() => {});
+        }
+      } else {
+        const cloudXp = userProfile.xp ?? 0;
+        setStats((prev) => ({
+          ...prev,
+          streak: userProfile.streak ?? prev.streak,
+          hearts: userProfile.hearts ?? prev.hearts,
+          maxHearts: userProfile.maxHearts ?? prev.maxHearts,
+          xp: cloudXp,
+          gems: userProfile.gems ?? prev.gems,
+          level: calculateLevelFromXp(cloudXp),
+          quizzesCompleted: userProfile.quizzesCompleted ?? prev.quizzesCompleted,
+          totalCorrect: userProfile.totalCorrect ?? prev.totalCorrect,
+          totalQuestions: userProfile.totalQuestions ?? prev.totalQuestions,
+          badges: userProfile.badges ?? prev.badges,
+        }));
+      }
       if (userProfile.assessmentConfig) {
         setAssessmentConfig((prev) => ({ ...prev, ...userProfile.assessmentConfig }));
       }
     }
-  }, [userProfile]);
+  }, [userProfile, user]);
 
   // Subscribe to real quiz history from Firestore
   useEffect(() => {
@@ -365,7 +396,7 @@ export default function App() {
   const updateStats = (delta: Partial<UserStats>) => {
     setStats((prev) => {
       const newXp = delta.xp !== undefined ? delta.xp : prev.xp;
-      const newLevel = Math.max(1, Math.floor(newXp / 150) + 1);
+      const newLevel = calculateLevelFromXp(newXp);
       const updated = {
         ...prev,
         ...delta,
@@ -465,15 +496,35 @@ export default function App() {
     );
     const updatedCoins = coinReward.coins > 0 ? addMascotCoinsGlobal(coinReward.coins) : getSavedMascotPreferences().coins;
 
+    // Calculate revamped challenging retention XP & Gems
+    const retentionRewards = calculateRetentionQuizRewards({
+      score: results.score,
+      total: results.total,
+      difficulty: results.quiz.difficulty,
+      streak: stats.streak,
+      level: stats.level,
+      speedBonusXp: Math.max(0, results.xpEarned - results.score * 15),
+    });
+
+    const effectiveXpEarned = retentionRewards.totalXpEarned;
+    const effectiveGemsEarned = retentionRewards.gemsEarned;
+
+    setQuizResults({
+      ...results,
+      xpEarned: effectiveXpEarned,
+      gemsEarned: effectiveGemsEarned,
+    });
+
+    const newTotalXp = stats.xp + effectiveXpEarned;
     const updatedNewStats: UserStats = {
       ...stats,
       totalCorrect: stats.totalCorrect + results.score,
       totalQuestions: stats.totalQuestions + results.total,
       quizzesCompleted: stats.quizzesCompleted + 1,
-      xp: stats.xp + results.xpEarned,
-      gems: stats.gems + results.gemsEarned,
+      xp: newTotalXp,
+      gems: stats.gems + effectiveGemsEarned,
       coins: updatedCoins,
-      level: Math.max(1, Math.floor((stats.xp + results.xpEarned) / 150) + 1),
+      level: calculateLevelFromXp(newTotalXp),
     };
 
     setStats(updatedNewStats);
@@ -644,17 +695,29 @@ export default function App() {
 
   // Required authentication gate: user must log in
   if (!user) {
-    return <LoginGate />;
+    return (
+      <>
+        <ParticleBackgroundCanvas />
+        <RtxLightingOverlay />
+        <LoginGate />
+      </>
+    );
   }
 
   return (
     <div className="relative h-screen bg-slate-50/90 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-row transition-colors duration-200 antialiased selection:bg-indigo-500 selection:text-white overflow-hidden">
+      {/* Interactive Particle Visual Effects & RTX Ray-Traced Lighting Layers */}
+      <ParticleBackgroundCanvas />
+      <RtxLightingOverlay />
+
       {/* Vibrant Ambient Glow Orbs in Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-32 -left-32 w-[450px] h-[450px] bg-gradient-to-br from-indigo-500/15 via-purple-500/15 to-transparent rounded-full blur-3xl animate-float-slow" />
-        <div className="absolute top-1/4 -right-32 w-[500px] h-[500px] bg-gradient-to-bl from-pink-500/15 via-rose-500/10 to-amber-500/10 rounded-full blur-3xl animate-pulse-glow" />
-        <div className="absolute -bottom-32 left-1/4 w-[550px] h-[550px] bg-gradient-to-tr from-cyan-500/15 via-emerald-500/15 to-transparent rounded-full blur-3xl animate-float-slow" />
-      </div>
+      {ambientOrbsEnabled && (
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+          <div className="absolute -top-32 -left-32 w-[450px] h-[450px] bg-gradient-to-br from-indigo-500/15 via-purple-500/15 to-transparent rounded-full blur-3xl animate-float-slow" />
+          <div className="absolute top-1/4 -right-32 w-[500px] h-[500px] bg-gradient-to-bl from-pink-500/15 via-rose-500/10 to-amber-500/10 rounded-full blur-3xl animate-pulse-glow" />
+          <div className="absolute -bottom-32 left-1/4 w-[550px] h-[550px] bg-gradient-to-tr from-cyan-500/15 via-emerald-500/15 to-transparent rounded-full blur-3xl animate-float-slow" />
+        </div>
+      )}
 
       {/* Desktop Sidebar Navigation (Hidden in Focus Mode) */}
       {!isFocusModeActive && (
@@ -756,6 +819,7 @@ export default function App() {
               setIsProfileModalOpen(true);
             }}
             onOpenUploadQuiz={() => setIsUploadModalOpen(true)}
+            onOpenLevelRoadmap={() => setIsLevelRoadmapOpen(true)}
             activeQuiz={activeQuiz}
             stats={stats}
             soundEnabled={soundEnabled}
@@ -782,12 +846,21 @@ export default function App() {
               errorMessage={errorMessage}
               setErrorMessage={setErrorMessage}
               assessmentConfig={assessmentConfig}
+              onUpdateAssessmentConfig={(cfg) => {
+                const merged = { ...assessmentConfig, ...cfg };
+                setAssessmentConfig(merged);
+                if (user) {
+                  syncAssessmentConfigToCloud(merged);
+                }
+              }}
+              onUpdateStats={updateStats}
               onOpenRawJsonModal={(q) => handleInspectRawJson(q)}
               onOpenUploadQuiz={() => setIsUploadModalOpen(true)}
               onOpenTutor={() => {
                 setTutorQuestion(null);
                 setIsTutorOpen(true);
               }}
+              onOpenLevelRoadmap={() => setIsLevelRoadmapOpen(true)}
               stats={stats}
               historyRecords={historyRecords}
             />
@@ -862,6 +935,35 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'searcher' && (
+            <QuizSearcherView
+              persona={persona}
+              stats={stats}
+              historyRecords={historyRecords}
+              customQuizzes={customQuizzes}
+              activeQuiz={activeQuiz}
+              onStartQuiz={handleStartQuiz}
+              onOpenFlashcards={(q) => {
+                setActiveQuiz(q);
+                setActiveTab('flashcards');
+              }}
+              onOpenWorksheet={(q) => setWorksheetQuiz(q)}
+              onDeleteCustomQuiz={handleDeleteCustomQuiz}
+              onUpdateStats={updateStats}
+            />
+          )}
+
+          {activeTab === 'games' && (
+            <GamesArenaView
+              persona={persona}
+              stats={stats}
+              onUpdateStats={updateStats}
+              onGenerateNotesForTopic={(topic) => {
+                setActiveTab('notes');
+              }}
+            />
+          )}
+
           {activeTab === 'community' && (
             <CommunityFeed
               currentPersona={persona}
@@ -892,13 +994,14 @@ export default function App() {
                     BADGE_CATALOG.filter((b) => b.checkUnlocked(stats)).map((b) => b.id)
                   );
                   const updatedCoins = addMascotCoinsGlobal(6);
+                  const newLiveXp = stats.xp + xpEarned;
                   const nextStats: UserStats = {
                     ...stats,
                     quizzesCompleted: stats.quizzesCompleted + 1,
-                    xp: stats.xp + xpEarned,
+                    xp: newLiveXp,
                     gems: stats.gems + gemsEarned,
                     coins: updatedCoins,
-                    level: Math.max(1, Math.floor((stats.xp + xpEarned) / 150) + 1),
+                    level: calculateLevelFromXp(newLiveXp),
                   };
                   setStats(nextStats);
                   if (user) {
@@ -1298,6 +1401,14 @@ export default function App() {
         stats={stats}
       />
 
+      {/* Revamped Level Roadmap, Prestige Ranks & 7-Day Check-In Modal */}
+      <LevelRoadmapModal
+        isOpen={isLevelRoadmapOpen}
+        onClose={() => setIsLevelRoadmapOpen(false)}
+        stats={stats}
+        onUpdateStats={updateStats}
+      />
+
       {/* Interactive Starter Tutorial for New & Returning Scholars */}
       <StarterTutorialModal
         isOpen={isStarterTutorialOpen && !isProfileModalOpen}
@@ -1407,6 +1518,7 @@ export default function App() {
           stats={stats}
           persona={persona}
           soundEnabled={soundEnabled}
+          isQuizRunning={activeTab === 'runner'}
           onToggleSound={handleToggleSound}
           onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
           onOpenTutor={() => {

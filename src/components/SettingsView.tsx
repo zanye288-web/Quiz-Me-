@@ -51,14 +51,21 @@ import {
   ACCENT_PALETTES,
   FONT_CATALOG,
   ANIMATION_STYLE_CATALOG,
+  PARTICLE_PRESET_CATALOG,
+  GRAPHICS_MODE_CATALOG,
+  UI_STYLE_CATALOG,
+  UiStyleMode,
   AccentColor,
   FontFamilyChoice,
   CardCornerRadius,
   UiDensity,
   AnimationStyle,
   AnimationIntensity,
+  GraphicsQualityMode,
 } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { resetAllSignedInUsersLevelsInFirestore } from '../services/firestore';
+import { createFreshResetStats } from '../utils/levelingSystem';
 import { AssessmentConfig, PersonaType, DifficultyType, UserStats } from '../types/quiz';
 import { QuizHistoryRecord } from './HistoryView';
 import {
@@ -125,6 +132,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setAccent,
     fontFamily,
     setFontFamily,
+    uiStyle,
+    setUiStyle,
     uiDensity,
     setUiDensity,
     cardRadius,
@@ -143,6 +152,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setCardHoverLiftEnabled,
     confettiEnabled,
     setConfettiEnabled,
+    particlesEnabled,
+    setParticlesEnabled,
+    particlePreset,
+    setParticlePreset,
+    particleDensity,
+    setParticleDensity,
+    particleSpeed,
+    setParticleSpeed,
+    particleInteractive,
+    setParticleInteractive,
+    ambientOrbsEnabled,
+    setAmbientOrbsEnabled,
+    eyeComfortWarmth,
+    setEyeComfortWarmth,
+    adaptiveDifficultyEnabled,
+    setAdaptiveDifficultyEnabled,
+    streakShieldAutoEnabled,
+    setStreakShieldAutoEnabled,
+    graphicsMode,
+    setGraphicsMode,
+    rtxEnabled,
+    setRtxEnabled,
+    rtxGlobalIllumination,
+    setRtxGlobalIllumination,
+    rtxReflections,
+    setRtxReflections,
+    rtxVolumetricBloom,
+    setRtxVolumetricBloom,
+    fpsCounterEnabled,
+    setFpsCounterEnabled,
     soundVolume,
     setSoundVolume,
     questionLayout,
@@ -210,6 +249,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [isSavingAll, setIsSavingAll] = useState<boolean>(false);
 
   // Profile Customization State in Settings
+  const [customKeybinds, setCustomKeybinds] = useState<{
+    submitResponse: string;
+    moveDownwards: string;
+    nextQuestion: string;
+    prevQuestion: string;
+    toggleHint: string;
+    askAiTutor: string;
+    speakAnswer: string;
+  }>(() => {
+    try {
+      const saved = localStorage.getItem('quizme_custom_keybinds_v1');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return {
+      submitResponse: 'Ctrl + Enter',
+      moveDownwards: 'Enter',
+      nextQuestion: 'ArrowRight',
+      prevQuestion: 'ArrowLeft',
+      toggleHint: 'H',
+      askAiTutor: 'T',
+      speakAnswer: 'M',
+    };
+  });
+
+  const handleUpdateKeybind = (key: string, val: string) => {
+    setCustomKeybinds((prev) => {
+      const next = { ...prev, [key]: val };
+      localStorage.setItem('quizme_custom_keybinds_v1', JSON.stringify(next));
+      return next;
+    });
+  };
   const { user, userProfile, updateUserProfileInCloud } = useAuth();
   const [profileName, setProfileName] = useState(userProfile?.displayName || user?.displayName || 'Scholar');
   const [profileHeadline, setProfileHeadline] = useState(userProfile?.headline || 'Lifelong Learner');
@@ -592,7 +664,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const challengeTimer = assessmentConfig.challengeTimerSeconds ?? 15;
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 py-8 space-y-8 animate-in fade-in duration-200">
+    <div className="w-full max-w-7xl mx-auto px-3 sm:px-5 py-3 h-[calc(100vh-4.25rem)] flex flex-col gap-3 overflow-hidden animate-in fade-in duration-200">
       {/* Toast Notification Banner */}
       {saveBannerText && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-2xl shadow-2xl border border-slate-700 dark:border-slate-300 animate-in slide-in-from-bottom-4 duration-200">
@@ -601,189 +673,307 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* Hero Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className={`p-3.5 rounded-2xl ${currentAccentConfig.badgeBg} ${currentAccentConfig.badgeText} border ${currentAccentConfig.border} shadow-sm`}>
-            <SlidersHorizontal className="w-7 h-7" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                Settings & Customization Studio
-              </h1>
-              <span className={`text-xs font-black px-2.5 py-0.5 rounded-full ${currentAccentConfig.badgeBg} ${currentAccentConfig.badgeText} border ${currentAccentConfig.border}`}>
-                Live Reactive
-              </span>
+      {/* Compact Fit-to-Screen Hero Header + Navigation Bar */}
+      <div className="shrink-0 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs p-3.5 space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl ${currentAccentConfig.badgeBg} ${currentAccentConfig.badgeText} border ${currentAccentConfig.border}`}>
+              <SlidersHorizontal className="w-5 h-5" />
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Personalize colors, typography, card shapes, audio tactile effects, and exam behaviors.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
+                  Settings & Advanced Studio
+                </h1>
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  · Live Reactive
+                  {lastSavedTimestamp ? ` · Saved ${lastSavedTimestamp}` : ''}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Customize particle visual effects, themes, mascots, audio synthesis, adaptive AI difficulty, and progression.
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {onOpenStarterTutorial && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Quick Graphics Mode Switcher in Settings Header */}
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              {GRAPHICS_MODE_CATALOG.map((gm) => (
+                <button
+                  key={gm.id}
+                  type="button"
+                  onClick={() => {
+                    soundFx.playPop();
+                    setGraphicsMode(gm.id);
+                    triggerSaveNotice(`Switched graphics engine to ${gm.name}!`);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center gap-1 ${
+                    graphicsMode === gm.id
+                      ? gm.id === 'ultra'
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-xs'
+                        : 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title={gm.tagline}
+                >
+                  <span>{gm.icon}</span>
+                  <span>{gm.shortName}</span>
+                </button>
+              ))}
+            </div>
+
             <button
               type="button"
               onClick={() => {
                 soundFx.playClick();
-                onOpenStarterTutorial();
+                setParticlesEnabled(!particlesEnabled);
+                triggerSaveNotice(
+                  !particlesEnabled
+                    ? 'Particle visual effects enabled!'
+                    : 'Particle visual effects removed.'
+                );
               }}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-colors cursor-pointer ${
+                particlesEnabled
+                  ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                  : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+              }`}
+              title="Toggle background particle visual effects on or off"
             >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Starter Tutorial</span>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{particlesEnabled ? 'Particles: ON' : 'Particles: OFF'}</span>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleRestoreSavedSnapshot}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-            title="Revert to your last saved settings snapshot"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Restore Saved</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              resetAllSettings();
-              triggerSaveNotice('Default theme & settings restored.');
-            }}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Reset Defaults</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveAllSettings}
-            disabled={isSavingAll}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold shadow-md transition-all cursor-pointer ${currentAccentConfig.activeBtn}`}
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>{isSavingAll ? 'Saving...' : 'Save Changes'}</span>
-          </button>
-        </div>
-      </div>
 
-      {/* Persistent Settings Save & Cloud Sync Bar */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-emerald-500/10 border border-indigo-200/80 dark:border-indigo-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-xs">
-            <Save className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <span>Settings Persistence & Cloud Profile Sync</span>
-              {lastSavedTimestamp && (
-                <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                  · Last saved at {lastSavedTimestamp}
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Changes apply live and auto-save to device storage. Click Save All Changes (or press Ctrl+S) to lock a restore point and sync to your cloud account.
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={handleSaveAllSettings}
-          disabled={isSavingAll}
-          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer shrink-0 flex items-center gap-1.5"
-        >
-          <Save className="w-3.5 h-3.5" />
-          <span>{isSavingAll ? 'Syncing...' : 'Save All Changes'}</span>
-        </button>
-      </div>
-
-      {/* One-Click Theme Aesthetic Presets Banner */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>One-Click Aesthetic Presets</span>
-          </label>
-          <span className="text-[11px] text-slate-400">Click any preset to instantly restyle the entire application</span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-          {THEME_PRESETS.map((p) => {
-            const isSelected =
-              theme === p.theme &&
-              accent === p.accent &&
-              fontFamily === p.fontFamily &&
-              uiDensity === p.uiDensity &&
-              cardRadius === p.cardRadius;
-
-            return (
+            {onOpenStarterTutorial && (
               <button
-                key={p.id}
                 type="button"
                 onClick={() => {
-                  applyPreset(p.id);
-                  triggerSaveNotice(`Applied preset: ${p.name}`);
+                  soundFx.playClick();
+                  onOpenStarterTutorial();
                 }}
-                className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 group ${
-                  isSelected
-                    ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/40 ring-2 ring-indigo-500/20 shadow-xs'
-                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors cursor-pointer"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Tutorial</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleRestoreSavedSnapshot}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Revert to your last saved settings snapshot"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Restore</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetAllSettings();
+                triggerSaveNotice('Default theme & settings restored.');
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Defaults</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveAllSettings}
+              disabled={isSavingAll}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold shadow-xs transition-all cursor-pointer ${currentAccentConfig.activeBtn}`}
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSavingAll ? 'Saving...' : 'Save Changes'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Main Settings Navigation Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-slate-100 dark:border-slate-800/80">
+          {[
+            { id: 'appearance' as SettingsSection, label: 'Appearance & Mascots', icon: Palette },
+            { id: 'accessibility' as SettingsSection, label: 'Particle FX & Advanced', icon: Sparkles },
+            { id: 'profile' as SettingsSection, label: 'Scholar Profile', icon: UserIcon },
+            { id: 'audio_voice' as SettingsSection, label: 'Audio & Voice Synth', icon: Volume2 },
+            { id: 'assessment' as SettingsSection, label: 'Quiz & AI Engine', icon: GraduationCap },
+            { id: 'data' as SettingsSection, label: 'Data & Level Reset', icon: Download },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeSection === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setActiveSection(tab.id);
+                }}
+                className={`flex items-center gap-1.5 px-3.5 py-2 font-bold text-xs rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? `${currentAccentConfig.badgeBg} ${currentAccentConfig.badgeText} border ${currentAccentConfig.border} shadow-2xs`
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xl">{p.icon}</span>
-                  {isSelected && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                  )}
-                </div>
-                <div>
-                  <div className="text-xs font-black text-slate-900 dark:text-white truncate">
-                    {p.name}
-                  </div>
-                  <div className="text-[10px] text-slate-400 capitalize mt-0.5">
-                    {p.theme} • {p.accent}
-                  </div>
-                </div>
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Main Settings Navigation Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto pb-1">
-        {[
-          { id: 'profile' as SettingsSection, label: 'Scholar Profile', icon: UserIcon },
-          { id: 'appearance' as SettingsSection, label: 'Appearance & Theme', icon: Palette },
-          { id: 'audio_voice' as SettingsSection, label: 'Audio & Voice', icon: Volume2 },
-          { id: 'assessment' as SettingsSection, label: 'Assessment Defaults', icon: GraduationCap },
-          { id: 'accessibility' as SettingsSection, label: 'Accessibility & FX', icon: Eye },
-          { id: 'data' as SettingsSection, label: 'Data & Backup', icon: Download },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeSection === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                setActiveSection(tab.id);
-              }}
-              className={`flex items-center gap-2 px-4 py-3 font-bold text-xs rounded-xl transition-all whitespace-nowrap cursor-pointer ${
-                isActive
-                  ? `${currentAccentConfig.badgeBg} ${currentAccentConfig.badgeText} border ${currentAccentConfig.border} shadow-2xs`
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
+      {/* Scrollable Fit-to-Screen Active Tab Viewport */}
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-6 space-y-5">
+        {activeSection === 'appearance' && (
+          <div className="space-y-5">
+            {/* 5 UI STYLES SELECTOR: 3D, Modern, Legacy, Playful, Default */}
+            <div className="p-5 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                    Global Interface Architecture
+                  </span>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    UI Style Engine (3D · Modern · Legacy · Playful · Default)
+                  </h3>
+                </div>
+                <span className="text-xs font-bold text-slate-500">
+                  Active: {UI_STYLE_CATALOG.find((s) => s.id === uiStyle)?.name || 'Default'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {UI_STYLE_CATALOG.map((styleItem) => {
+                  const isCurrentStyle = uiStyle === styleItem.id;
+                  return (
+                    <button
+                      key={styleItem.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setUiStyle(styleItem.id);
+                        triggerSaveNotice(`Switched UI Style to ${styleItem.name}`);
+                      }}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                        isCurrentStyle
+                          ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/50 ring-2 ring-indigo-500/20'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-indigo-400'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-black text-slate-900 dark:text-white">
+                            {styleItem.name}
+                          </span>
+                          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                            {styleItem.badge}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                          {styleItem.tagline}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* CUSTOM KEYBINDS EDITOR */}
+            <div className="p-5 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    Custom Keybinds & Controls
+                  </span>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">
+                    Keyboard Shortcuts Configuration (Ctrl+Enter Submit · Enter Move Downwards)
+                  </h3>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  { key: 'submitResponse', label: 'Submit Response' },
+                  { key: 'moveDownwards', label: 'Move Downwards / Next Option' },
+                  { key: 'nextQuestion', label: 'Next Question' },
+                  { key: 'prevQuestion', label: 'Previous Question' },
+                  { key: 'toggleHint', label: 'Toggle Hint' },
+                  { key: 'askAiTutor', label: 'Open AI Tutor' },
+                  { key: 'speakAnswer', label: 'Voice Microphone' },
+                ].map((kb) => (
+                  <div
+                    key={kb.key}
+                    className="p-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 flex flex-col gap-1.5"
+                  >
+                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                      {kb.label}
+                    </label>
+                    <input
+                      type="text"
+                      value={(customKeybinds as any)[kb.key] || ''}
+                      onChange={(e) => handleUpdateKeybind(kb.key, e.target.value)}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-mono font-black text-indigo-600 dark:text-indigo-400"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>One-Click Aesthetic Presets</span>
+              </label>
+              <span className="text-[11px] text-slate-400">Instant full-app restyle</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+              {THEME_PRESETS.map((p) => {
+                const isSelected =
+                  theme === p.theme &&
+                  accent === p.accent &&
+                  fontFamily === p.fontFamily &&
+                  uiDensity === p.uiDensity &&
+                  cardRadius === p.cardRadius;
+
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      applyPreset(p.id);
+                      triggerSaveNotice(`Applied preset: ${p.name}`);
+                    }}
+                    className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 group ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/40 ring-2 ring-indigo-500/20 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg">{p.icon}</span>
+                      {isSelected && (
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                        {p.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400 capitalize">
+                        {p.theme} · {p.accent}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            </div>
+          </div>
+        )}
 
       {/* Section 0: Scholar Profile & Identity Customization */}
       {activeSection === 'profile' && (
@@ -2625,26 +2815,587 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               </button>
             </div>
+
+            {/* Quiz Time Range System Card */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-indigo-500" />
+                    <span>Quiz Time Range Window (Min – Max Target Range)</span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Set a minimum target pace and maximum auto-submit cutoff. Finishing inside the range awards bonus XP & Coins!
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    const next = !assessmentConfig.timerRangeEnabled;
+                    onUpdateAssessmentConfig({
+                      timerRangeEnabled: next,
+                      minTimeMinutes: assessmentConfig.minTimeMinutes ?? 2,
+                      maxTimeMinutes: assessmentConfig.maxTimeMinutes ?? 10,
+                      timeLimitMinutes: next ? (assessmentConfig.maxTimeMinutes ?? 10) : 0,
+                    });
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-colors ${
+                    assessmentConfig.timerRangeEnabled
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {assessmentConfig.timerRangeEnabled ? 'Time Range: ON' : 'Time Range: OFF'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: 'untimed', label: 'No Time Range', sub: 'Relaxed pace', min: 0, max: 0 },
+                  { id: 'blitz_1_3', label: '⚡ Blitz Range', sub: '1 – 3 mins (+30% XP)', min: 1, max: 3 },
+                  { id: 'standard_3_10', label: '🎯 Gold Range', sub: '3 – 10 mins (+35% XP)', min: 3, max: 10 },
+                  { id: 'exam_10_25', label: '🏛️ Exam Window', sub: '10 – 25 mins', min: 10, max: 25 },
+                ].map((preset) => {
+                  const isSelected =
+                    preset.id === 'untimed'
+                      ? !assessmentConfig.timerRangeEnabled && assessmentConfig.timeLimitMinutes === 0
+                      : assessmentConfig.timerRangeEnabled &&
+                        assessmentConfig.minTimeMinutes === preset.min &&
+                        assessmentConfig.maxTimeMinutes === preset.max;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playSelect();
+                        if (preset.id === 'untimed') {
+                          onUpdateAssessmentConfig({
+                            timerRangeEnabled: false,
+                            timeLimitMinutes: 0,
+                            timerRangePreset: 'untimed',
+                          });
+                        } else {
+                          onUpdateAssessmentConfig({
+                            timerRangeEnabled: true,
+                            minTimeMinutes: preset.min,
+                            maxTimeMinutes: preset.max,
+                            timeLimitMinutes: preset.max,
+                            timerRangePreset: preset.id as any,
+                          });
+                        }
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/50 ring-2 ring-indigo-500/20'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="text-xs font-black text-slate-900 dark:text-white">{preset.label}</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{preset.sub}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {assessmentConfig.timerRangeEnabled && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                  <div>
+                    <div className="flex justify-between text-[11px] font-bold mb-1">
+                      <span className="text-slate-600 dark:text-slate-300">Minimum Target Time</span>
+                      <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                        {assessmentConfig.minTimeMinutes ?? 2} min
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="20"
+                      value={assessmentConfig.minTimeMinutes ?? 2}
+                      onChange={(e) => {
+                        const minVal = Number(e.target.value);
+                        const maxVal = Math.max(minVal + 1, assessmentConfig.maxTimeMinutes ?? 10);
+                        onUpdateAssessmentConfig({
+                          minTimeMinutes: minVal,
+                          maxTimeMinutes: maxVal,
+                          timeLimitMinutes: maxVal,
+                          timerRangePreset: 'custom_range',
+                        });
+                      }}
+                      className="w-full accent-emerald-500 cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[11px] font-bold mb-1">
+                      <span className="text-slate-600 dark:text-slate-300">Maximum Cutoff Time</span>
+                      <span className="font-mono font-black text-indigo-600 dark:text-indigo-400">
+                        {assessmentConfig.maxTimeMinutes ?? 10} min
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="2"
+                      max="60"
+                      value={assessmentConfig.maxTimeMinutes ?? 10}
+                      onChange={(e) => {
+                        const maxVal = Number(e.target.value);
+                        const minVal = Math.min(maxVal - 1, assessmentConfig.minTimeMinutes ?? 2);
+                        onUpdateAssessmentConfig({
+                          minTimeMinutes: Math.max(1, minVal),
+                          maxTimeMinutes: maxVal,
+                          timeLimitMinutes: maxVal,
+                          timerRangePreset: 'custom_range',
+                        });
+                      }}
+                      className="w-full accent-indigo-600 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Section 4: Accessibility & Visual FX */}
+      {/* Section 4: Particle FX, Graphics Mode & RTX Studio */}
       {activeSection === 'accessibility' && (
-        <div className="max-w-3xl space-y-6">
-          <div className="p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+        <div className="space-y-5">
+          {/* Graphics Quality Mode & RTX Ray-Tracing Deck */}
+          <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-xs">
+                    RTX GRAPHICS ENGINE
+                  </span>
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white">
+                    Graphics Quality Mode & RTX Features
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Switch between Simple, Medium, 120Hz Performance, and Ultra RTX Mode with real-time ray-traced lighting.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setFpsCounterEnabled(!fpsCounterEnabled);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
+                    fpsCounterEnabled
+                      ? 'bg-slate-900 text-emerald-400 border-emerald-500/50'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  {fpsCounterEnabled ? '🟢 FPS HUD: ON' : 'FPS HUD: OFF'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playPop();
+                    const next = !rtxEnabled;
+                    setRtxEnabled(next);
+                    if (next && graphicsMode === 'simple') {
+                      setGraphicsMode('ultra');
+                    }
+                    triggerSaveNotice(next ? 'RTX Shaders & Dynamic Illumination Enabled!' : 'RTX Shaders Disabled.');
+                  }}
+                  className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    rtxEnabled && graphicsMode !== 'simple'
+                      ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-md shadow-emerald-500/20'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {rtxEnabled && graphicsMode !== 'simple' ? '💎 RTX: ON' : 'RTX: OFF'}
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Graphics Mode Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {GRAPHICS_MODE_CATALOG.map((gm) => {
+                const isSelected = graphicsMode === gm.id;
+                return (
+                  <button
+                    key={gm.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playPop();
+                      setGraphicsMode(gm.id);
+                      triggerSaveNotice(`Graphics Mode set to ${gm.name}`);
+                    }}
+                    className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                      isSelected
+                        ? gm.id === 'ultra'
+                          ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 ring-2 ring-emerald-500/25'
+                          : 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 ring-2 ring-indigo-500/25'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 hover:border-slate-300'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xl">{gm.icon}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                            gm.id === 'ultra'
+                              ? 'bg-emerald-500 text-white'
+                              : isSelected
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {gm.badge}
+                        </span>
+                      </div>
+                      <div className="text-xs font-black text-slate-900 dark:text-white">{gm.name}</div>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                        {gm.tagline}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                      {gm.specs.map((sp) => (
+                        <span
+                          key={sp}
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300"
+                        >
+                          {sp}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Individual RTX Feature Toggles */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+              {[
+                {
+                  id: 'gi',
+                  title: 'RTX Ray-Traced Cursor Light',
+                  desc: 'Dynamic real-time specular illumination & caustic light tracking your cursor',
+                  active: rtxGlobalIllumination,
+                  toggle: () => setRtxGlobalIllumination(!rtxGlobalIllumination),
+                },
+                {
+                  id: 'refl',
+                  title: 'RTX Specular Glass Reflections',
+                  desc: 'Prismatic top-edge rim reflections and multi-layered frosted depth on cards',
+                  active: rtxReflections,
+                  toggle: () => setRtxReflections(!rtxReflections),
+                },
+                {
+                  id: 'bloom',
+                  title: 'RTX Volumetric God-Rays & Bloom',
+                  desc: 'Atmospheric light shafts and vibrant neon bloom halos across badges and buttons',
+                  active: rtxVolumetricBloom,
+                  toggle: () => setRtxVolumetricBloom(!rtxVolumetricBloom),
+                },
+              ].map((feat) => (
+                <div
+                  key={feat.id}
+                  className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                    rtxEnabled && graphicsMode !== 'simple' && feat.active
+                      ? 'border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/40 dark:bg-emerald-950/25'
+                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 opacity-75'
+                  }`}
+                >
+                  <div className="pr-2">
+                    <div className="text-xs font-black text-slate-900 dark:text-white">{feat.title}</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                      {feat.desc}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      if (!rtxEnabled) setRtxEnabled(true);
+                      if (graphicsMode === 'simple') setGraphicsMode('ultra');
+                      feat.toggle();
+                    }}
+                    className={`w-11 h-6 shrink-0 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                      rtxEnabled && graphicsMode !== 'simple' && feat.active
+                        ? 'bg-emerald-500 justify-end'
+                        : 'bg-slate-300 dark:bg-slate-700 justify-start'
+                    }`}
+                  >
+                    <div className="bg-white w-4 h-4 rounded-full shadow-xs" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Left Column: Interactive Particle Visual Effects Studio */}
+          <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-500" />
+                  <span>Interactive Particle Visual Effects</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Customize ambient & interactive background particles, or remove them completely anytime.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !particlesEnabled;
+                  soundFx.playClick();
+                  setParticlesEnabled(next);
+                  triggerSaveNotice(
+                    next
+                      ? 'Particle visual effects enabled!'
+                      : 'Particle visual effects removed.'
+                  );
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer shrink-0 ${
+                  particlesEnabled
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                {particlesEnabled ? 'Active (Remove FX)' : 'Removed (Enable FX)'}
+              </button>
+            </div>
+
+            {/* Particle Style Presets */}
+            <div className={`space-y-2.5 transition-opacity ${particlesEnabled ? 'opacity-100' : 'opacity-45 pointer-events-none'}`}>
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Particle Visual Style (6 Themes)
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {PARTICLE_PRESET_CATALOG.map((p) => {
+                  const isSelected = particlePreset === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setParticlePreset(p.id);
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1 ${
+                        isSelected
+                          ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/50 ring-2 ring-indigo-500/20'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg">{p.icon}</span>
+                        <span className="text-[9px] font-bold text-indigo-600 dark:text-indigo-400">
+                          {p.badge}
+                        </span>
+                      </div>
+                      <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                        {p.name}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-tight">
+                        {p.tagline}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Density & Speed Controls */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    Particle Count Density
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['low', 'medium', 'high'] as const).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          setParticleDensity(d);
+                        }}
+                        className={`py-1.5 rounded-xl text-[11px] font-bold capitalize cursor-pointer ${
+                          particleDensity === d
+                            ? 'bg-indigo-600 text-white font-black'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                    Particle Drift Speed
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(['slow', 'normal', 'fast'] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          setParticleSpeed(s);
+                        }}
+                        className={`py-1.5 rounded-xl text-[11px] font-bold capitalize cursor-pointer ${
+                          particleSpeed === s
+                            ? 'bg-indigo-600 text-white font-black'
+                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Cursor Repulsion & Click Burst */}
+              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    Interactive Cursor Physics & Click Bursts
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Particles gently part around your cursor and burst when you click anywhere
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setParticleInteractive(!particleInteractive);
+                  }}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                    particleInteractive ? 'bg-indigo-600 justify-end' : 'bg-slate-300 dark:bg-slate-600 justify-start'
+                  }`}
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md transition-transform" />
+                </button>
+              </div>
+            </div>
+
+            {/* Ambient Glow Orbs Toggle */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <div>
+                <div className="text-xs font-bold text-slate-900 dark:text-white">
+                  Ambient Color Aura Orbs
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Soft gradient light halos in the background workspace
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setAmbientOrbsEnabled(!ambientOrbsEnabled);
+                }}
+                className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                  ambientOrbsEnabled ? 'bg-indigo-600 justify-end' : 'bg-slate-300 dark:bg-slate-600 justify-start'
+                }`}
+              >
+                <div className="bg-white w-4 h-4 rounded-full shadow-md transition-transform" />
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Advanced Study Features, Eye Comfort & Accessibility */}
+          <div className="p-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
             <h3 className="text-sm font-black text-slate-900 dark:text-white">
-              Accessibility & Visual FX Controls
+              Advanced Cognitive, Eye Comfort & Motion Controls
             </h3>
 
+            {/* Night Study Eye Comfort Warmth Slider */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    Night Study Eye-Comfort Filter (Blue-Light Shield)
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Adds a warm amber reading tint to reduce eye strain during late study sessions
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-black text-amber-600 dark:text-amber-400">
+                  {eyeComfortWarmth}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="40"
+                step="5"
+                value={eyeComfortWarmth}
+                onChange={(e) => setEyeComfortWarmth(Number(e.target.value))}
+                className="w-full accent-amber-500 cursor-pointer"
+              />
+            </div>
+
+            {/* Adaptive Difficulty Auto-Scaling */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <div>
+                <div className="text-xs font-bold text-slate-900 dark:text-white">
+                  Smart Adaptive Difficulty Scaling
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Automatically tunes question complexity based on your recent accuracy
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setAdaptiveDifficultyEnabled(!adaptiveDifficultyEnabled);
+                }}
+                className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                  adaptiveDifficultyEnabled ? 'bg-emerald-600 justify-end' : 'bg-slate-300 dark:bg-slate-600 justify-start'
+                }`}
+              >
+                <div className="bg-white w-4 h-4 rounded-full shadow-md transition-transform" />
+              </button>
+            </div>
+
+            {/* Auto Streak Shield Protection */}
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <div>
+                <div className="text-xs font-bold text-slate-900 dark:text-white">
+                  Streak Freeze Auto-Shield
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Protects your daily study streak using reserve Gems if you miss a day
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setStreakShieldAutoEnabled(!streakShieldAutoEnabled);
+                }}
+                className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                  streakShieldAutoEnabled ? 'bg-indigo-600 justify-end' : 'bg-slate-300 dark:bg-slate-600 justify-start'
+                }`}
+              >
+                <div className="bg-white w-4 h-4 rounded-full shadow-md transition-transform" />
+              </button>
+            </div>
+
             {/* High Contrast Mode */}
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
               <div>
                 <div className="text-xs font-bold text-slate-900 dark:text-white">
                   High Contrast Borders & Outlines
                 </div>
                 <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Sharpens card borders, increases text contrast, and eliminates low-contrast grays
+                  Sharpens card borders and increases text contrast
                 </div>
               </div>
 
@@ -2662,76 +3413,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </button>
             </div>
 
-            {/* Animation Physics Selector in Accessibility & FX */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-slate-900 dark:text-white">
-                    Animation Physics &amp; Bounciness Preset
-                  </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Choose between Playful Bouncy Spring, Silky Smooth, Snappy Arcade, or Minimal Motion
-                  </div>
-                </div>
-                <span className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400">
-                  {animationStyle}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {ANIMATION_STYLE_CATALOG.map((anim) => (
-                  <button
-                    key={anim.id}
-                    type="button"
-                    onClick={() => {
-                      soundFx.playPop();
-                      setAnimationStyle(anim.id);
-                    }}
-                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
-                      animationStyle === anim.id
-                        ? 'border-indigo-500 bg-indigo-600 text-white font-black'
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    <span>{anim.icon}</span>
-                    <span className="truncate">{anim.name.split(' ')[1] || anim.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Reduced Motion */}
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-              <div>
-                <div className="text-xs font-bold text-slate-900 dark:text-white">
-                  Reduced Motion & Fast Transitions
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Disables smooth sliding and zooming animations for vestibular safety
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  soundFx.playClick();
-                  setReducedMotion(!reducedMotion);
-                }}
-                className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
-                  reducedMotion ? 'bg-indigo-600 justify-end' : 'bg-slate-300 dark:bg-slate-600 justify-start'
-                }`}
-              >
-                <div className="bg-white w-4 h-4 rounded-full shadow-md transition-transform" />
-              </button>
-            </div>
-
             {/* Confetti Celebrations */}
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
               <div>
                 <div className="text-xs font-bold text-slate-900 dark:text-white">
-                  Confetti Particle Celebrations
+                  Victory Confetti Celebrations
                 </div>
                 <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Triggers colorful particle explosions on 100% scores and milestone badge unlocks
+                  Celebratory bursts on 100% scores and level-up milestones
                 </div>
               </div>
 
@@ -2748,6 +3437,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="bg-white w-4 h-4 rounded-full shadow-md transition-transform" />
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}
@@ -2819,34 +3509,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm('Are you sure you want to reset all user XP, level, and streaks to 0?')) {
-                      onUpdateStats({
-                        streak: 0,
-                        hearts: 5,
-                        maxHearts: 5,
-                        xp: 0,
-                        gems: 0,
-                        level: 1,
-                        quizzesCompleted: 0,
-                        totalCorrect: 0,
-                        totalQuestions: 0,
-                        badges: [],
-                      });
-                      soundFx.playClick();
-                      triggerSaveNotice('Performance statistics reset to zero.');
+                  onClick={async () => {
+                    onUpdateStats(createFreshResetStats(stats));
+                    if (user?.uid) {
+                      await resetAllSignedInUsersLevelsInFirestore(user.uid);
                     }
+                    soundFx.playClick();
+                    triggerSaveNotice('All signed-in levels & XP reset to Level 1 (0 XP)!');
                   }}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-400 font-bold text-xs hover:bg-rose-100 transition-colors cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Reset All Stats & Streaks</span>
+                  <span>Reset Level & Stats to Level 1</span>
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

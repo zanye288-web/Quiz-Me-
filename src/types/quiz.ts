@@ -65,15 +65,28 @@ export interface QuizResponse {
   cover_image?: string | null;
   deck_theme?: DeckTheme;
   target_audience?: string;
+  calculatorEnabled?: boolean;
+  dictionaryEnabled?: boolean;
+  aiVerified?: boolean;
+  aiVerificationScore?: number;
+  aiVerificationSummary?: string;
 }
+
+export type TimerRangePresetId = 'untimed' | 'blitz_1_3' | 'standard_3_10' | 'exam_10_25' | 'custom_range';
 
 export interface AssessmentConfig {
   mode: AssessmentMode;
   feedbackTiming: 'instant' | 'deferred'; // instant feedback vs review at end (exam)
-  timeLimitMinutes: number; // 0 = untimed
+  timeLimitMinutes: number; // 0 = untimed (max cutoff)
+  minTimeMinutes?: number; // Minimum time in range (e.g. 2 min)
+  maxTimeMinutes?: number; // Maximum time in range (e.g. 10 min)
+  timerRangeEnabled?: boolean; // Whether a Min-Max time range window is active
+  timerRangePreset?: TimerRangePresetId;
   passingScorePercent: number; // e.g. 70
   shuffleQuestions: boolean;
   allowHints: boolean;
+  calculatorEnabled?: boolean;
+  dictionaryEnabled?: boolean;
   challengeMode?: boolean; // Per-question countdown timer with speed XP multiplier
   challengeTimerSeconds?: number; // Per-question time limit, e.g. 15, 20, 30
 }

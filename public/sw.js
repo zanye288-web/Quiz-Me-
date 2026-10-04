@@ -1,8 +1,8 @@
 // Quiz Me! Progressive Web App Service Worker
 // Provides full offline functionality for core assets, quiz runners, and curriculum data.
 
-const SHELL_CACHE_NAME = 'quizme-shell-v1';
-const DATA_CACHE_NAME = 'quizme-data-v1';
+const SHELL_CACHE_NAME = 'quizme-shell-v4';
+const DATA_CACHE_NAME = 'quizme-data-v4';
 
 // Core assets to precache on installation
 const PRECACHE_ASSETS = [
@@ -102,35 +102,22 @@ self.addEventListener('fetch', (event) => {
 
   if (isStaticAsset) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) {
-          // Fetch update in background (Stale-While-Revalidate)
-          fetch(request)
-            .then((fresh) => {
-              if (fresh && fresh.status === 200) {
-                caches.open(SHELL_CACHE_NAME).then((cache) => cache.put(request, fresh));
-              }
-            })
-            .catch(() => {
-              // Network failed, already served cached version
-            });
-          return cached;
-        }
-
-        // Not in cache: fetch from network and store
-        return fetch(request)
-          .then((response) => {
-            if (response && response.status === 200) {
-              const copy = response.clone();
-              caches.open(SHELL_CACHE_NAME).then((cache) => cache.put(request, copy));
-            }
-            return response;
-          })
-          .catch((err) => {
-            console.warn('[ServiceWorker] Failed to fetch asset:', url.pathname, err);
-            return new Response('', { status: 408 });
-          });
-      })
+      fetch(request)
+        .then((response) => {
+          const contentType = response.headers.get('content-type') || '';
+          const isValidMime =
+            !url.pathname.endsWith('.js') || !contentType.includes('text/html');
+          if (response && response.status === 200 && isValidMime) {
+            const copy = response.clone();
+            caches.open(SHELL_CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          return new Response('', { status: 408 });
+        })
     );
     return;
   }
