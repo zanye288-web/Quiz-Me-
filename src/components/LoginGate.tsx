@@ -25,7 +25,13 @@ import { useTheme } from '../context/ThemeContext';
 import { soundFx } from '../utils/audio';
 import { PersonaType } from '../types/quiz';
 import { AppLogo } from './AppLogo';
-import { MascotAvatar, MASCOT_CATALOG, MASCOT_ACCESSORY_CATALOG } from './MascotAvatar';
+import {
+  MascotAvatar,
+  MASCOT_CATALOG,
+  MASCOT_ACCESSORY_CATALOG,
+  getMascotIconDataUrl,
+  useMascotPreferences,
+} from './MascotAvatar';
 
 export const LoginGate: React.FC = () => {
   const {
@@ -43,6 +49,7 @@ export const LoginGate: React.FC = () => {
   } = useAuth();
 
   const { resolvedTheme, toggleTheme } = useTheme();
+  const { mascotCharacter, setMascotCharacter, unlockedMascots } = useMascotPreferences();
 
   // Mode: 'signin' | 'signup' | 'forgot_password'
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'forgot_password'>('signin');
@@ -60,6 +67,11 @@ export const LoginGate: React.FC = () => {
   const currentShowcaseAccessory =
     MASCOT_ACCESSORY_CATALOG.find((a) => a.id === currentShowcaseMascot.defaultAccessory) ||
     MASCOT_ACCESSORY_CATALOG[0];
+  const currentShowcaseAppIconUrl = getMascotIconDataUrl(
+    currentShowcaseMascot.id,
+    currentShowcaseMascot.defaultTheme,
+    currentShowcaseMascot.defaultAccessory || 'none'
+  );
 
   // Form Fields
   const [email, setEmail] = useState('');
@@ -311,25 +323,31 @@ export const LoginGate: React.FC = () => {
               </div>
             )}
 
-            {/* Animated Mascot Showcase — All 10 Mascots Fade In & Out with Their Unique Poses */}
+            {/* Animated Mascot Showcase — All Mascots & Official App Icons Fade In & Out */}
             <div className="mb-5 p-4 rounded-2xl bg-gradient-to-br from-indigo-50/90 via-white to-violet-50/90 dark:from-slate-800/90 dark:via-slate-900 dark:to-indigo-950/60 border border-indigo-200/70 dark:border-indigo-800/60 shadow-inner">
               <div className="flex items-center justify-between gap-3">
-                <div className="relative w-20 h-20 flex items-center justify-center shrink-0">
+                <div className="relative flex items-center gap-2 shrink-0">
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={currentShowcaseMascot.id}
-                      initial={{ opacity: 0, scale: 0.82, y: 6 }}
+                      initial={{ opacity: 0, scale: 0.85, y: 6 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.82, y: -6 }}
+                      exit={{ opacity: 0, scale: 0.85, y: -6 }}
                       transition={{ duration: 0.55, ease: 'easeInOut' }}
-                      className="flex items-center justify-center"
+                      className="flex items-center gap-2"
                     >
+                      <img
+                        src={currentShowcaseAppIconUrl}
+                        alt={`${currentShowcaseMascot.title} App Icon`}
+                        referrerPolicy="no-referrer"
+                        className="w-16 h-16 rounded-2xl object-cover shadow-md border-2 border-indigo-400/50"
+                      />
                       <MascotAvatar
                         character={currentShowcaseMascot.id}
                         theme={currentShowcaseMascot.defaultTheme}
                         accessory={currentShowcaseMascot.defaultAccessory || 'none'}
                         mood="happy"
-                        size="lg"
+                        size="md"
                         interactive={false}
                       />
                     </motion.div>
@@ -351,7 +369,7 @@ export const LoginGate: React.FC = () => {
                           Mascot {showcaseIndex + 1} of {MASCOT_CATALOG.length}
                         </span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60">
-                          Pose: {currentShowcaseMascot.uniquePose}
+                          {currentShowcaseMascot.uniquePose}
                         </span>
                       </div>
                       <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
@@ -360,9 +378,27 @@ export const LoginGate: React.FC = () => {
                       <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
                         {currentShowcaseMascot.species} • {currentShowcaseMascot.tagline}
                       </p>
-                      <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">
-                        {currentShowcaseAccessory.previewEmoji} Wearing: {currentShowcaseAccessory.name}
-                      </p>
+                      <div className="flex items-center justify-between gap-2 pt-0.5">
+                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold truncate">
+                          {currentShowcaseAccessory.previewEmoji} {currentShowcaseAccessory.name}
+                        </span>
+                        {unlockedMascots.includes(currentShowcaseMascot.id) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundFx.playPop();
+                              setMascotCharacter(currentShowcaseMascot.id, true);
+                            }}
+                            className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all cursor-pointer shrink-0 ${
+                              mascotCharacter === currentShowcaseMascot.id
+                                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                                : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                            }`}
+                          >
+                            {mascotCharacter === currentShowcaseMascot.id ? 'Active App Icon' : 'Use This App Icon'}
+                          </button>
+                        )}
+                      </div>
                     </motion.div>
                   </AnimatePresence>
                 </div>

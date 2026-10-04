@@ -53,9 +53,23 @@ export interface MascotCharacterMeta {
   uniquePose: string;
   defaultTheme: MascotColorTheme;
   defaultAccessory?: MascotAccessory;
+  appIconUrl?: string;
   costCoins: number;
   rarity: 'Starter' | 'Rare' | 'Epic' | 'Legendary';
 }
+
+export const MASCOT_APP_ICON_MAP: Record<MascotCharacter, string> = {
+  quizzie: '/src/assets/images/mascot_icon_quizzie_1791114060337.jpg',
+  foxy: '/src/assets/images/mascot_icon_foxy_1791114068832.jpg',
+  astro: '/src/assets/images/mascot_icon_astro_1791114028726.jpg',
+  boba: '/src/assets/images/mascot_icon_boba_1791114040082.jpg',
+  sparky: '/src/assets/images/mascot_icon_sparky_1791114048182.jpg',
+  pixel: '/src/assets/images/mascot_icon_astro_1791114028726.jpg',
+  zeno: '/src/assets/images/mascot_icon_foxy_1791114068832.jpg',
+  nova: '/src/assets/images/mascot_icon_quizzie_1791114060337.jpg',
+  atlas: '/src/assets/images/mascot_icon_foxy_1791114068832.jpg',
+  solaris: '/src/assets/images/mascot_icon_sparky_1791114048182.jpg',
+};
 
 export interface MascotAccessoryMeta {
   id: MascotAccessory;
@@ -72,11 +86,12 @@ export const MASCOT_CATALOG: MascotCharacterMeta[] = [
     id: 'quizzie',
     name: 'Quizzie',
     title: 'Quizzie the Owl',
-    species: 'Scholarly Barn Owl',
+    species: 'Mystical Arcane Owl',
     tagline: 'Wisdom & deep mastery',
-    uniquePose: "Professor's Quill Point",
-    defaultTheme: 'indigo',
+    uniquePose: 'Mystic Lightbulb Tome',
+    defaultTheme: 'violet',
     defaultAccessory: 'scholar_glasses',
+    appIconUrl: '/src/assets/images/mascot_icon_quizzie_1791114060337.jpg',
     costCoins: 0,
     rarity: 'Starter',
   },
@@ -84,11 +99,12 @@ export const MASCOT_CATALOG: MascotCharacterMeta[] = [
     id: 'foxy',
     name: 'Foxy',
     title: 'Foxy the Fox',
-    species: 'Clever Arctic Red Fox',
+    species: 'Electric Kitsune Fox',
     tagline: 'Quick thinking & sharp logic',
-    uniquePose: 'Clever Crossed Paws',
-    defaultTheme: 'amber',
+    uniquePose: 'Clever Kitsune Chin Pose',
+    defaultTheme: 'sky',
     defaultAccessory: 'bow_tie',
+    appIconUrl: '/src/assets/images/mascot_icon_foxy_1791114068832.jpg',
     costCoins: 0,
     rarity: 'Starter',
   },
@@ -98,9 +114,10 @@ export const MASCOT_CATALOG: MascotCharacterMeta[] = [
     title: 'Astro the Cat',
     species: 'Cosmic Nebula Kitten',
     tagline: 'Curiosity & STEM discovery',
-    uniquePose: 'Zero-Gravity Star Reach',
-    defaultTheme: 'violet',
+    uniquePose: 'Starlight Helmet & Tablet',
+    defaultTheme: 'indigo',
     defaultAccessory: 'headphones',
+    appIconUrl: '/src/assets/images/mascot_icon_astro_1791114028726.jpg',
     costCoins: 0,
     rarity: 'Starter',
   },
@@ -108,11 +125,12 @@ export const MASCOT_CATALOG: MascotCharacterMeta[] = [
     id: 'boba',
     name: 'Boba',
     title: 'Boba the Bear',
-    species: 'Cozy Bamboo Panda',
+    species: 'Botanical Leaf Koala-Bear',
     tagline: 'Calm focus & steady memory',
-    uniquePose: 'Zen Boba Tea Sip',
+    uniquePose: 'Greenhouse Scholar Tome',
     defaultTheme: 'emerald',
     defaultAccessory: 'party_hat',
+    appIconUrl: '/src/assets/images/mascot_icon_boba_1791114040082.jpg',
     costCoins: 0,
     rarity: 'Starter',
   },
@@ -120,11 +138,12 @@ export const MASCOT_CATALOG: MascotCharacterMeta[] = [
     id: 'sparky',
     name: 'Sparky',
     title: 'Sparky the Dragon',
-    species: 'Friendly Crystal Drake',
+    species: 'Fiery Ember Drake',
     tagline: 'Fierce streaks & bold challenges',
-    uniquePose: 'Wing-Spread Flame Puff',
+    uniquePose: 'Flame-Tail Book Master',
     defaultTheme: 'rose',
     defaultAccessory: 'viking_helm',
+    appIconUrl: '/src/assets/images/mascot_icon_sparky_1791114048182.jpg',
     costCoins: 0,
     rarity: 'Starter',
   },
@@ -712,10 +731,14 @@ export function generateMascotIconSvgString(
 
 export function getMascotIconDataUrl(
   character: MascotCharacter,
-  theme: MascotColorTheme,
-  accessory: MascotAccessory
+  theme?: MascotColorTheme,
+  accessory?: MascotAccessory
 ): string {
-  const svg = generateMascotIconSvgString(character, theme, accessory);
+  const dedicatedIcon = MASCOT_APP_ICON_MAP[character];
+  if (dedicatedIcon) {
+    return dedicatedIcon;
+  }
+  const svg = generateMascotIconSvgString(character, theme || 'indigo', accessory || 'none');
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
@@ -724,7 +747,7 @@ let customManifestBlobUrl: string | null = null;
 /**
  * Dynamically updates the website's <link rel="icon">, <link rel="apple-touch-icon">,
  * and PWA Web App Manifest (<link rel="manifest">) so both the browser tab icon
- * and desktop / home-screen app icon match the user's personalized mascot!
+ * and desktop / home-screen app icon match the user's chosen mascot app icon!
  */
 export function syncMascotFaviconAndDesktopIcon(
   character: MascotCharacter,
@@ -734,18 +757,18 @@ export function syncMascotFaviconAndDesktopIcon(
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
   try {
-    const svgDataUrl = getMascotIconDataUrl(character, theme, accessory);
+    const iconUrl = getMascotIconDataUrl(character, theme, accessory);
     const mascotMeta = MASCOT_CATALOG.find((m) => m.id === character) || MASCOT_CATALOG[0];
 
-    // 1. Update SVG & shortcut favicons immediately
+    // 1. Update favicon & shortcut icon immediately
     let iconLink = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
     if (!iconLink) {
       iconLink = document.createElement('link');
       iconLink.rel = 'icon';
       document.head.appendChild(iconLink);
     }
-    iconLink.type = 'image/svg+xml';
-    iconLink.href = svgDataUrl;
+    iconLink.type = iconUrl.endsWith('.jpg') ? 'image/jpeg' : 'image/svg+xml';
+    iconLink.href = iconUrl;
 
     let shortcutLink = document.querySelector("link[rel='shortcut icon']") as HTMLLinkElement | null;
     if (!shortcutLink) {
@@ -753,10 +776,11 @@ export function syncMascotFaviconAndDesktopIcon(
       shortcutLink.rel = 'shortcut icon';
       document.head.appendChild(shortcutLink);
     }
-    shortcutLink.href = svgDataUrl;
+    shortcutLink.href = iconUrl;
 
-    // 2. Render PNG icons on an offscreen canvas for Apple Touch Icon & Desktop PWA Manifest
+    // 2. Render rounded app icon PNGs on an offscreen canvas for Apple Touch Icon & Desktop PWA Manifest
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => {
       try {
         const createPngUrl = (size: number) => {
@@ -765,14 +789,57 @@ export function syncMascotFaviconAndDesktopIcon(
           canvas.height = size;
           const ctx = canvas.getContext('2d');
           if (ctx) {
+            // Rounded app-icon squircle clip
+            const r = Math.round(size * 0.22);
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(size - r, 0);
+            ctx.quadraticCurveTo(size, 0, size, r);
+            ctx.lineTo(size, size - r);
+            ctx.quadraticCurveTo(size, size, size - r, size);
+            ctx.lineTo(r, size);
+            ctx.quadraticCurveTo(0, size, 0, size - r);
+            ctx.lineTo(0, r);
+            ctx.quadraticCurveTo(0, 0, r, 0);
+            ctx.closePath();
+            ctx.clip();
+
             ctx.drawImage(img, 0, 0, size, size);
+
+            // If user also equipped an accessory badge, composite a small badge indicator in top-left
+            const accMeta = MASCOT_ACCESSORY_CATALOG.find((a) => a.id === accessory);
+            if (accMeta && accMeta.id !== 'none') {
+              const badgeSize = Math.round(size * 0.22);
+              const pad = Math.round(size * 0.05);
+              ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+              ctx.beginPath();
+              ctx.arc(pad + badgeSize / 2, pad + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.strokeStyle = '#fbbf24';
+              ctx.lineWidth = Math.max(2, Math.round(size * 0.012));
+              ctx.stroke();
+              ctx.font = `${Math.round(badgeSize * 0.62)}px sans-serif`;
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(accMeta.previewEmoji, pad + badgeSize / 2, pad + badgeSize / 2 + 2);
+            }
+
             return canvas.toDataURL('image/png');
           }
-          return svgDataUrl;
+          return iconUrl;
         };
 
+        const png64 = createPngUrl(64);
         const png192 = createPngUrl(192);
         const png512 = createPngUrl(512);
+
+        if (iconLink) {
+          iconLink.type = 'image/png';
+          iconLink.href = png64;
+        }
+        if (shortcutLink) {
+          shortcutLink.href = png64;
+        }
 
         let appleLink = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement | null;
         if (!appleLink) {
@@ -826,7 +893,7 @@ export function syncMascotFaviconAndDesktopIcon(
         // non-fatal canvas fallback
       }
     };
-    img.src = svgDataUrl;
+    img.src = iconUrl;
   } catch (e) {
     console.warn('Could not update dynamic mascot favicon:', e);
   }
@@ -841,22 +908,57 @@ export function downloadCustomMascotDesktopIcon(
   accessory: MascotAccessory
 ): void {
   if (typeof window === 'undefined') return;
-  const svgDataUrl = getMascotIconDataUrl(character, theme, accessory);
+  const iconUrl = getMascotIconDataUrl(character, theme, accessory);
   const img = new Image();
+  img.crossOrigin = 'anonymous';
   img.onload = () => {
+    const size = 512;
     const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.drawImage(img, 0, 0, 512, 512);
+
+    const r = Math.round(size * 0.22);
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(size - r, 0);
+    ctx.quadraticCurveTo(size, 0, size, r);
+    ctx.lineTo(size, size - r);
+    ctx.quadraticCurveTo(size, size, size - r, size);
+    ctx.lineTo(r, size);
+    ctx.quadraticCurveTo(0, size, 0, size - r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath();
+    ctx.clip();
+
+    ctx.drawImage(img, 0, 0, size, size);
+
+    const accMeta = MASCOT_ACCESSORY_CATALOG.find((a) => a.id === accessory);
+    if (accMeta && accMeta.id !== 'none') {
+      const badgeSize = Math.round(size * 0.2);
+      const pad = Math.round(size * 0.05);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.beginPath();
+      ctx.arc(pad + badgeSize / 2, pad + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.font = `${Math.round(badgeSize * 0.62)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(accMeta.previewEmoji, pad + badgeSize / 2, pad + badgeSize / 2 + 2);
+    }
+
     const pngUrl = canvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = pngUrl;
-    a.download = `quizme-${character}-${theme}-${accessory}-icon.png`;
+    a.download = `quizme-${character}-${accessory}-app-icon.png`;
     a.click();
   };
-  img.src = svgDataUrl;
+  img.src = iconUrl;
 }
 
 export function getSavedMascotPreferences(): {
