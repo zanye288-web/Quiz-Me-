@@ -297,17 +297,22 @@ export const QuestionAuthoringStudio: React.FC<QuestionAuthoringStudioProps> = (
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8 space-y-6">
       {/* Top Banner */}
-      <div className="rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm transition-colors">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="comic-tab-hero rounded-3xl p-6 sm:p-8 transition-colors">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-              <Layers className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Custom Quiz Builder</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                ISSUE #08 · QUIZ BUILDER
+              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-slate-950/55 text-cyan-200 border border-white/25">
+                <Layers className="w-3.5 h-3.5 text-amber-300" />
+                <span>Custom Quiz Builder</span>
+              </div>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-xs">
               Create Your Own Quiz
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-indigo-100 font-medium">
               Write questions, set options, choose the correct answer, and play or study anytime.
             </p>
           </div>
@@ -320,10 +325,10 @@ export const QuestionAuthoringStudio: React.FC<QuestionAuthoringStudioProps> = (
                   soundFx.playClick();
                   onOpenUploadQuiz();
                 }}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-extrabold text-sm shadow-2xs transition-all cursor-pointer whitespace-nowrap"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-2xl border-2 border-slate-950 bg-slate-950/60 hover:bg-slate-950/80 text-white font-black text-sm shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                 title="Upload an existing quiz file to populate builder"
               >
-                <Upload className="w-4 h-4 text-indigo-500 shrink-0" />
+                <Upload className="w-4 h-4 text-amber-300 shrink-0" />
                 <span>Upload Quiz File</span>
               </button>
             )}
@@ -331,10 +336,10 @@ export const QuestionAuthoringStudio: React.FC<QuestionAuthoringStudioProps> = (
             <button
               type="button"
               onClick={handleOpenShareModal}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-2xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-extrabold text-sm shadow-2xs transition-all cursor-pointer whitespace-nowrap"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-2xl border-2 border-slate-950 bg-slate-950/60 hover:bg-slate-950/80 text-cyan-200 font-black text-sm shadow-2xs transition-all cursor-pointer whitespace-nowrap"
               title="Generate a unique shareable link for peers"
             >
-              <Share2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <Share2 className="w-4 h-4 text-cyan-300 shrink-0" />
               <span>Share Quiz</span>
             </button>
 
@@ -342,7 +347,7 @@ export const QuestionAuthoringStudio: React.FC<QuestionAuthoringStudioProps> = (
               type="button"
               onClick={handleVerifyAndPublishToDatabase}
               disabled={isVerifyingPublish}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-sm transition-all cursor-pointer whitespace-nowrap disabled:opacity-60"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-2 border-slate-950 font-black text-sm shadow-sm transition-all cursor-pointer whitespace-nowrap disabled:opacity-60"
               title="Run AI Standards Verification and publish to database"
             >
               <ShieldCheck className="w-4 h-4 shrink-0" />
@@ -352,9 +357,9 @@ export const QuestionAuthoringStudio: React.FC<QuestionAuthoringStudioProps> = (
             <button
               type="button"
               onClick={handleBuildAndPlay}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm shadow-md shadow-indigo-600/25 transition-all cursor-pointer shrink-0 whitespace-nowrap"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 sm:py-3 rounded-2xl bg-amber-300 hover:bg-amber-200 text-slate-950 border-2 border-slate-950 font-black text-sm shadow-md transition-all cursor-pointer shrink-0 whitespace-nowrap"
             >
-              <Play className="w-4 h-4 fill-white shrink-0" />
+              <Play className="w-4 h-4 fill-slate-950 shrink-0" />
               <span>Play Quiz ({questions.length} Qs)</span>
             </button>
           </div>

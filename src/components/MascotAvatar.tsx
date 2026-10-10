@@ -61,16 +61,16 @@ export interface MascotCharacterMeta {
 }
 
 export const MASCOT_APP_ICON_MAP: Record<MascotCharacter, string> = {
-  quizzie: '/src/assets/images/mascot_icon_quizzie_1791114060337.jpg',
-  foxy: '/src/assets/images/mascot_icon_foxy_1791114068832.jpg',
-  astro: '/src/assets/images/mascot_icon_astro_1791114028726.jpg',
-  boba: '/src/assets/images/mascot_icon_boba_1791114040082.jpg',
-  sparky: '/src/assets/images/mascot_icon_sparky_1791114048182.jpg',
-  pixel: '/src/assets/images/mascot_icon_astro_1791114028726.jpg',
-  zeno: '/src/assets/images/mascot_icon_foxy_1791114068832.jpg',
-  nova: '/src/assets/images/mascot_icon_quizzie_1791114060337.jpg',
-  atlas: '/src/assets/images/mascot_icon_foxy_1791114068832.jpg',
-  solaris: '/src/assets/images/mascot_icon_sparky_1791114048182.jpg',
+  quizzie: '',
+  foxy: '',
+  astro: '',
+  boba: '',
+  sparky: '',
+  pixel: '',
+  zeno: '',
+  nova: '',
+  atlas: '',
+  solaris: '',
 };
 
 export interface MascotAccessoryMeta {
@@ -736,10 +736,6 @@ export function getMascotIconDataUrl(
   theme?: MascotColorTheme,
   accessory?: MascotAccessory
 ): string {
-  const dedicatedIcon = MASCOT_APP_ICON_MAP[character];
-  if (dedicatedIcon) {
-    return dedicatedIcon;
-  }
   const svg = generateMascotIconSvgString(character, theme || 'indigo', accessory || 'none');
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }

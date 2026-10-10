@@ -3,6 +3,15 @@ export type PersonaType = 'Teacher' | 'Student';
 export type DifficultyType = 'Beginner' | 'Intermediate' | 'Master';
 export type CognitiveDomain = 'Foundations' | 'Applied Logic' | 'Syntax & Execution' | 'Analytical Reasoning' | 'Edge Cases';
 export type AssessmentMode = 'practice' | 'exam' | 'taxonomy';
+export type ExamFormatId =
+  | 'checkpoint'
+  | 'waec'
+  | 'jamb'
+  | 'neco'
+  | 'igcse'
+  | 'sat'
+  | 'ap_ib'
+  | 'standard_exam';
 
 export interface GamifiedFeedback {
   success_quote: string;
@@ -16,6 +25,9 @@ export interface Question {
   options?: string[] | null;
   correct_answer: string;
   explanation: string;
+  option_explanations?: Record<string, string> | null;
+  difficulty?: DifficultyType;
+  topic?: string;
   image_url?: string | null;
   image_caption?: string | null;
   image_layout?: 'top' | 'left' | 'split' | 'background' | 'none';
@@ -70,12 +82,14 @@ export interface QuizResponse {
   aiVerified?: boolean;
   aiVerificationScore?: number;
   aiVerificationSummary?: string;
+  examFormat?: ExamFormatId;
 }
 
 export type TimerRangePresetId = 'untimed' | 'blitz_1_3' | 'standard_3_10' | 'exam_10_25' | 'custom_range';
 
 export interface AssessmentConfig {
   mode: AssessmentMode;
+  examFormat?: ExamFormatId;
   feedbackTiming: 'instant' | 'deferred'; // instant feedback vs review at end (exam)
   timeLimitMinutes: number; // 0 = untimed (max cutoff)
   minTimeMinutes?: number; // Minimum time in range (e.g. 2 min)
@@ -87,8 +101,11 @@ export interface AssessmentConfig {
   allowHints: boolean;
   calculatorEnabled?: boolean;
   dictionaryEnabled?: boolean;
-  challengeMode?: boolean; // Per-question countdown timer with speed XP multiplier
+  challengeMode?: boolean; // Optional separate Speed Round mode that doesn't affect mastery levels
   challengeTimerSeconds?: number; // Per-question time limit, e.g. 15, 20, 30
+  interleavedMode?: boolean; // Mixes questions from different topics instead of grouping by topic
+  adaptiveDifficulty?: boolean; // Adjusts difficulty automatically aiming for 70-80% accuracy
+  speedRoundMode?: boolean; // Separate optional timer mode that doesn't affect mastery
 }
 
 export interface QuizRecommendation {
@@ -126,6 +143,11 @@ export interface UserStats {
   badges: string[];
   totalTimeSpentSeconds?: number;
   masteryByDomain?: Record<string, { correct: number; total: number }>;
+  fixedMistakesCount?: number;
+  masteredTopics?: string[];
+  takeawaysSavedCount?: number;
+  equippedTitle?: string;
+  equippedAvatarCosmetic?: string;
 }
 
 export interface RecommendedVideo {

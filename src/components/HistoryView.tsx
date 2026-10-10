@@ -62,17 +62,22 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8 space-y-6">
       {/* Header Banner */}
-      <div className="rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm transition-colors">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="comic-tab-hero rounded-3xl p-6 sm:p-8 transition-colors">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-              <History className="w-3.5 h-3.5 text-indigo-500" />
-              <span>Quiz Archives</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                ISSUE #12 · QUIZ ARCHIVES
+              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-slate-950/55 text-cyan-200 border border-white/25">
+                <History className="w-3.5 h-3.5 text-amber-300" />
+                <span>Quiz Archives</span>
+              </div>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              Past Quizzes & Results
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-xs">
+              Past Quizzes &amp; Results
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-indigo-100 font-medium">
               Review your previous scores, retake any test to improve your accuracy, or view official certificates.
             </p>
           </div>
@@ -82,11 +87,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
               type="button"
               onClick={() => {
                 soundFx.playClick();
-                if (window.confirm('Clear all quiz history?')) {
-                  onClearHistory();
-                }
+                onClearHistory();
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black bg-slate-950/60 hover:bg-rose-600 text-white border-2 border-slate-950 transition-colors cursor-pointer"
             >
               <Trash2 className="w-4 h-4" />
               <span>Clear History</span>
@@ -102,10 +105,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             <Sparkles className="w-6 h-6" />
           </div>
           <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-            No Past Quizzes Yet
+            No quizzes available
           </h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Take your first quiz from the Create Quiz tab or explore the Quiz Library to see your results recorded here.
+            No completed quizzes yet. Generate or upload a quiz to see your results recorded here.
           </p>
         </div>
       ) : (

@@ -400,15 +400,21 @@ export function calculateRetentionQuizRewards(params: {
     }
   }
 
-  const totalXpEarned = Math.max(
-    5,
-    baseXp + accuracyBonusXp + difficultyBonusXp + streakBonusXp + dailyFirstQuizBonusXp
-  );
+  const totalXpEarned =
+    score <= 0
+      ? 0
+      : Math.max(
+          5,
+          baseXp + accuracyBonusXp + difficultyBonusXp + streakBonusXp + dailyFirstQuizBonusXp
+        );
 
-  const gemsEarned = Math.max(
-    1,
-    score * 2 + (percent === 100 ? 12 : percent >= 80 ? 5 : 0)
-  );
+  const gemsEarned =
+    score <= 0
+      ? 0
+      : Math.max(
+          1,
+          score * 2 + (percent === 100 ? 12 : percent >= 80 ? 5 : 0)
+        );
 
   return {
     totalXpEarned,

@@ -34,16 +34,19 @@ export const QuizMistakesDiagnosticsView: React.FC<QuizMistakesDiagnosticsViewPr
   );
 
   return (
-    <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-6 sm:p-7 space-y-6 transition-colors">
+    <div className="comic-panel rounded-3xl bg-white dark:bg-slate-900 p-6 sm:p-7 space-y-6 transition-colors">
       {/* Diagnostics Header & Key Indicators */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b-2 border-slate-900/15 dark:border-slate-800">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="p-1.5 rounded-xl bg-amber-300 border-2 border-slate-950 text-slate-950">
               <AlertTriangle className="w-4 h-4" />
             </span>
+            <span className="comic-badge px-2 py-0.5 rounded-md bg-rose-500 text-white border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+              GAP DIAGNOSTICS
+            </span>
             <h3 className="text-base font-black text-slate-900 dark:text-white">
-              Pedagogical Mistake Diagnostics & Knowledge Gap Analysis
+              Pedagogical Mistake Diagnostics &amp; Knowledge Gap Analysis
             </h3>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">

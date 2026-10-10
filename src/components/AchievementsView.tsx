@@ -37,6 +37,8 @@ import {
 } from '../types/badges';
 import { soundFx } from '../utils/audio';
 import { BadgeCelebrationModal } from './BadgeCelebrationModal';
+import { MasteryProgressPath } from './MasteryProgressPath';
+import { buildInterleavedMixQuiz } from '../utils/adaptiveLearningEngine';
 
 interface AchievementsViewProps {
   stats: UserStats;
@@ -54,6 +56,8 @@ const ITEMS_PER_PAGE = 48;
 
 export const AchievementsView: React.FC<AchievementsViewProps> = ({
   stats,
+  persona,
+  onStartQuiz,
   onCelebrateBadge,
   onClaimXpBonus,
   onSelectTab,
@@ -330,30 +334,30 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
   const completionPercentage = Math.round((unlockedList.length / BADGE_CATALOG.length) * 100);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 pb-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 animate-in fade-in duration-300 pb-12">
       {/* Top Hero Banner */}
-      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 text-white p-6 sm:p-8 shadow-2xl border border-indigo-500/30">
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-fuchsia-500/15 blur-3xl pointer-events-none" />
-
+      <div className="comic-tab-hero rounded-3xl text-white p-6 sm:p-8">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+              <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                ISSUE #10 · TROPHY VAULT
+              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-slate-950/60 text-amber-300 border border-amber-400/40">
                 <Trophy className="w-3.5 h-3.5 text-amber-400" />
                 <span>Grand Hall of 1,100+ Achievements</span>
               </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-200 border border-indigo-400/30">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-950/50 text-cyan-200 border border-white/20">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 <span>5 Prestige Tiers • Click Any Unlocked Trophy to Celebrate</span>
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight">
+            <h1 className="text-2xl sm:text-4xl font-black tracking-tight drop-shadow-xs">
               Scholar Achievements &amp; Trophy Vault
             </h1>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              Conquer over <span className="font-black text-white">{BADGE_CATALOG.length.toLocaleString()}</span> milestones across Daily Streaks, Precision Mastery, Kahoot! Live Arena Battles, Scholar Levels, and Polymath Synergies.
+            <p className="text-indigo-100 text-sm leading-relaxed font-medium">
+              Conquer over <span className="font-black text-amber-300">{BADGE_CATALOG.length.toLocaleString()}</span> milestones across Daily Streaks, Precision Mastery, Kahoot! Live Arena Battles, Scholar Levels, and Polymath Synergies.
             </p>
           </div>
 
@@ -480,6 +484,15 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Fun Layer Tied to Learning: Mastery Progress Map & Unlockable Cosmetics */}
+      <MasteryProgressPath
+        streakDays={stats.streak}
+        onLaunchInterleavedQuiz={
+          onStartQuiz ? () => onStartQuiz(buildInterleavedMixQuiz('Student')) : undefined
+        }
+        onOpenMyNotes={onSelectTab ? () => onSelectTab('notes') : undefined}
+      />
 
       {/* Daily Gamified Quests & Next Up Milestones Bento Row */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">

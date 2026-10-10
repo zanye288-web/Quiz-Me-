@@ -28,7 +28,11 @@ export const AskTutorDrawer: React.FC<AskTutorDrawerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  if (!isOpen || !question) return null;
+  if (!isOpen) return null;
+
+  const activePrompt = question?.prompt || question?.question || 'General Study & Assessment Help';
+  const activeExplanation = question?.explanation || 'Review the key concepts in your study material.';
+  const activeCorrectAnswer = question?.correct_answer || '';
 
   const handleSendPrompt = async (promptText: string) => {
     if (!promptText.trim() || isLoading) return;
@@ -43,11 +47,11 @@ export const AskTutorDrawer: React.FC<AskTutorDrawerProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          question: question.prompt || question.question,
+          question: activePrompt,
           userQuery: promptText,
           persona,
-          correctAnswer: question.correct_answer,
-          explanation: question.explanation,
+          correctAnswer: activeCorrectAnswer,
+          explanation: activeExplanation,
         }),
       });
 
@@ -62,7 +66,7 @@ export const AskTutorDrawer: React.FC<AskTutorDrawerProps> = ({
         ...prev,
         {
           sender: 'tutor',
-          text: `Here is the explanation: ${question.explanation || 'Review the key concepts in the prompt.'}`,
+          text: `Here is the explanation: ${activeExplanation}`,
         },
       ]);
     } finally {
@@ -72,18 +76,18 @@ export const AskTutorDrawer: React.FC<AskTutorDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200">
-      <div className="w-full max-w-md sm:max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col justify-between border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-300 transition-colors">
+      <div className="w-full max-w-md sm:max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col justify-between border-l-4 border-slate-950 dark:border-cyan-400 animate-in slide-in-from-right duration-300 transition-colors">
         {/* Header */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-gradient-to-r from-indigo-50/70 via-purple-50/40 to-white dark:from-slate-900 dark:via-indigo-950/20 dark:to-slate-900">
+        <div className="p-4 border-b-2 border-slate-900 dark:border-slate-800 pattern-halftone flex items-center justify-between bg-slate-50/90 dark:bg-slate-900">
           <div className="flex items-center gap-3">
             <MascotAvatar
               mood={persona === 'Teacher' ? 'teacher' : 'thinking'}
               size="sm"
             />
             <div>
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+              <h3 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2">
                 <span>AI Academic Tutor</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                <span className="comic-badge text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950">
                   {persona} Mode
                 </span>
               </h3>
@@ -108,15 +112,23 @@ export const AskTutorDrawer: React.FC<AskTutorDrawerProps> = ({
         {/* Question Context */}
         <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 text-xs space-y-1">
           <span className="font-extrabold uppercase tracking-wider text-[10px] text-slate-400">
-            Current Question:
+            {question ? 'Current Question:' : 'Study Session:'}
           </span>
           <p className="font-bold text-slate-800 dark:text-slate-200 line-clamp-2 leading-relaxed">
-            {question.prompt || question.question}
+            {activePrompt}
           </p>
         </div>
 
         {/* Quick Query Suggestions */}
         <div className="p-3 bg-slate-100/60 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 overflow-x-auto text-xs">
+          <button
+            type="button"
+            onClick={() => handleSendPrompt('Generate a simplified "Explain this Concept" summary specific to this question\'s context.')}
+            className="px-3 py-1.5 rounded-xl bg-amber-300 text-slate-950 border border-slate-950 hover:bg-amber-200 whitespace-nowrap font-black transition-colors cursor-pointer flex items-center gap-1"
+          >
+            <Sparkles className="w-3 h-3" />
+            <span>Explain this Concept</span>
+          </button>
           <button
             type="button"
             onClick={() => handleSendPrompt('Why is this answer the correct one?')}
@@ -143,7 +155,7 @@ export const AskTutorDrawer: React.FC<AskTutorDrawerProps> = ({
               type="button"
               onClick={() => {
                 soundFx.playClick();
-                onGenerateNotes(question.domain || question.prompt || 'Core Concept');
+                onGenerateNotes(question?.domain || activePrompt || 'Core Concept');
               }}
               className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 whitespace-nowrap font-bold transition-colors cursor-pointer flex items-center gap-1"
             >

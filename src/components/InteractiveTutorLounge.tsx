@@ -210,9 +210,9 @@ You've mastered all the core questions. In this tutor session, we can explore ad
   };
 
   return (
-    <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden flex flex-col h-[750px] animate-in fade-in duration-300">
+    <div className="comic-panel rounded-3xl bg-white dark:bg-slate-900 overflow-hidden flex flex-col h-[750px] animate-in fade-in duration-300">
       {/* Header Bar */}
-      <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="pattern-halftone p-4 sm:p-5 border-b-2 border-slate-900/15 dark:border-slate-800 bg-indigo-50/50 dark:bg-slate-900/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {onBackToSources && (
             <button
@@ -231,7 +231,10 @@ You've mastered all the core questions. In this tutor session, we can explore ad
           <MascotAvatar mood="happy" size="sm" />
 
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                TUTOR LOUNGE
+              </span>
               <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
                 Quizzie's 1-on-1 AI Tutor Lounge
               </h3>

@@ -100,24 +100,27 @@ export const BadgesGrid: React.FC<BadgesGridProps> = ({ stats, onCelebrateBadge 
   return (
     <div className="space-y-6">
       {/* Overview & Progress Summary Header */}
-      <div className="rounded-3xl p-6 sm:p-7 border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/80 shadow-sm relative overflow-hidden">
+      <div className="comic-panel pattern-halftone rounded-3xl p-6 sm:p-7 bg-white dark:bg-slate-900 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="p-2 rounded-xl bg-indigo-600 text-white shadow-xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="p-2 rounded-xl bg-amber-300 text-slate-950 border-2 border-slate-950 shadow-xs">
                 <Trophy className="w-4 h-4" />
               </span>
+              <span className="comic-badge px-2 py-0.5 rounded-md bg-indigo-600 text-white border border-slate-950 text-[9px] font-black uppercase tracking-wider">
+                MEDAL SHOWCASE
+              </span>
               <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                Badges & Achievements
+                Badges &amp; Achievements
               </h3>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xl leading-relaxed font-medium">
               Earn badges as you hit milestones, maintain your streak, answer questions with high precision, and explore custom quizzes.
             </p>
           </div>
 
           {/* Progress Ring / Percentage Box */}
-          <div className="flex items-center gap-4 bg-white dark:bg-slate-800/90 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-2xs shrink-0">
+          <div className="comic-panel-sm flex items-center gap-4 bg-white dark:bg-slate-800/95 p-4 rounded-2xl shrink-0">
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
                 <span>Mastery Progress</span>

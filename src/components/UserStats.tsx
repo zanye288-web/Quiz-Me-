@@ -133,7 +133,7 @@ export const UserStats: React.FC<UserStatsProps> = ({
   return (
     <div
       onClick={onOpenAnalytics}
-      className="p-3 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs relative overflow-hidden group transition-all hover:border-indigo-300 dark:hover:border-indigo-600/60 cursor-pointer"
+      className="comic-panel-sm pattern-halftone p-3 rounded-2xl bg-white dark:bg-slate-800/95 relative overflow-hidden group transition-all cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       title="View Progression & Mastery Roadmap"

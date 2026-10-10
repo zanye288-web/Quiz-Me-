@@ -109,32 +109,8 @@ export const QuizCommentsModal: React.FC<QuizCommentsModalProps> = ({
         saveLocalComments(cloudComments);
         onCommentCountChange?.(cloudComments.length);
       } else if (local.length === 0) {
-        // Sample starter commentary for rich engagement if completely empty
-        const defaultSample: QuizComment[] = [
-          {
-            id: `sample_${quizId}_1`,
-            quizId,
-            authorId: 'system_mentor',
-            authorName: 'Prof. Julian Vance',
-            authorPhotoURL: null,
-            authorRole: 'Teacher',
-            content: 'Excellent knowledge track! Pay close attention to definitions in the opening questions as they form the foundation for later applied challenges.',
-            createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-          },
-          {
-            id: `sample_${quizId}_2`,
-            quizId,
-            authorId: 'system_scholar',
-            authorName: 'Alex Mercer',
-            authorPhotoURL: null,
-            authorRole: 'Student',
-            content: 'The flashcard drills for this quiz really helped me lock in the concepts before attempting the full assessment with timed mode!',
-            createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-          },
-        ];
-        setComments(defaultSample);
-        saveLocalComments(defaultSample);
-        onCommentCountChange?.(defaultSample.length);
+        setComments([]);
+        onCommentCountChange?.(0);
       }
     });
 
@@ -283,11 +259,11 @@ export const QuizCommentsModal: React.FC<QuizCommentsModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden animate-scale-up"
+        className="comic-modal-panel relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-white dark:bg-slate-900 overflow-hidden animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-4 bg-gradient-to-r from-slate-50 to-indigo-50/20 dark:from-slate-900 dark:to-indigo-950/20">
+        <div className="pattern-halftone p-5 sm:p-6 border-b-2 border-slate-900/15 dark:border-slate-800 flex items-start justify-between gap-4 bg-gradient-to-r from-indigo-50/50 to-purple-50/30 dark:from-slate-900 dark:to-indigo-950/20">
           <div className="space-y-1.5 min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">

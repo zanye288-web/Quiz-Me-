@@ -483,25 +483,30 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
   });
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 pb-12">
       {/* Top Header Banner */}
-      <div className="rounded-3xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className="comic-tab-hero rounded-3xl p-6 sm:p-8">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2 max-w-2xl">
-            <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-              <Search className="w-4 h-4" />
-              <span>Global Quiz Searcher · AI-Verified Database</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                ISSUE #02 · GLOBAL DB
+              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950/55 border border-white/25 text-xs font-black text-cyan-200 uppercase tracking-wider">
+                <Search className="w-3.5 h-3.5 text-amber-300" />
+                <span>Global Quiz Searcher · AI-Verified Database</span>
+              </div>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              Discover, Verify & Play User-Created Quizzes
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-xs">
+              Discover, Verify &amp; Play User-Created Quizzes
             </h1>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Every published quiz is inspected by the AI Standards Engine before going live. Like, comment with AI safety protection, follow top creators, and launch quizzes with built-in Scientific Calculator & Academic Dictionary tools.
+            <p className="text-sm text-indigo-100 leading-relaxed font-medium">
+              Every published quiz is inspected by the AI Standards Engine before going live. Like, comment with AI safety protection, follow top creators, and launch quizzes with built-in Scientific Calculator &amp; Academic Dictionary tools.
             </p>
           </div>
 
           {/* Sub-navigation Tabs */}
-          <div className="flex flex-wrap items-center gap-2 bg-slate-100 dark:bg-slate-800/90 p-1.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/70 self-start">
+          <div className="flex flex-wrap items-center gap-2 bg-slate-950/60 p-1.5 rounded-2xl border-2 border-slate-950 self-start">
             <button
               type="button"
               onClick={() => {
@@ -510,8 +515,8 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
               }}
               className={`px-4 py-2.5 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
                 activeSubTab === 'search'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-amber-300 text-slate-950 border-2 border-slate-950 shadow-xs'
+                  : 'text-white/85 hover:text-white'
               }`}
             >
               <Search className="w-3.5 h-3.5" />
@@ -719,6 +724,16 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
             </div>
           </div>
 
+          {creatorLeaderboard.length === 0 ? (
+            <div className="p-10 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-center space-y-2">
+              <h3 className="text-base font-black text-slate-900 dark:text-white">
+                No quizzes available
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                No creators have published quizzes to the database yet. Publish a quiz to take the #1 spot on the leaderboard!
+              </p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 gap-3">
             {creatorLeaderboard.map((creator, index) => {
               const isFollowing = followedCreators.has(creator.creatorId);
@@ -811,6 +826,7 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
               );
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -836,6 +852,16 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
               )}
             </div>
 
+            {aiRecommendedForYou.length === 0 ? (
+              <div className="p-6 rounded-2xl border border-dashed border-indigo-200 dark:border-indigo-900/60 bg-white/80 dark:bg-slate-900/80 text-center">
+                <div className="text-sm font-black text-slate-900 dark:text-white">
+                  No quizzes available
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Once quizzes are added to the database, AI will rank the best matches for your learning goals here.
+                </p>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {aiRecommendedForYou.map(({ quiz, match }) => (
                 <div
@@ -875,6 +901,7 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
                 </div>
               ))}
             </div>
+            )}
           </div>
 
           {/* Search & Multi-Faceted Filter Bar */}
@@ -975,6 +1002,34 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
           </div>
 
           {/* Database Results Grid */}
+          {filteredQuizzes.length === 0 ? (
+            <div className="p-12 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-center space-y-3">
+              <Search className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                No quizzes available
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                {allDatabaseQuizzes.length === 0
+                  ? 'There are currently no quizzes in the database. Generate a new quiz in the Studio and publish it to populate the database!'
+                  : 'No quizzes match your current search or filter selection.'}
+              </p>
+              {(searchQuery || selectedSubject !== 'ALL' || selectedDifficulty !== 'ALL' || onlyFollowedCreators || onlyWithTools !== 'ALL') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedSubject('ALL');
+                    setSelectedDifficulty('ALL');
+                    setOnlyFollowedCreators(false);
+                    setOnlyWithTools('ALL');
+                  }}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-black cursor-pointer"
+                >
+                  Reset Filters
+                </button>
+              )}
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {filteredQuizzes.map((quiz) => {
               const isLiked = likedIds.has(quiz.id);
@@ -1135,6 +1190,7 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
               );
             })}
           </div>
+          )}
         </>
       )}
 

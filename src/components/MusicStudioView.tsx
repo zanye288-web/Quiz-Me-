@@ -113,19 +113,15 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-3.5 sm:py-4 space-y-4 animate-in fade-in duration-300">
+    <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6 space-y-5 animate-in fade-in duration-300">
       {/* Live Visualizer Stage Hero */}
-      <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 text-white p-4 sm:p-6 shadow-lg">
-        {/* Decorative Ambient Glow */}
-        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-indigo-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-fuchsia-500/15 blur-3xl pointer-events-none" />
-
+      <div className="comic-tab-hero rounded-3xl text-white p-5 sm:p-7">
         <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           {/* Left: Spinning Vinyl & Track Info */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 min-w-0">
             <div className="relative shrink-0">
               <div
-                className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr ${currentTrackMeta.accentColor} p-1 shadow-2xl border-2 border-white/20 flex items-center justify-center ${
+                className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr ${currentTrackMeta.accentColor} p-1 shadow-2xl border-2 border-slate-950 flex items-center justify-center ${
                   isPlaying ? 'animate-spin' : ''
                 }`}
                 style={{ animationDuration: '6s' }}
@@ -138,23 +134,26 @@ export const MusicStudioView: React.FC<MusicStudioViewProps> = ({ onOpenSettings
                 </div>
               </div>
               {isPlaying && (
-                <span className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-md">
+                <span className="comic-badge absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-400 text-slate-950 border border-slate-950 shadow-md">
                   LIVE
                 </span>
               )}
             </div>
 
             <div className="space-y-1.5 min-w-0">
-              <div className="flex items-center flex-wrap gap-2 text-xs text-indigo-200/90">
-                <span className="font-bold text-emerald-300">
+              <div className="flex items-center flex-wrap gap-2 text-xs text-indigo-100">
+                <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                  ISSUE #13 · SOUNDTRACKS
+                </span>
+                <span className="font-black text-emerald-300">
                   {isPlaying ? '● Playing' : bgMusicEnabled ? '○ Ready' : '✕ Muted in Settings'}
                 </span>
                 <span aria-hidden="true">·</span>
-                <span>{currentTrackMeta.badge}</span>
+                <span className="font-bold">{currentTrackMeta.badge}</span>
                 <span aria-hidden="true">·</span>
-                <span className="font-mono tabular-nums">{bpm} BPM</span>
+                <span className="font-mono tabular-nums font-bold">{bpm} BPM</span>
                 <span aria-hidden="true">·</span>
-                <span className="capitalize">{timbre} Sound</span>
+                <span className="capitalize font-bold">{timbre} Sound</span>
               </div>
 
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">

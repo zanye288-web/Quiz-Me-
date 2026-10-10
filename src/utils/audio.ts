@@ -116,13 +116,16 @@ class SoundEngine {
   private masterGain: GainNode | null = null;
 
   public enabled: boolean = true;
+  public voiceCalloutsEnabled: boolean = true;
   public volume: number = 0.85;
   public soundProfile: SoundProfileType = 'crystal';
 
   private soundStorageKey = 'quizme_sound_effects_enabled';
+  private voiceCalloutsStorageKey = 'quizme_voice_callouts_enabled';
   private volumeStorageKey = 'quizme_sound_volume';
   private profileStorageKey = 'quizme_sound_profile';
   private customSoundsStorageKey = 'quizme_custom_sfx_v1';
+  private lastCalloutTimestamp: number = 0;
 
   public customSounds: Partial<Record<CustomSoundSlot, CustomSoundConfig>> = {};
   public ambientMode: AmbientSoundscapeMode = 'alpha432';
@@ -139,6 +142,9 @@ class SoundEngine {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(this.soundStorageKey);
       this.enabled = saved !== null ? saved === 'true' : true;
+
+      const savedVoice = localStorage.getItem(this.voiceCalloutsStorageKey);
+      this.voiceCalloutsEnabled = savedVoice !== null ? savedVoice === 'true' : true;
 
       const savedVol = localStorage.getItem(this.volumeStorageKey);
       if (savedVol !== null) {
@@ -629,10 +635,100 @@ class SoundEngine {
   }
 
   // ==========================================
-  // 5. CORRECT ANSWER: HARMONIOUS CHIME
+  // ARCADE VOICE CALLOUT ANNOUNCER ("Correct!", "Aw man!", "You're on a roll!")
   // ==========================================
-  public playCorrect() {
+  public setVoiceCalloutsEnabled(enabled: boolean) {
+    this.voiceCalloutsEnabled = enabled;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.voiceCalloutsStorageKey, String(enabled));
+    }
+    if (enabled) {
+      this.announceCallout('Voice announcer ready!', 1.12, 1.1, true);
+    } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  public announceCallout(
+    phrase: string,
+    pitch: number = 1.12,
+    rate: number = 1.08,
+    forceImmediate: boolean = false
+  ) {
+    if (!this.enabled || !this.voiceCalloutsEnabled) return;
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    try {
+      const nowMs = Date.now();
+      if (!forceImmediate && nowMs - this.lastCalloutTimestamp < 320) return;
+      this.lastCalloutTimestamp = nowMs;
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(phrase);
+      utterance.pitch = Math.max(0.6, Math.min(1.6, pitch));
+      utterance.rate = Math.max(0.75, Math.min(1.45, rate));
+      utterance.volume = Math.max(0.25, Math.min(1.0, this.volume));
+
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(
+        (v) =>
+          v.lang.startsWith('en') &&
+          (v.name.includes('Google') ||
+            v.name.includes('Natural') ||
+            v.name.includes('Samantha') ||
+            v.name.includes('Aria'))
+      );
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      // Speech synthesis fallback
+    }
+  }
+
+  // ==========================================
+  // 5. CORRECT ANSWER: HARMONIOUS CHIME + "CORRECT!" / "YOU'RE ON A ROLL!"
+  // ==========================================
+  public playCorrect(streakCount: number = 1, skipVoice: boolean = false) {
     if (!this.enabled) return;
+    if (!skipVoice) {
+      if (streakCount >= 8) {
+        const epicCallouts = [
+          'Godlike streak! Unstoppable!',
+          'Legendary! Nobody can stop you!',
+          "You're on an absolute tear!",
+        ];
+        this.announceCallout(epicCallouts[streakCount % epicCallouts.length], 1.22, 1.12);
+      } else if (streakCount >= 5) {
+        const fireCallouts = [
+          'Five in a row! On fire!',
+          'Monster streak! Keep going!',
+          'Supercharged! Genius mode!',
+        ];
+        this.announceCallout(fireCallouts[streakCount % fireCallouts.length], 1.18, 1.1);
+      } else if (streakCount >= 3) {
+        const rollCallouts = [
+          "You're on a roll!",
+          "Correct! You're on a roll!",
+          'Hat trick! Three in a row!',
+          "You're on a roll! Keep it up!",
+        ];
+        this.announceCallout(rollCallouts[streakCount % rollCallouts.length], 1.16, 1.1);
+      } else {
+        const correctCallouts = [
+          'Correct!',
+          'Correct!',
+          'Spot on!',
+          'Correct! Nice job!',
+          'Bingo! Correct!',
+        ];
+        const pick = correctCallouts[Math.floor(Math.random() * correctCallouts.length)];
+        this.announceCallout(pick, 1.14, 1.08);
+      }
+    }
+
     if (this.playCustomSoundSlot('correct')) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
@@ -746,14 +842,29 @@ class SoundEngine {
   }
 
   // ==========================================
-  // 6. GENTLE / CONSTRUCTIVE INCORRECT BOOP
+  // 6. GENTLE / CONSTRUCTIVE INCORRECT BOOP + "AW MAN!"
   // ==========================================
-  public playWrong() {
-    this.playIncorrect();
+  public playWrong(hadStreak: number = 0) {
+    this.playIncorrect(hadStreak);
   }
 
-  public playIncorrect() {
+  public playIncorrect(hadStreak: number = 0, skipVoice: boolean = false) {
     if (!this.enabled) return;
+    if (!skipVoice) {
+      if (hadStreak >= 3) {
+        this.announceCallout('Aw man! Combo broken!', 0.92, 1.0);
+      } else {
+        const wrongCallouts = [
+          'Aw man!',
+          'Aw man, so close!',
+          'Oh no, almost!',
+          'Aw man! Shake it off!',
+        ];
+        const pick = wrongCallouts[Math.floor(Math.random() * wrongCallouts.length)];
+        this.announceCallout(pick, 0.94, 1.0);
+      }
+    }
+
     if (this.playCustomSoundSlot('incorrect')) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
@@ -813,8 +924,17 @@ class SoundEngine {
   // ==========================================
   // 7. COMBO STREAK ARPEGGIO & CELEBRATION
   // ==========================================
-  public playCombo(combo: number) {
+  public playCombo(combo: number, skipVoice: boolean = false) {
     if (!this.enabled) return;
+    if (!skipVoice && combo >= 3) {
+      if (combo >= 7) {
+        this.announceCallout('Unstoppable streak!', 1.2, 1.12);
+      } else if (combo >= 5) {
+        this.announceCallout('Supercharged! Five in a row!', 1.18, 1.1);
+      } else {
+        this.announceCallout("You're on a roll!", 1.16, 1.1);
+      }
+    }
     if (this.playCustomSoundSlot('streak')) return;
     const ctx = this.getContext();
     const dest = this.getMasterOutput();
@@ -854,16 +974,325 @@ class SoundEngine {
     }
   }
 
-  public playStreak() {
-    this.playCombo(4);
+  public playStreak(streakCount: number = 3) {
+    this.playCombo(streakCount, false);
   }
 
   public playLevelUp() {
-    this.playCombo(5);
+    this.playCombo(5, true);
+    this.announceCallout('Level up! Rank promoted!', 1.2, 1.08);
   }
 
   public playVictory() {
     this.playComplete();
+    this.announceCallout('Victory! Amazing performance!', 1.18, 1.06);
+  }
+
+  public playSuccess() {
+    this.playCorrect(1);
+  }
+
+  public playKeystroke() {
+    this.playPop();
+  }
+
+  public playBossHit(isCrit: boolean = false) {
+    if (!this.enabled) return;
+    if (isCrit) {
+      this.announceCallout('Critical hit! Double damage!', 1.22, 1.1);
+    }
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = isCrit ? 'sawtooth' : 'triangle';
+      osc.frequency.setValueAtTime(isCrit ? 220 : 160, now);
+      osc.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(now);
+      osc.stop(now + 0.21);
+    } catch {
+      // ignore
+    }
+  }
+
+  // ==========================================
+  // ROBLOX LAST LETTER & ARCADE SPECIALTY SOUNDS
+  // ==========================================
+  public playFuseTick(urgency: number = 0.2) {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+
+    try {
+      const now = ctx.currentTime;
+      const clampedUrgency = Math.max(0, Math.min(1, urgency));
+      const baseFreq = 440 + clampedUrgency * 540;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = clampedUrgency > 0.65 ? 'square' : 'triangle';
+      osc.frequency.setValueAtTime(baseFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.55, now + 0.038);
+
+      gain.gain.setValueAtTime(0.06 + clampedUrgency * 0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.042);
+
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(now);
+      osc.stop(now + 0.045);
+    } catch {
+      // ignore
+    }
+  }
+
+  public playBombExplode(skipVoice: boolean = false) {
+    if (!this.enabled) return;
+    if (!skipVoice) {
+      this.announceCallout("Boom! Time's up! Aw man!", 0.88, 1.05, true);
+    }
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+
+    try {
+      const now = ctx.currentTime;
+      // Sub-bass explosion drop
+      const subOsc = ctx.createOscillator();
+      const subGain = ctx.createGain();
+      subOsc.type = 'sawtooth';
+      subOsc.frequency.setValueAtTime(150, now);
+      subOsc.frequency.exponentialRampToValueAtTime(28, now + 0.55);
+
+      subGain.gain.setValueAtTime(0.32, now);
+      subGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.58);
+      subOsc.connect(subGain);
+      subGain.connect(dest);
+      subOsc.start(now);
+      subOsc.stop(now + 0.6);
+
+      // White noise blast
+      const bufferSize = Math.floor(ctx.sampleRate * 0.45);
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1100, now);
+      filter.frequency.exponentialRampToValueAtTime(120, now + 0.44);
+
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.26, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.44);
+
+      noise.connect(filter);
+      filter.connect(noiseGain);
+      noiseGain.connect(dest);
+      noise.start(now);
+      noise.stop(now + 0.45);
+    } catch {
+      // ignore
+    }
+  }
+
+  public playWordAccepted(wordLength: number = 5, streak: number = 1) {
+    if (!this.enabled) return;
+    if (streak >= 5) {
+      this.announceCallout("You're on fire! Keep chaining!", 1.2, 1.12);
+    } else if (streak >= 3) {
+      this.announceCallout("You're on a roll!", 1.16, 1.1);
+    } else if (wordLength >= 8) {
+      this.announceCallout('Correct! Massive word bonus!', 1.18, 1.1);
+    } else {
+      this.announceCallout('Correct!', 1.15, 1.1);
+    }
+
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+
+    try {
+      const now = ctx.currentTime;
+      const pitchShift = Math.min(1.45, 1 + Math.max(0, streak - 1) * 0.06);
+      const chord = [523.25, 659.25, 783.99, 1046.5, wordLength >= 7 ? 1318.51 : 1046.5];
+      chord.forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + idx * 0.035;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f * pitchShift, t);
+        gain.gain.setValueAtTime(0.15, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + 0.26);
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  public playEliminated(playerName?: string) {
+    if (!this.enabled) return;
+    this.announceCallout(
+      playerName ? `${playerName} eliminated!` : 'Player eliminated!',
+      0.92,
+      1.04,
+      true
+    );
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+
+    try {
+      const now = ctx.currentTime;
+      const freqs = [293.66, 261.63, 220.0, 146.83];
+      freqs.forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + idx * 0.09;
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.14, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + 0.26);
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  public playPowerUp(powerName?: string) {
+    if (!this.enabled) return;
+    this.announceCallout(powerName ? `${powerName} activated!` : 'Power up activated!', 1.2, 1.12);
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+
+    try {
+      const now = ctx.currentTime;
+      const notes = [440, 554.37, 659.25, 880, 1108.73, 1318.51];
+      notes.forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + idx * 0.03;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.14, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + 0.23);
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  public playHeadshotCritical() {
+    if (!this.enabled) return;
+    this.announceCallout('Critical speed hit! Double damage!', 1.22, 1.14);
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+
+    try {
+      const now = ctx.currentTime;
+      [880, 1318.51, 1760].forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + idx * 0.03;
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.18, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + 0.27);
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  public playBossWave(bossName?: string) {
+    if (!this.enabled) return;
+    this.announceCallout(
+      bossName ? `Warning! Boss wave: ${bossName}!` : 'Warning! Boss wave incoming!',
+      0.95,
+      1.05,
+      true
+    );
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+
+    try {
+      const now = ctx.currentTime;
+      [196, 233.08, 293.66, 392].forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const t = now + idx * 0.08;
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(f, t);
+        gain.gain.setValueAtTime(0.14, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(t);
+        osc.stop(t + 0.35);
+      });
+    } catch {
+      // ignore
+    }
+  }
+
+  public playRoundClear() {
+    if (!this.enabled) return;
+    this.announceCallout('Round cleared! Next wave!', 1.18, 1.1, true);
+    this.playCombo(4, true);
+  }
+
+  public playCountdownBeep(count: number) {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+
+    try {
+      const now = ctx.currentTime;
+      const isGo = count <= 0;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(isGo ? 880 : 440, now);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + (isGo ? 0.32 : 0.16));
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(now);
+      osc.stop(now + (isGo ? 0.34 : 0.18));
+    } catch {
+      // ignore
+    }
   }
 
   // ==========================================

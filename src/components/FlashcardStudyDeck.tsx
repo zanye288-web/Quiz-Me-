@@ -22,6 +22,12 @@ import {
 import { Question, QuizResponse, PersonaType } from '../types/quiz';
 import { soundFx } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
+import {
+  recordFlashcardSpacedRepetitionReview,
+  loadSpacedRepetitionSchedule,
+  SpacedRepetitionItem,
+  recordDailyPracticeMinutesAndQuestions,
+} from '../utils/adaptiveLearningEngine';
 
 interface FlashcardStudyDeckProps {
   isOpen: boolean;
@@ -41,6 +47,10 @@ export const FlashcardStudyDeck: React.FC<FlashcardStudyDeckProps> = ({
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
   const [masteredIds, setMasteredIds] = useState<Set<number>>(new Set());
   const [learningIds, setLearningIds] = useState<Set<number>>(new Set());
+  const [srSchedule, setSrSchedule] = useState<Record<string, SpacedRepetitionItem>>(() =>
+    loadSpacedRepetitionSchedule()
+  );
+  const [srFeedbackBanner, setSrFeedbackBanner] = useState<string | null>(null);
 
   // Initialize cards on open
   useEffect(() => {
@@ -103,6 +113,19 @@ export const FlashcardStudyDeck: React.FC<FlashcardStudyDeckProps> = ({
 
   const handleMarkMastered = () => {
     soundFx.playCorrect();
+    const updatedItem = recordFlashcardSpacedRepetitionReview({
+      questionId: currentCard.id,
+      questionText: currentCard.question,
+      correctAnswer: currentCard.correct_answer,
+      explanation: currentCard.explanation,
+      topic: currentCard.topic || currentCard.domain || quiz.quiz_title,
+      knewIt: true,
+    });
+    recordDailyPracticeMinutesAndQuestions(0.4, 1);
+    setSrSchedule(loadSpacedRepetitionSchedule());
+    setSrFeedbackBanner(
+      `✓ Knew It! Promoted to Spaced Repetition Box ${updatedItem.box} (Next review in ${updatedItem.intervalDays}d: ${updatedItem.nextReviewDate})`
+    );
     setMasteredIds((prev) => {
       const next = new Set(prev);
       next.add(currentCard.id);
@@ -120,6 +143,19 @@ export const FlashcardStudyDeck: React.FC<FlashcardStudyDeckProps> = ({
 
   const handleMarkLearning = () => {
     soundFx.playClick();
+    const updatedItem = recordFlashcardSpacedRepetitionReview({
+      questionId: currentCard.id,
+      questionText: currentCard.question,
+      correctAnswer: currentCard.correct_answer,
+      explanation: currentCard.explanation,
+      topic: currentCard.topic || currentCard.domain || quiz.quiz_title,
+      knewIt: false,
+    });
+    recordDailyPracticeMinutesAndQuestions(0.4, 1);
+    setSrSchedule(loadSpacedRepetitionSchedule());
+    setSrFeedbackBanner(
+      `📚 Didn't Know It — Scheduled in Spaced Repetition Box ${updatedItem.box} (Immediate Review / Daily Challenge Queue)`
+    );
     setLearningIds((prev) => {
       const next = new Set(prev);
       next.add(currentCard.id);
@@ -164,15 +200,18 @@ export const FlashcardStudyDeck: React.FC<FlashcardStudyDeckProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh] overflow-hidden">
+      <div className="comic-modal-panel relative w-full max-w-3xl bg-white dark:bg-slate-900 rounded-3xl flex flex-col max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-850">
+        <div className="pattern-halftone p-4 border-b-2 border-slate-900/15 dark:border-slate-800 flex items-center justify-between bg-indigo-50/50 dark:bg-slate-850">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+            <div className="p-2 rounded-xl bg-amber-300 text-slate-950 border-2 border-slate-950">
               <Brain className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <span className="comic-badge px-2 py-0.5 rounded-md bg-indigo-600 text-white border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                  3D DECK
+                </span>
                 <span>Interactive Study Deck</span>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                   {cards.length} Cards
@@ -244,6 +283,14 @@ export const FlashcardStudyDeck: React.FC<FlashcardStudyDeckProps> = ({
         </div>
 
         {/* 3D Flip Card Container */}
+        {srFeedbackBanner && (
+          <div className="mx-6 mt-3 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-xs font-bold text-indigo-800 dark:text-indigo-200 flex items-center justify-between gap-2">
+            <span>{srFeedbackBanner}</span>
+            <span className="text-[10px] font-mono text-slate-500">
+              {Object.keys(srSchedule).length} Tracked SR Cards
+            </span>
+          </div>
+        )}
         <div className="flex-1 p-6 sm:p-8 overflow-y-auto flex flex-col items-center justify-center min-h-[360px]">
           <div
             onClick={handleFlip}
@@ -354,32 +401,32 @@ export const FlashcardStudyDeck: React.FC<FlashcardStudyDeckProps> = ({
             </button>
           </div>
 
-          {/* Evaluation buttons */}
+          {/* Spaced Repetition Evaluation buttons: "Didn't Know It" / "Knew It" */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={handleMarkLearning}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 isLearning
                   ? 'bg-amber-600 text-white shadow-xs'
-                  : 'border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100'
+                  : 'border-2 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 hover:bg-amber-100'
               }`}
             >
               <ThumbsDown className="w-3.5 h-3.5" />
-              <span>Need Review (1)</span>
+              <span>Didn’t Know It (1)</span>
             </button>
 
             <button
               type="button"
               onClick={handleMarkMastered}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                 isMastered
                   ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
+                  : 'border-2 border-emerald-400 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100'
               }`}
             >
               <ThumbsUp className="w-3.5 h-3.5" />
-              <span>Mastered (2)</span>
+              <span>Knew It! (2)</span>
             </button>
           </div>
         </div>

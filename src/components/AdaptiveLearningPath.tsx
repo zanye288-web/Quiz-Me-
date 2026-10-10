@@ -384,12 +384,17 @@ export const AdaptiveLearningPath: React.FC<AdaptiveLearningPathProps> = ({
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Overview & Progress Banner */}
-      <div className="rounded-3xl p-6 sm:p-7 border border-indigo-200/90 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/40 dark:from-slate-900 dark:via-indigo-950/30 dark:to-slate-900 shadow-sm relative overflow-hidden">
+      <div className="comic-panel pattern-halftone rounded-3xl p-6 sm:p-7 bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/40 dark:from-slate-900 dark:via-indigo-950/30 dark:to-slate-900 relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-indigo-100/80 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-300/50 dark:border-indigo-700/50">
-              <Compass className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span>Adaptive Skill Tree Visualizer</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                SKILL TREE
+              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-indigo-100/80 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-300/50 dark:border-indigo-700/50">
+                <Compass className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>Adaptive Skill Tree Visualizer</span>
+              </div>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
               Adaptive Learning Path
@@ -400,7 +405,7 @@ export const AdaptiveLearningPath: React.FC<AdaptiveLearningPathProps> = ({
           </div>
 
           {/* Path Stats Widget */}
-          <div className="flex items-center gap-4 bg-white/90 dark:bg-slate-800/90 p-4 rounded-2xl border border-indigo-100 dark:border-slate-700 shadow-xs shrink-0">
+          <div className="comic-panel-sm flex items-center gap-4 bg-white/95 dark:bg-slate-800/95 p-4 rounded-2xl shrink-0">
             <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
               <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 60 60">
                 <circle

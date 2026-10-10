@@ -329,22 +329,24 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-16">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 animate-fadeIn pb-16">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-indigo-900 via-indigo-950 to-slate-950 text-white p-6 sm:p-8 border border-indigo-800/40 shadow-xl">
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 -mb-10 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
-
+      <div className="comic-tab-hero rounded-3xl text-white p-6 sm:p-8">
         <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-bold text-indigo-200">
-              <Users className="w-3.5 h-3.5 text-pink-400" />
-              <span>Scholar Community Hub</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                ISSUE #05 · COMMUNITY HUB
+              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-950/55 border border-white/25 text-xs font-black text-cyan-200">
+                <Users className="w-3.5 h-3.5 text-amber-300" />
+                <span>Scholar Community Hub</span>
+              </div>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white drop-shadow-xs">
               Community Feed
             </h1>
-            <p className="text-sm text-indigo-200/90 leading-relaxed">
+            <p className="text-sm text-indigo-100 leading-relaxed font-medium">
               Explore, study, and like quizzes shared by teachers and fellow students. Tap the heart to show appreciation and boost your favorite assessments!
             </p>
           </div>
@@ -692,25 +694,27 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({
           </div>
           <div className="space-y-1 max-w-md mx-auto">
             <h3 className="text-lg font-black text-slate-900 dark:text-white">
-              No matching community quizzes found
+              No quizzes available
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Try adjusting your search terms or filter selection. You can also publish your own quizzes to help grow the community library!
+              There are no community quizzes available right now. Generate a quiz in the AI Studio and click Publish to be the first creator!
             </p>
           </div>
-          <div className="pt-2 flex justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setAuthorFilter('all');
-                setTopicFilter('All');
-              }}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 cursor-pointer"
-            >
-              Reset Filters
-            </button>
-          </div>
+          {(searchQuery || authorFilter !== 'all' || topicFilter !== 'All') && (
+            <div className="pt-2 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setAuthorFilter('all');
+                  setTopicFilter('All');
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">

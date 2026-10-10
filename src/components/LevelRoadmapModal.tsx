@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Calendar,
   Award,
+  ShieldCheck,
 } from 'lucide-react';
 import { UserStats } from '../types/quiz';
 import {
@@ -26,6 +27,7 @@ import {
   getCumulativeXpForLevel,
   getXpRequiredForLevelStep,
 } from '../utils/levelingSystem';
+import { getDailyEffortVerificationStatus } from '../utils/xpIntegrity';
 import { addMascotCoinsGlobal } from './MascotAvatar';
 import { soundFx } from '../utils/audio';
 
@@ -52,6 +54,7 @@ export const LevelRoadmapModal: React.FC<LevelRoadmapModalProps> = ({
   if (!isOpen) return null;
 
   const progress = getLevelProgress(stats.xp || 0, stats.streak || 1);
+  const dailyEffortStatus = getDailyEffortVerificationStatus();
 
   const showToast = (msg: string) => {
     setRewardToast(msg);
@@ -59,6 +62,13 @@ export const LevelRoadmapModal: React.FC<LevelRoadmapModalProps> = ({
   };
 
   const handleClaimDailyCheckIn = () => {
+    if (!dailyEffortStatus.unlocked) {
+      soundFx.playIncorrect();
+      showToast(
+        `🛡️ Effort Verification Required: Answer at least ${dailyEffortStatus.requiredQuestions} questions or complete 1 quiz today (${dailyEffortStatus.verifiedQuestionsToday}/${dailyEffortStatus.requiredQuestions}) to unlock your Daily Check-In!`
+      );
+      return;
+    }
     const res = claimDailyRetentionCheckIn();
     if (!res) return;
     soundFx.playBadgeUnlock();
@@ -301,8 +311,23 @@ export const LevelRoadmapModal: React.FC<LevelRoadmapModalProps> = ({
                     <span>🔥 7-Day Scholar Retention Check-In</span>
                   </h3>
                   <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                    Check in every day to climb the 7-day reward ladder! Missing a day resets the 7-day cycle back to Day 1.
+                    Complete at least 1 quiz or 3 verified questions today to unlock your daily reward chest! Missing a day resets the 7-day cycle back to Day 1.
                   </p>
+                  <div className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 text-[11px] font-extrabold">
+                    <ShieldCheck
+                      className={`w-3.5 h-3.5 ${
+                        dailyEffortStatus.unlocked ? 'text-emerald-500' : 'text-amber-500'
+                      }`}
+                    />
+                    <span>
+                      Today&apos;s Verified Study Effort:{' '}
+                      <strong className={dailyEffortStatus.unlocked ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
+                        {dailyEffortStatus.unlocked
+                          ? '✓ Effort Verified (Unlocked)'
+                          : `${dailyEffortStatus.verifiedQuestionsToday} / ${dailyEffortStatus.requiredQuestions} Correct Answers Required`}
+                      </strong>
+                    </span>
+                  </div>
                 </div>
 
                 <button
@@ -312,12 +337,16 @@ export const LevelRoadmapModal: React.FC<LevelRoadmapModalProps> = ({
                   className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
                     checkInState.claimedToday
                       ? 'bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-not-allowed'
-                      : 'bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                      : dailyEffortStatus.unlocked
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                      : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40'
                   }`}
                 >
                   {checkInState.claimedToday
                     ? '✓ Claimed Today — Come Back Tomorrow!'
-                    : `Claim Day ${checkInState.dayIndex} Reward`}
+                    : dailyEffortStatus.unlocked
+                    ? `Claim Day ${checkInState.dayIndex} Reward`
+                    : `🔒 Solve ${Math.max(1, dailyEffortStatus.requiredQuestions - dailyEffortStatus.verifiedQuestionsToday)} More Qs to Claim`}
                 </button>
               </div>
 

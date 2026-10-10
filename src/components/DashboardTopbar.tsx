@@ -26,10 +26,12 @@ import {
   WifiOff,
   Music,
   Coins,
+  ShieldCheck,
+  Palette,
 } from 'lucide-react';
 import { DashboardTab } from './DashboardSidebar';
 import { QuizResponse, UserStats, PersonaType } from '../types/quiz';
-import { useTheme, GRAPHICS_MODE_CATALOG } from '../context/ThemeContext';
+import { useTheme, GRAPHICS_MODE_CATALOG, UI_THEME_CATALOG, UI_STYLE_CATALOG } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { usePomodoro } from '../context/PomodoroContext';
 import { soundFx } from '../utils/audio';
@@ -37,6 +39,8 @@ import { UserAvatar } from './UserAvatar';
 import { AppLogo } from './AppLogo';
 import { useMascotPreferences, MascotCharacter, MascotColorTheme, MascotAccessory } from './MascotAvatar';
 import { getLevelProgress, getDailyRetentionCheckIn } from '../utils/levelingSystem';
+import { getDailyEffortVerificationStatus } from '../utils/xpIntegrity';
+import { loadMasteryProfile } from '../utils/adaptiveLearningEngine';
 
 interface DashboardTopbarProps {
   activeTab: DashboardTab;
@@ -85,8 +89,26 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
     setRtxEnabled,
     fpsCounterEnabled,
     setFpsCounterEnabled,
+    uiTheme,
+    setUiTheme,
+    uiStyle,
+    setUiStyle,
   } = useTheme();
   const [isGfxMenuOpen, setIsGfxMenuOpen] = React.useState(false);
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = React.useState(false);
+  const themeMenuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
+        setIsThemeMenuOpen(false);
+      }
+    };
+    if (isThemeMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isThemeMenuOpen]);
   const { user, userProfile, isFirebaseConnected, logout, switchAccount } = useAuth();
   const { mascotCoins, mascotCharacter, mascotTheme, mascotAccessory } = useMascotPreferences();
   const {
@@ -100,6 +122,23 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
 
   const [isOnline, setIsOnline] = React.useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
+  const [masteryProfile, setMasteryProfile] = React.useState(() => loadMasteryProfile());
+
+  React.useEffect(() => {
+    const syncMastery = () => {
+      const next = loadMasteryProfile();
+      setMasteryProfile(next);
+      if (next.equippedThemeBadge && next.equippedThemeBadge.includes('Golden')) {
+        setUiTheme('sunset_manga');
+      }
+    };
+    window.addEventListener('mastery-profile-updated', syncMastery);
+    window.addEventListener('storage', syncMastery);
+    return () => {
+      window.removeEventListener('mastery-profile-updated', syncMastery);
+      window.removeEventListener('storage', syncMastery);
+    };
+  }, [setUiTheme]);
   const [regionalClock, setRegionalClock] = React.useState<{ time: string; region: string }>(() => {
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
@@ -167,98 +206,108 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
     switch (activeTab) {
       case 'studio':
         return {
-          title: 'Make a Quiz',
-          subtitle: 'Create a quiz from any topic, notes, document, or voice recording',
+          title: 'Quiz Maker & Quick-Play Arena',
+          subtitle: 'Pick a topic, choose your difficulty & play an interactive quiz in seconds',
+        };
+      case 'exam':
+        return {
+          title: 'Official Exam Mode · Checkpoint, WAEC, JAMB, IGCSE & SAT',
+          subtitle: 'Timed standardized exam simulator with authentic grading scales and AI paper generator',
+        };
+      case 'past_papers':
+        return {
+          title: 'Past Papers & Exam Textbooks Hub',
+          subtitle: 'Download printable WAEC, JAMB, Checkpoint, NECO, IGCSE & SAT past papers, marking schemes & textbooks',
         };
       case 'searcher':
         return {
-          title: 'Quiz Searcher',
-          subtitle: 'Search AI-verified community quizzes, follow creators & explore leaderboards',
+          title: 'Global Quiz Searcher',
+          subtitle: 'Play AI-verified community quizzes, climb the creator leaderboard & challenge peers',
         };
       case 'games':
         return {
-          title: 'Games · One by One, Math & Spelling Bee',
-          subtitle: 'Fast-paced educational word-chain challenge, Math Quiz & Spelling Bee',
+          title: 'Quiz Arcade · Word-Chain, Math & Spelling Bee',
+          subtitle: 'Turn-based One by One Word-Chain, Speed Math Quiz & Academic Spelling Bee',
         };
       case 'notes':
         return {
-          title: 'Study Guides',
-          subtitle: 'Clear study notes, key takeaways, and quick practice checks',
+          title: 'AI Notes Generator & Study Guides',
+          subtitle: 'Generate custom study notes, WAEC/JAMB/Checkpoint cram sheets & practice checks',
         };
       case 'flashcards':
         return {
-          title: 'Flashcards',
-          subtitle: 'Flip through smart cards to memorize key facts quickly',
+          title: 'Flashcard Speed Drill',
+          subtitle: 'Flip active-recall quiz cards to lock in definitions and formulas',
         };
       case 'gamma':
         return {
-          title: 'Slide Decks',
-          subtitle: 'Create and play visual study slides with interactive questions',
+          title: 'Gamma AI+ Presentation Maker & Interactive Studio',
+          subtitle: 'Build interactive slide decks with live quizzes, polls, simulators & export to PPTX, PDF, HTML5 & DOC',
         };
       case 'curricula':
         return {
-          title: 'Quiz Library',
-          subtitle: 'Browse 12+ ready-to-play quizzes in science, coding, history & trivia',
+          title: 'Quiz Deck Library',
+          subtitle: 'Ready-to-play subject quiz decks across STEM, History, Literature & Trivia',
         };
       case 'community':
         return {
-          title: 'Community Quizzes',
-          subtitle: 'Explore and play quizzes shared by students and teachers',
+          title: 'Community Quiz Decks',
+          subtitle: 'Play, like, and comment on quizzes created by students and teachers',
         };
       case 'live':
         return {
-          title: 'Live Battles',
-          subtitle: 'Play real-time multiplayer quiz games with a room code',
+          title: 'Live Multiplayer Quiz Battles',
+          subtitle: 'Host or join a real-time multiplayer quiz arena with a 6-digit PIN',
         };
       case 'music':
         return {
-          title: 'Music & Beats',
-          subtitle: 'Background study tracks, live visualizer, tempo controls & soundboard',
+          title: 'Quiz Show & Study Beats',
+          subtitle: 'Full-length royalty-free NCS & classical study tracks with credit attribution',
         };
       case 'authoring':
         return {
-          title: 'Write Your Own Quiz',
-          subtitle: 'Build custom questions, answers, and explanations from scratch',
+          title: 'Custom Quiz Creator Studio',
+          subtitle: 'Write your own multiple-choice, fill-in-the-blank & open quiz questions',
         };
       case 'suggestions':
         return {
-          title: 'Ideas & Feedback',
-          subtitle: 'Share your ideas, vote on features, or pick a suggested topic to study',
+          title: 'Quiz Topic Ideas & Voting',
+          subtitle: 'Vote on new quiz packs or launch a trending community quiz topic',
         };
       case 'achievements':
         return {
-          title: 'Achievements & Rewards',
-          subtitle: 'Track your 1,000+ unlockable badges, trophies, and milestones',
+          title: 'Trophy Case & Quiz Badges',
+          subtitle: 'Unlock 1,000+ quiz mastery badges, streak medals, and championship titles',
         };
       case 'analytics':
         return {
-          title: 'My Stats & Progress',
-          subtitle: 'See your accuracy, daily streaks, XP level, and strengths',
+          title: 'Player Stats & Accuracy',
+          subtitle: 'Track your quiz accuracy, subject mastery radar, XP rank, and daily streak',
         };
       case 'history':
         return {
-          title: 'Past Quizzes',
-          subtitle: 'Review your past scores, answers, and printable certificates',
+          title: 'Past Quizzes & 5-Star Certificates',
+          subtitle: 'Review completed quizzes, answer breakdowns, and downloadable 5-star certificates',
         };
       case 'settings':
         return {
-          title: 'Settings',
-          subtitle: 'Customize colors, animations, background music, and sound effects',
+          title: 'Quiz Settings & Keybinds',
+          subtitle: 'Customize 5 UI styles (3D, Modern, Legacy, Playful, Default), keybinds & audio',
         };
       case 'runner':
         return {
-          title: activeQuiz?.quiz_title || 'Active Quiz',
-          subtitle: `In Progress • ${activeQuiz?.questions?.length || 0} questions • ${activeQuiz?.difficulty || 'Medium'}`,
+          title: activeQuiz?.quiz_title || 'Live Quiz Stage',
+          subtitle: `Question Arena • ${activeQuiz?.questions?.length || 0} Questions • ${activeQuiz?.difficulty || 'Intermediate'}`,
         };
       case 'complete':
         return {
-          title: 'Quiz Results',
-          subtitle: 'Your score, XP earned, and step-by-step answer review',
+          title: 'Quiz Podium & Final Scoreboard',
+          subtitle: 'Your final score, XP earned, 5-star rating, and question-by-question review',
         };
       default:
         return {
           title: 'Quiz Me!',
-          subtitle: 'Smart & Fun Learning',
+          subtitle: 'Interactive Quiz & Trivia Arena',
         };
     }
   };
@@ -274,52 +323,142 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
     onToggleSound();
   };
 
+  const primaryArcadePills: Array<{ id: DashboardTab; emoji: string; label: string; badge?: string }> = [
+    { id: 'studio', emoji: '⚡', label: 'Play & Create' },
+    { id: 'exam', emoji: '🎓', label: 'Exam Mode', badge: 'WAEC/JAMB' },
+    { id: 'past_papers', emoji: '📚', label: 'Past Papers Hub', badge: 'PDF/BOOK' },
+    { id: 'gamma', emoji: '🖥️', label: 'Presentation Maker', badge: 'PPTX/PDF' },
+    { id: 'notes', emoji: '📝', label: 'Notes Generator' },
+    { id: 'curricula', emoji: '🎯', label: 'Quiz Decks' },
+  ];
+
+  const lvlProg = getLevelProgress(stats.xp || 0, stats.streak || 1);
+  const dailyCheck = getDailyRetentionCheckIn();
+  const effortStatus = getDailyEffortVerificationStatus();
+
   return (
-    <header className="sticky top-0 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 transition-colors shadow-2xs">
-      <div className="px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-        {/* Left Section: Mobile Menu + Title */}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+    <header className="sticky top-0 z-20 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b-2 border-slate-900 dark:border-slate-800 transition-colors shadow-xs">
+      <div className="max-w-[1460px] mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
+        {/* ZONE 1: All Modes Drawer Button & Vibrant QuizMe! Arcade Brand */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => {
               soundFx.playClick();
               onToggleMobileSidebar();
             }}
-            className="md:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-            aria-label="Toggle Menu"
+            className="comic-panel-sm arcade-btn flex items-center gap-2 px-3 py-2 rounded-2xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 hover:bg-amber-50 dark:hover:bg-slate-800 transition-all cursor-pointer text-xs font-black whitespace-nowrap"
+            aria-label="Open All Modes & Game Menu"
+            title="Open All 16 Quiz Modes, Trophies & Tools"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-4 h-4 text-indigo-600 dark:text-cyan-400" />
+            <span className="hidden sm:inline">All Modes</span>
           </button>
 
-          <div className="md:hidden flex items-center shrink-0">
-            <AppLogo size="xs" showSubtitle={false} showBadge={false} onClick={() => onSelectTab('studio')} />
-          </div>
-
-          <div className="flex flex-col min-w-0">
-            <h1 className="text-sm sm:text-base lg:text-lg font-black text-slate-900 dark:text-white tracking-tight leading-tight truncate">
-              {page.title}
-            </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate hidden sm:block">
-              {page.subtitle}
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              soundFx.playClick();
+              onSelectTab('studio');
+            }}
+            className="flex items-center gap-2 group cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-2xl bg-indigo-600 border-2 border-slate-950 border-b-4 border-b-slate-950 flex items-center justify-center text-amber-300 font-black text-lg shadow-sm group-hover:scale-105 transition-transform">
+              ⚡
+            </div>
+            <div className="text-left">
+              <div className="flex items-center gap-1.5">
+                <span className="text-lg sm:text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                  QuizMe!
+                </span>
+                <span className="comic-badge hidden sm:inline-block px-2 py-0.5 rounded-lg bg-amber-300 border-2 border-slate-950 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                  ARCADE
+                </span>
+              </div>
+            </div>
+          </button>
         </div>
 
-        {/* Right Section: Streamlined Search, Mastery Pill, Mode Selector, Utilities & Profile Menu */}
+        {/* ZONE 2: Modern Floating Glass Arcade Pill Dock */}
+        <nav
+          aria-label="Primary Quiz Arcade Navigation"
+          className="comic-panel-sm hidden lg:flex items-center gap-1 p-1.5 rounded-2xl bg-slate-100/95 dark:bg-slate-900/95"
+        >
+          {primaryArcadePills.map((item, idx) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  onSelectTab(item.id);
+                }}
+                className={`arcade-btn relative px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                  idx >= 5 ? 'hidden xl:flex' : 'flex'
+                } ${
+                  isActive
+                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white border-2 border-slate-950 shadow-xs'
+                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800'
+                }`}
+              >
+                <span className="text-sm leading-none">{item.emoji}</span>
+                <span>{item.label}</span>
+                {item.badge && !isActive && (
+                  <span className="comic-badge px-1.5 py-0.2 rounded-md bg-rose-500 border border-slate-950 text-white text-[9px] font-black uppercase tracking-wider">
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* ZONE 3: Gamified Player HUD (Streak Flame, XP Gem, Clock & Controls) */}
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Regional Clock QoL Widget */}
-          <div
-            className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800/80 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 select-none"
-            title={`Regional Clock linked to ${Intl.DateTimeFormat().resolvedOptions().timeZone || 'your region'}`}
+          {/* Gamified Streak + Level XP Pill */}
+          <button
+            type="button"
+            onClick={() => {
+              soundFx.playClick();
+              if (onOpenLevelRoadmap) onOpenLevelRoadmap();
+              else onSelectTab('analytics');
+            }}
+            className="comic-panel-sm pattern-stripes-amber arcade-btn hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-amber-50/90 dark:bg-slate-900 transition-all cursor-pointer whitespace-nowrap"
+            title={`Lv.${lvlProg.level} ${lvlProg.rank.title} • ${stats.xp.toLocaleString()} XP • Click for Player Rewards & Rank Roadmap`}
           >
-            <Timer className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-            <span>{regionalClock.time}</span>
-            <span className="text-slate-400">·</span>
-            <span className="font-sans text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 truncate max-w-[90px]">
-              {regionalClock.region}
+            <span className="flex items-center gap-1 text-xs font-black text-orange-600 dark:text-orange-400">
+              <span>🔥</span>
+              <span>{stats.streak}d</span>
             </span>
-          </div>
-          {/* Quick Command Palette / Search Trigger */}
+            <span className="w-px h-3.5 bg-amber-300 dark:bg-amber-800" />
+            <span className="flex items-center gap-1 text-xs font-black text-indigo-700 dark:text-indigo-300">
+              <span>💎</span>
+              <span>Lv.{lvlProg.level}</span>
+            </span>
+            <span
+              className={`hidden xl:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                effortStatus.unlocked
+                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                  : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+              }`}
+              title={`Zero-Loophole XP Shield: ${effortStatus.verifiedCorrectToday}/${effortStatus.requiredCorrect} verified correct today`}
+            >
+              <ShieldCheck className="w-3 h-3 text-emerald-500" />
+              <span>{effortStatus.verifiedCorrectToday}✓</span>
+            </span>
+            <span className="hidden 2xl:inline text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">
+              {regionalClock.time}
+            </span>
+            {!dailyCheck.claimedToday && (
+              <span
+                className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"
+                title="Daily Bonus Ready!"
+              />
+            )}
+          </button>
+
+          {/* Search / Command Trigger */}
           {onOpenCommandPalette && (
             <button
               type="button"
@@ -327,250 +466,38 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                 soundFx.playClick();
                 onOpenCommandPalette();
               }}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs text-xs font-semibold"
-              title="Search & Command Menu (Cmd + K)"
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors cursor-pointer"
+              title="Quick Search & Jump (Cmd + K)"
+              aria-label="Open Command Palette"
             >
-              <Search className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline text-slate-600 dark:text-slate-300">Search</span>
-              <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400">
-                ⌘K
-              </kbd>
+              <Search className="w-4 h-4" />
             </button>
           )}
 
-          {/* Offline Mode Indicator */}
-          {!isOnline && (
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700 font-bold text-xs shadow-2xs"
-              title="Working Offline: Core quizzes & flashcards remain fully functional via local caching"
-            >
-              <WifiOff className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <span className="hidden sm:inline">Offline</span>
-            </div>
-          )}
-
-          {/* Student / Teacher Mode Selector */}
-          {onPersonaChange && (
-            <div className="hidden md:flex items-center bg-slate-100/90 dark:bg-slate-800/90 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-black shadow-inner">
-              <button
-                type="button"
-                onClick={() => {
-                  soundFx.playClick();
-                  onPersonaChange('Student');
-                }}
-                className={`px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
-                  persona === 'Student'
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-500/25'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                Student
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  soundFx.playClick();
-                  onPersonaChange('Teacher');
-                }}
-                className={`px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
-                  persona === 'Teacher'
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-500/25'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                Teacher
-              </button>
-            </div>
-          )}
-
-          {/* Unified Rank, Streak, XP & Mascot Coins Action Bar */}
-          {(() => {
-            const lvlProg = getLevelProgress(stats.xp || 0, stats.streak || 1);
-            const dailyCheck = getDailyRetentionCheckIn();
-            return (
-              <button
-                type="button"
-                onClick={() => {
-                  soundFx.playClick();
-                  if (onOpenLevelRoadmap) onOpenLevelRoadmap();
-                  else if (onOpenProfileModal) onOpenProfileModal();
-                  else onSelectTab('analytics');
-                }}
-                className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 shadow-2xs text-xs font-black cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
-                title={`Lv.${lvlProg.level} ${lvlProg.rank.title} • ${stats.xp} XP (${lvlProg.progressPercent}% to Lv.${lvlProg.level + 1}) • Click for Level Roadmap & Daily Check-In`}
-              >
-                <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
-                  <span>{lvlProg.rank.badgeEmoji}</span>
-                  <span>Lv.{lvlProg.level}</span>
-                </span>
-                <span className="text-slate-300 dark:text-slate-600">·</span>
-                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                  <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                  <span>{stats.streak}d</span>
-                </span>
-                <span className="text-slate-300 dark:text-slate-600">·</span>
-                <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
-                  <Award className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>{stats.xp.toLocaleString()} XP</span>
-                </span>
-                <span className="text-slate-300 dark:text-slate-600">·</span>
-                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-                  <Coins className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{mascotCoins}</span>
-                </span>
-                {!dailyCheck.claimedToday && (
-                  <span className="ml-0.5 w-2 h-2 rounded-full bg-emerald-500 animate-ping" title="Daily Check-In Reward Available!" />
-                )}
-              </button>
-            );
-          })()}
-
-          {/* New Quiz Quick Action Button (Only when not in Studio) */}
-          {activeTab !== 'studio' && (
+          {/* UI Themes Studio Popover + Light/Dark Toggle */}
+          <div ref={themeMenuRef} className="relative flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
                 soundFx.playClick();
-                onSelectTab('studio');
+                setIsThemeMenuOpen((prev) => !prev);
               }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white text-xs font-black shadow-sm shadow-indigo-500/25 hover:shadow-md transition-all cursor-pointer whitespace-nowrap"
+              className="arcade-btn flex items-center gap-1.5 px-2.5 py-2 rounded-xl border-2 border-slate-900 dark:border-slate-700 bg-amber-300 hover:bg-amber-200 text-slate-950 text-xs font-black transition-all cursor-pointer shadow-2xs"
+              title="Switch UI Theme (6 Comic & Arcade Palettes + 5 UI Geometry Styles)"
+              aria-label="Open UI Themes Menu"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">New Quiz</span>
-            </button>
-          )}
-
-          {/* Compact Utility Group: Graphics/RTX, Pomodoro, Theme, Sound, Settings */}
-          <div className="relative flex items-center gap-1 p-1 rounded-2xl bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
-            {/* Quick Graphics & RTX Mode Button */}
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                setIsGfxMenuOpen((prev) => !prev);
-              }}
-              className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
-                rtxEnabled && graphicsMode !== 'simple'
-                  ? 'bg-gradient-to-r from-emerald-500/15 to-teal-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-400/40'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
-              }`}
-              title="Switch Graphics Mode (Simple / Medium / Performance 120Hz / Ultra RTX)"
-            >
-              <span>{graphicsMode === 'ultra' ? '💎' : graphicsMode === 'performance' ? '⚡' : graphicsMode === 'medium' ? '⚖️' : '🌿'}</span>
-              <span className="uppercase">{graphicsMode === 'ultra' ? 'RTX' : graphicsMode}</span>
-            </button>
-
-            {isGfxMenuOpen && (
-              <div className="absolute right-0 top-11 z-50 w-72 p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-2xl space-y-2.5 animate-in fade-in zoom-in-95 duration-150">
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <div>
-                    <div className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1">
-                      <span>💎 Graphics & RTX Engine</span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Real-time shaders, lighting & frame pacing
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundFx.playPop();
-                      const next = !rtxEnabled;
-                      setRtxEnabled(next);
-                      if (next && graphicsMode === 'simple') setGraphicsMode('ultra');
-                    }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-black cursor-pointer ${
-                      rtxEnabled && graphicsMode !== 'simple'
-                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {rtxEnabled && graphicsMode !== 'simple' ? 'RTX ON' : 'RTX OFF'}
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-1.5">
-                  {GRAPHICS_MODE_CATALOG.map((gm) => (
-                    <button
-                      key={gm.id}
-                      type="button"
-                      onClick={() => {
-                        soundFx.playPop();
-                        setGraphicsMode(gm.id);
-                        setIsGfxMenuOpen(false);
-                      }}
-                      className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
-                        graphicsMode === gm.id
-                          ? gm.id === 'ultra'
-                            ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/50'
-                            : 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/50'
-                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">{gm.icon}</span>
-                        <span className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400">
-                          {gm.badge}
-                        </span>
-                      </div>
-                      <div className="text-[11px] font-black text-slate-900 dark:text-white mt-0.5">
-                        {gm.shortName}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundFx.playClick();
-                      setFpsCounterEnabled(!fpsCounterEnabled);
-                    }}
-                    className={`text-[10px] font-extrabold px-2.5 py-1 rounded-lg cursor-pointer ${
-                      fpsCounterEnabled
-                        ? 'bg-slate-900 text-emerald-400'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {fpsCounterEnabled ? '🟢 Live FPS HUD: ON' : 'Show Live FPS HUD'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsGfxMenuOpen(false)}
-                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <button
-              type="button"
-              id="topbar-pomodoro-toggle-btn"
-              onClick={togglePomodoro}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                isPomodoroRunning
-                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 ring-1 ring-amber-400/50'
-                  : isPomodoroOpen
-                  ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
-              }`}
-              title="Toggle Pomodoro Study Timer"
-            >
-              <Timer className={`w-3.5 h-3.5 ${isPomodoroRunning ? 'text-amber-500 animate-spin' : ''}`} />
-              {isPomodoroRunning && (
-                <span className="font-mono text-[11px]">{formatPomodoroTime(pomodoroTimeLeft)}</span>
-              )}
+              <Palette className="w-3.5 h-3.5 text-slate-950" />
+              <span className="hidden xl:inline">
+                {UI_THEME_CATALOG.find((t) => t.id === uiTheme)?.emoji || '⚡'} Themes
+              </span>
             </button>
 
             <button
               type="button"
               id="theme-mode-toggle"
               onClick={handleThemeClick}
-              className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              title={resolvedTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-violet-400 transition-colors cursor-pointer"
+              title={resolvedTheme === 'dark' ? 'Switch to Bright Day Mode' : 'Switch to Neon Night Mode'}
               aria-label="Toggle Light and Dark Mode"
             >
               {resolvedTheme === 'dark' ? (
@@ -580,59 +507,134 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
               )}
             </button>
 
-            <button
-              type="button"
-              id="sound-fx-toggle"
-              onClick={handleSoundClick}
-              className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              title={soundEnabled ? 'Sound Effects Active' : 'Sound Effects Muted'}
-              aria-label="Toggle Sound Effects"
-            >
-              {soundEnabled ? (
-                <Volume2 className="w-4 h-4 text-emerald-500" />
-              ) : (
-                <VolumeX className="w-4 h-4 text-slate-400" />
-              )}
-            </button>
+            {isThemeMenuOpen && (
+              <div className="absolute right-0 top-12 w-80 sm:w-96 rounded-3xl comic-pop-card bg-white dark:bg-slate-900 border-2 border-slate-900 dark:border-slate-200 p-4 z-50 space-y-3.5 shadow-2xl animate-in fade-in duration-150">
+                <div className="flex items-center justify-between border-b-2 border-slate-200 dark:border-slate-800 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="comic-badge px-2 py-0.5 rounded bg-amber-300 text-slate-950 text-[10px] font-black uppercase">
+                      6 UI THEMES
+                    </span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white">
+                      Visual Theme &amp; Geometry
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleThemeClick}
+                    className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-black text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 cursor-pointer"
+                  >
+                    {resolvedTheme === 'dark' ? '☀️ Day Mode' : '🌙 Night Mode'}
+                  </button>
+                </div>
 
-            {bgMusicEnabled && (
-              <button
-                type="button"
-                id="bg-music-quick-toggle"
-                onClick={() => {
-                  soundFx.playClick();
-                  soundFx.toggleBgMusic();
-                }}
-                className={`p-1.5 rounded-xl transition-all cursor-pointer ${
-                  isBgMusicPlaying
-                    ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
-                }`}
-                title={
-                  isBgMusicPlaying
-                    ? 'Minimal Gamified Background Music Playing (Click to pause)'
-                    : 'Play Minimal Gamified Background Music'
-                }
-                aria-label="Toggle Minimal Background Music"
-              >
-                <Music className={`w-4 h-4 ${isBgMusicPlaying ? 'animate-pulse' : ''}`} />
-              </button>
+                {/* 6 Curated UI Themes */}
+                <div className="grid grid-cols-2 gap-2">
+                  {UI_THEME_CATALOG.map((themeItem) => {
+                    const isSelected = uiTheme === themeItem.id;
+                    return (
+                      <button
+                        key={themeItem.id}
+                        type="button"
+                        onClick={() => {
+                          soundFx.playPop();
+                          setUiTheme(themeItem.id);
+                        }}
+                        className={`flex flex-col items-start p-2.5 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-slate-950 dark:border-amber-300 bg-indigo-50/90 dark:bg-indigo-950/60 ring-2 ring-indigo-500/30'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-slate-400 bg-slate-50/60 dark:bg-slate-800/50'
+                        }`}
+                      >
+                        <div className="w-full flex items-center justify-between mb-1">
+                          <span className="text-base">{themeItem.emoji}</span>
+                          <span
+                            className={`w-6 h-2.5 rounded-full bg-gradient-to-r ${themeItem.swatchGradient} border border-slate-900/30`}
+                          />
+                        </div>
+                        <span className="text-[11px] font-black text-slate-900 dark:text-white leading-tight">
+                          {themeItem.name}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                          {themeItem.badge}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 5 Geometry Styles (Default, 3D Tactile, Modern Glass, Playful, Legacy) */}
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Card Shape &amp; Button Physics
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {UI_STYLE_CATALOG.map((st) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => {
+                          soundFx.playSelect();
+                          setUiStyle(st.id);
+                        }}
+                        className={`px-2.5 py-1 rounded-xl text-[10px] font-black border transition-all cursor-pointer ${
+                          uiStyle === st.id
+                            ? 'bg-indigo-600 text-white border-slate-900'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                        }`}
+                      >
+                        {st.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
+          </div>
 
+          {/* Sound Toggle */}
+          <button
+            type="button"
+            id="sound-fx-toggle"
+            onClick={handleSoundClick}
+            className="hidden sm:inline-flex p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-violet-400 transition-colors cursor-pointer"
+            title={soundEnabled ? 'Arcade Sound FX On' : 'Arcade Sound FX Muted'}
+            aria-label="Toggle Sound Effects"
+          >
+            {soundEnabled ? (
+              <Volume2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <VolumeX className="w-4 h-4 text-slate-400" />
+            )}
+          </button>
+
+          {/* Preferences Button */}
+          <button
+            type="button"
+            onClick={() => {
+              soundFx.playClick();
+              onOpenSettings();
+            }}
+            className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-violet-400 transition-colors cursor-pointer"
+            title="UI Styles (3D, Playful, Modern) & Keybinds"
+            aria-label="Open Settings"
+          >
+            <Sliders className="w-4 h-4" />
+          </button>
+
+          {/* Resume Active Quiz Pill */}
+          {activeQuiz && activeTab !== 'runner' && (
             <button
               type="button"
               onClick={() => {
                 soundFx.playClick();
-                onOpenSettings();
+                onSelectTab('runner');
               }}
-              className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              title="Open Quick Preferences"
+              className="arcade-btn hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 border-b-4 border-emerald-700 text-white text-xs font-black shadow-md shadow-emerald-500/20 cursor-pointer whitespace-nowrap"
             >
-              <Sliders className="w-4 h-4" />
+              <span>▶ Resume Game</span>
             </button>
-          </div>
+          )}
 
-          {/* User Account / Scholar Menu Dropdown */}
           {user && (
             <div ref={profileMenuRef} className="relative">
               <button
@@ -641,8 +643,8 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                   soundFx.playClick();
                   setIsProfileMenuOpen((prev) => !prev);
                 }}
-                className="flex items-center gap-2 p-1 sm:pr-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer shadow-2xs"
-                title="Scholar Profile & Quick Menu"
+                className="flex items-center gap-2 p-1 sm:pr-3 rounded-2xl bg-white dark:bg-slate-900 border-2 border-b-4 border-slate-200 dark:border-slate-800 hover:border-violet-400 transition-all cursor-pointer"
+                title="Player Profile & Quick Menu"
               >
                 <UserAvatar
                   displayName={userProfile?.displayName || user.displayName}
@@ -659,28 +661,58 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                   equippedAccessory={(userProfile?.equippedAccessory as MascotAccessory) || mascotAccessory}
                   size="xs"
                 />
-                <span className="hidden xl:inline text-xs font-bold text-slate-800 dark:text-slate-100 max-w-[90px] truncate">
-                  {userProfile?.displayName || user.displayName || 'Scholar'}
-                </span>
+                <div className="hidden xl:flex flex-col items-start leading-tight">
+                  <span className="text-xs font-semibold text-stone-800 dark:text-stone-200 max-w-[110px] truncate flex items-center gap-1">
+                    {masteryProfile.equippedAvatarId && <span>{masteryProfile.equippedAvatarId}</span>}
+                    <span>{userProfile?.displayName || user.displayName || 'Scholar'}</span>
+                  </span>
+                  {masteryProfile.equippedTitle && (
+                    <span className="text-[9px] font-black uppercase tracking-wider text-violet-600 dark:text-violet-400 truncate max-w-[110px]">
+                      {masteryProfile.equippedTitle}
+                    </span>
+                  )}
+                </div>
               </button>
 
               {isProfileMenuOpen && (
-                <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-2 z-50 space-y-1">
-                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-                    <div className="text-xs font-black text-slate-900 dark:text-white truncate">
+                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#FFFDF9] dark:bg-[#121816] border border-stone-300 dark:border-stone-800 shadow-xl p-2.5 z-50 space-y-1">
+                  <div className="px-3 py-2 border-b border-stone-200 dark:border-stone-800">
+                    <div className="font-editorial text-sm font-bold text-stone-900 dark:text-white truncate">
                       {userProfile?.displayName || user.displayName || 'Scholar'}
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
-                      {isFirebaseConnected && (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          Cloud Synced
-                        </span>
-                      )}
-                      <span>•</span>
-                      <span>{stats.gems ?? 0} Gems</span>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[11px] font-mono tabular-nums text-stone-500 dark:text-stone-400">
+                      <span>{persona} Mode</span>
+                      <span>·</span>
+                      <span>{stats.xp.toLocaleString()} XP</span>
+                      <span>·</span>
+                      <span>{mascotCoins} Coins</span>
                     </div>
                   </div>
+
+                  {onPersonaChange && (
+                    <div className="px-3 py-1.5 flex items-center justify-between text-xs">
+                      <span className="text-stone-500 dark:text-stone-400">Perspective</span>
+                      <div className="flex items-center gap-1 bg-stone-100 dark:bg-stone-800 p-0.5 rounded-lg">
+                        {(['Student', 'Teacher'] as PersonaType[]).map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => {
+                              soundFx.playClick();
+                              onPersonaChange(p);
+                            }}
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold cursor-pointer ${
+                              persona === p
+                                ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-2xs'
+                                : 'text-stone-500'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     type="button"
@@ -689,10 +721,30 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                       setIsProfileMenuOpen(false);
                       onOpenProfileModal?.();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
                   >
-                    <UserIcon className="w-3.5 h-3.5 text-indigo-500" />
-                    <span>Customize Scholar Profile</span>
+                    <UserIcon className="w-3.5 h-3.5 text-stone-500" />
+                    <span>Scholar Profile & Mascot</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setIsProfileMenuOpen(false);
+                      togglePomodoro();
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <Timer className="w-3.5 h-3.5 text-stone-500" />
+                      <span>Pomodoro Focus Timer</span>
+                    </span>
+                    {isPomodoroRunning && (
+                      <span className="font-mono text-[11px] tabular-nums text-amber-700 dark:text-amber-400">
+                        {formatPomodoroTime(pomodoroTimeLeft)}
+                      </span>
+                    )}
                   </button>
 
                   {onOpenUploadQuiz && (
@@ -703,26 +755,10 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                         setIsProfileMenuOpen(false);
                         onOpenUploadQuiz();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
                     >
-                      <Upload className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Upload Quiz File</span>
-                    </button>
-                  )}
-
-                  {activeTab !== 'live' && (
-                    <button
-                      type="button"
-                      id="topbar-live-room-btn"
-                      onClick={() => {
-                        soundFx.playClick();
-                        setIsProfileMenuOpen(false);
-                        onSelectTab('live');
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                    >
-                      <Radio className="w-3.5 h-3.5 text-rose-500" />
-                      <span>Live Multiplayer Room</span>
+                      <Upload className="w-3.5 h-3.5 text-stone-500" />
+                      <span>Import Quiz Dossier</span>
                     </button>
                   )}
 
@@ -734,14 +770,14 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                         setIsProfileMenuOpen(false);
                         onOpenShortcuts();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
                     >
-                      <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                      <HelpCircle className="w-3.5 h-3.5 text-stone-400" />
                       <span>Keyboard Shortcuts (?)</span>
                     </button>
                   )}
 
-                  <div className="pt-1 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                  <div className="pt-1 border-t border-stone-200 dark:border-stone-800 space-y-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -749,9 +785,9 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                         setIsProfileMenuOpen(false);
                         switchAccount();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
                     >
-                      <Users className="w-3.5 h-3.5 text-amber-500" />
+                      <Users className="w-3.5 h-3.5 text-stone-400" />
                       <span>Switch Account</span>
                     </button>
 
@@ -762,7 +798,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                         setIsProfileMenuOpen(false);
                         logout();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Sign Out</span>

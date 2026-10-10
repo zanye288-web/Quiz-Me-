@@ -156,17 +156,22 @@ export const SummaryStudyGuideStudio: React.FC<SummaryStudyGuideStudioProps> = (
   return (
     <div className="space-y-6">
       {/* Studio Header Card */}
-      <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 text-white border border-indigo-500/30 shadow-xl">
+      <div className="comic-panel pattern-blueprint-grid p-6 sm:p-7 rounded-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-black uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>AI Summary & Study Guide Studio</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                AI CRAM SHEET
+              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-black uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>AI Summary &amp; Study Guide Studio</span>
+              </div>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Sleek Executive Summaries & Master Study Guides
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white">
+              Sleek Executive Summaries &amp; Master Study Guides
             </h2>
-            <p className="text-xs sm:text-sm text-indigo-200/80 max-w-2xl">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-2xl font-medium">
               Paste up to 5,000 characters of lecture notes, textbook chapters, or any academic topic to synthesize a structured, exam-ready visual study guide.
             </p>
           </div>

@@ -351,14 +351,14 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
       const data = await res.json();
       if (data.success && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
         const mapped: SuggestedStudyTopic[] = data.recommendations.map((rec: any, idx: number) => {
-          const fallbackPreset = PRESET_TOPICS[idx % PRESET_TOPICS.length];
+          const fallbackPreset = PRESET_TOPICS.length > 0 ? PRESET_TOPICS[idx % PRESET_TOPICS.length] : null;
           return {
-            title: rec.title || fallbackPreset.title,
-            category: rec.category || fallbackPreset.category,
+            title: rec.title || fallbackPreset?.title || 'AI Study Topic',
+            category: rec.category || fallbackPreset?.category || 'General Knowledge',
             difficulty: rec.difficulty || 'Intermediate',
             reason: rec.reason || rec.description || 'AI-tailored to expand your knowledge graph.',
-            prompt: rec.prompt || rec.title || fallbackPreset.inputText,
-            presetQuiz: fallbackPreset.prebuiltStudentQuiz,
+            prompt: rec.prompt || rec.title || fallbackPreset?.inputText || 'General Knowledge',
+            presetQuiz: fallbackPreset?.prebuiltStudentQuiz,
           };
         });
         setAiStudyPicks(mapped);
@@ -554,30 +554,31 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
       )}
 
       {/* Hero Header */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-start sm:items-center gap-3.5">
-          <div
-            className={`p-3 rounded-xl ${currentAccentConfig.badgeBg} ${currentAccentConfig.badgeText} border ${currentAccentConfig.border} shadow-2xs shrink-0`}
-          >
+      <div className="comic-tab-hero p-5 sm:p-7 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5 relative z-10">
+          <div className="p-3 rounded-2xl bg-amber-300 text-slate-950 border-2 border-slate-950 shadow-md shrink-0">
             <Lightbulb className="w-6 h-6" />
           </div>
-          <div>
+          <div className="space-y-1">
             <div className="flex items-center flex-wrap gap-2">
-              <h1 className="text-lg sm:text-xl font-black tracking-tight text-slate-900 dark:text-white">
-                Ideas &amp; Study Picks
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800">
+              <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                ISSUE #14 · IDEA LAB
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-slate-950/60 text-cyan-200 border border-white/25">
                 Feedback &amp; Topics
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 max-w-2xl">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white drop-shadow-xs">
+              Ideas &amp; Study Picks
+            </h1>
+            <p className="text-xs text-indigo-100 font-medium max-w-2xl">
               Send your ideas directly to us, vote on upcoming features, or try quizzes picked just for you.
             </p>
           </div>
         </div>
 
         {/* Sub-navigation Switcher */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 self-stretch md:self-auto">
+        <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-950/65 border-2 border-slate-950 self-stretch md:self-auto relative z-10">
           {[
             { id: 'feature_board' as const, label: 'Send Idea & Vote', icon: MessageSquarePlus },
             { id: 'study_picks' as const, label: 'Study Picks', icon: Compass },
@@ -593,10 +594,10 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
                   soundFx.playClick();
                   setActiveSubTab(tab.id);
                 }}
-                className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
                   active
-                    ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-amber-300 text-slate-950 border-2 border-slate-950 shadow-xs'
+                    : 'text-white/85 hover:text-white'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -635,6 +636,16 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
             </button>
           </div>
 
+          {aiStudyPicks.length === 0 ? (
+            <div className="p-10 rounded-3xl bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-3">
+              <h3 className="text-base font-black text-slate-900 dark:text-white">
+                No quizzes available
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                Take a quiz first or click Refresh AI Study Suggestions above to generate personalized study picks!
+              </p>
+            </div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {aiStudyPicks.map((pick, idx) => (
               <div
@@ -698,6 +709,7 @@ export const SuggestionsHubView: React.FC<SuggestionsHubViewProps> = ({
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 

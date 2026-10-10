@@ -28,6 +28,8 @@ import { LiveSessionRoom } from './components/live/LiveSessionRoom';
 import { PomodoroTimerOverlay } from './components/PomodoroTimerOverlay';
 import { LiveSessionData } from './types/liveSession';
 import { IntelligentNotesHubView } from './components/IntelligentNotesHubView';
+import { ExamModeHubView } from './components/ExamModeHubView';
+import { PastPapersHubView } from './components/PastPapersHubView';
 import { SuggestionsHubView } from './components/SuggestionsHubView';
 import { MusicStudioView } from './components/MusicStudioView';
 import { QuizSearcherView } from './components/QuizSearcherView';
@@ -47,12 +49,12 @@ import {
   LEVEL_SYSTEM_VERSION,
   LEVEL_RESET_STORAGE_KEY,
   calculateLevelFromXp,
-  calculateRetentionQuizRewards,
   createFreshResetStats,
 } from './utils/levelingSystem';
+import { verifyAndCalculateQuizRewards } from './utils/xpIntegrity';
 import { useTheme } from './context/ThemeContext';
 import { GraduationCap, Sparkles, BookOpen, Layers, BarChart3, Menu, Share2, Play, X, FileText } from 'lucide-react';
-import { PersonaType, QuizResponse, Question, UserStats, AssessmentConfig } from './types/quiz';
+import { PersonaType, QuizResponse, Question, UserStats, AssessmentConfig, ExamFormatId } from './types/quiz';
 import { BadgeDefinition, BADGE_CATALOG } from './types/badges';
 import { soundFx } from './utils/audio';
 import { speechEngine } from './utils/speech';
@@ -81,6 +83,8 @@ export default function App() {
 
   // Navigation & Workspace View State
   const [activeTab, setActiveTab] = useState<DashboardTab>('studio');
+  const [notesInitialTopic, setNotesInitialTopic] = useState<string>('');
+  const [notesInitialExamFormat, setNotesInitialExamFormat] = useState<ExamFormatId | undefined>(undefined);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
@@ -133,6 +137,9 @@ export default function App() {
     gemsEarned: number;
     timeSpentSeconds?: number;
     flaggedIds?: number[];
+    fixedQuestionIds?: number[];
+    summaryTags?: string[];
+    integrityNotice?: string;
     answers: Array<{ questionId: number; isCorrect: boolean; userAnswer: string }>;
   } | null>(null);
 
@@ -487,19 +494,17 @@ export default function App() {
       BADGE_CATALOG.filter((b) => b.checkUnlocked(stats)).map((b) => b.id)
     );
 
-    // Award challenging Mascot Coins for 80%+ quiz mastery
-    const coinReward = calculateQuizMascotCoinsEarned(
-      results.score,
-      results.total,
-      results.quiz.difficulty,
-      stats.streak
-    );
-    const updatedCoins = coinReward.coins > 0 ? addMascotCoinsGlobal(coinReward.coins) : getSavedMascotPreferences().coins;
+    // Calculate effort-verified, zero-loophole XP & Gems (prevents 0-score, button-mashing, and repeat-quiz farming)
+    const answeredCount = results.answers.filter(
+      (a) => a.userAnswer && a.userAnswer.trim().length > 0 && a.userAnswer !== '(Time Expired)'
+    ).length;
 
-    // Calculate revamped challenging retention XP & Gems
-    const retentionRewards = calculateRetentionQuizRewards({
+    const retentionRewards = verifyAndCalculateQuizRewards({
+      quiz: results.quiz,
       score: results.score,
       total: results.total,
+      answeredCount,
+      timeSpentSeconds: results.timeSpentSeconds,
       difficulty: results.quiz.difficulty,
       streak: stats.streak,
       level: stats.level,
@@ -509,18 +514,36 @@ export default function App() {
     const effectiveXpEarned = retentionRewards.totalXpEarned;
     const effectiveGemsEarned = retentionRewards.gemsEarned;
 
+    // Award challenging Mascot Coins ONLY if verified effort and 80%+ quiz mastery
+    const coinReward = retentionRewards.isVerifiedEffort
+      ? calculateQuizMascotCoinsEarned(
+          results.score,
+          results.total,
+          results.quiz.difficulty,
+          stats.streak
+        )
+      : { coins: 0, reason: 'Replay / unverified' };
+    const updatedCoins =
+      coinReward.coins > 0
+        ? addMascotCoinsGlobal(coinReward.coins)
+        : getSavedMascotPreferences().coins;
+
     setQuizResults({
       ...results,
       xpEarned: effectiveXpEarned,
       gemsEarned: effectiveGemsEarned,
+      summaryTags: retentionRewards.summaryTags,
+      integrityNotice: retentionRewards.integrityNotice,
     });
 
     const newTotalXp = stats.xp + effectiveXpEarned;
     const updatedNewStats: UserStats = {
       ...stats,
-      totalCorrect: stats.totalCorrect + results.score,
-      totalQuestions: stats.totalQuestions + results.total,
-      quizzesCompleted: stats.quizzesCompleted + 1,
+      totalCorrect: stats.totalCorrect + retentionRewards.newlyCreditedCorrect,
+      totalQuestions:
+        stats.totalQuestions + (retentionRewards.isVerifiedEffort ? results.total : 0),
+      quizzesCompleted:
+        stats.quizzesCompleted + (retentionRewards.isVerifiedEffort && results.score > 0 ? 1 : 0),
       xp: newTotalXp,
       gems: stats.gems + effectiveGemsEarned,
       coins: updatedCoins,
@@ -705,61 +728,28 @@ export default function App() {
   }
 
   return (
-    <div className="relative h-screen bg-slate-50/90 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-row transition-colors duration-200 antialiased selection:bg-indigo-500 selection:text-white overflow-hidden">
+    <div className="relative h-screen atelier-canvas-bg text-slate-900 dark:text-slate-100 flex flex-row transition-colors duration-200 antialiased selection:bg-violet-600 selection:text-white overflow-hidden">
       {/* Interactive Particle Visual Effects & RTX Ray-Traced Lighting Layers */}
       <ParticleBackgroundCanvas />
       <RtxLightingOverlay />
 
-      {/* Vibrant Ambient Glow Orbs in Background */}
+      {/* Vibrant Aurora Ambient Illumination */}
       {ambientOrbsEnabled && (
         <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute -top-32 -left-32 w-[450px] h-[450px] bg-gradient-to-br from-indigo-500/15 via-purple-500/15 to-transparent rounded-full blur-3xl animate-float-slow" />
-          <div className="absolute top-1/4 -right-32 w-[500px] h-[500px] bg-gradient-to-bl from-pink-500/15 via-rose-500/10 to-amber-500/10 rounded-full blur-3xl animate-pulse-glow" />
-          <div className="absolute -bottom-32 left-1/4 w-[550px] h-[550px] bg-gradient-to-tr from-cyan-500/15 via-emerald-500/15 to-transparent rounded-full blur-3xl animate-float-slow" />
+          <div className="absolute -top-40 -left-32 w-[520px] h-[520px] bg-gradient-to-br from-violet-500/12 via-fuchsia-500/8 to-transparent rounded-full blur-3xl animate-24fps-float" />
+          <div className="absolute top-1/4 -right-32 w-[520px] h-[520px] bg-gradient-to-bl from-cyan-500/12 via-indigo-500/8 to-emerald-400/8 rounded-full blur-3xl animate-24fps-float" />
+          <div className="absolute -bottom-36 left-1/4 w-[580px] h-[580px] bg-gradient-to-tr from-indigo-500/10 via-amber-400/8 to-transparent rounded-full blur-3xl animate-24fps-float" />
         </div>
       )}
 
-      {/* Desktop Sidebar Navigation (Hidden in Focus Mode) */}
-      {!isFocusModeActive && (
-        <div className="hidden md:block shrink-0 sticky top-0 h-screen z-30">
-          <DashboardSidebar
-            activeTab={activeTab}
-            onSelectTab={(tab) => {
-              setIsFocusMode(false);
-              setActiveTab(tab);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            persona={persona}
-            onPersonaChange={(p) => {
-              setPersona(p);
-              if (activeQuiz) {
-                setActiveQuiz({ ...activeQuiz, persona: p });
-              }
-            }}
-            stats={stats}
-            activeQuiz={activeQuiz}
-            hasCompletedResults={!!quizResults}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            onOpenProfileModal={() => {
-              setIsOptionalOnboarding(false);
-              setIsProfileModalOpen(true);
-            }}
-            onOpenUploadQuiz={() => setIsUploadModalOpen(true)}
-            isCollapsed={isSidebarCollapsed}
-            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            historyCount={historyRecords.length}
-          />
-        </div>
-      )}
-
-      {/* Mobile Drawer Overlay Sidebar (Hidden in Focus Mode) */}
+      {/* On-Demand Slide-Over Quiz Modes Drawer (Full-Canvas Center-Stage Quiz Lounge Architecture) */}
       {!isFocusModeActive && isMobileSidebarOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-50 flex">
           <div
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
             onClick={() => setIsMobileSidebarOpen(false)}
           />
-          <div className="relative w-72 max-w-[80vw] h-full bg-white dark:bg-slate-900 shadow-2xl z-10">
+          <div className="relative w-80 max-w-[85vw] h-full bg-white dark:bg-slate-950 shadow-2xl z-10 border-r border-slate-200 dark:border-slate-800">
             <DashboardSidebar
               activeTab={activeTab}
               onSelectTab={(tab) => {
@@ -792,7 +782,10 @@ export default function App() {
                 setIsUploadModalOpen(true);
               }}
               isCollapsed={false}
-              onToggleCollapse={() => setIsMobileSidebarOpen(false)}
+              onToggleCollapse={() => {
+                setIsMobileSidebarOpen(false);
+                setIsSidebarCollapsed((prev) => !prev);
+              }}
               historyCount={historyRecords.length}
             />
           </div>
@@ -861,8 +854,67 @@ export default function App() {
                 setIsTutorOpen(true);
               }}
               onOpenLevelRoadmap={() => setIsLevelRoadmapOpen(true)}
+              onNavigateTab={(tab) => setActiveTab(tab as DashboardTab)}
               stats={stats}
               historyRecords={historyRecords}
+            />
+          )}
+
+          {activeTab === 'exam' && (
+            <ExamModeHubView
+              persona={persona}
+              assessmentConfig={assessmentConfig}
+              onUpdateAssessmentConfig={(cfg) => {
+                const merged = { ...assessmentConfig, ...cfg };
+                setAssessmentConfig(merged);
+                if (user) {
+                  syncAssessmentConfigToCloud(merged);
+                }
+              }}
+              onStartQuiz={(quiz) => {
+                const examCfg: AssessmentConfig = {
+                  ...assessmentConfig,
+                  mode: 'exam',
+                  examFormat: quiz.examFormat || assessmentConfig.examFormat || 'waec',
+                };
+                setAssessmentConfig(examCfg);
+                handleStartQuiz(quiz);
+              }}
+              onOpenNotesGenerator={(topic, formatId) => {
+                if (topic) setNotesInitialTopic(topic);
+                if (formatId) setNotesInitialExamFormat(formatId);
+                setActiveTab('notes');
+              }}
+              onOpenPastPapersHub={(formatId) => {
+                if (formatId) {
+                  setAssessmentConfig((prev) => ({ ...prev, examFormat: formatId }));
+                }
+                setActiveTab('past_papers');
+              }}
+              onOpenWorksheet={(q) => setWorksheetQuiz(q)}
+              stats={stats}
+            />
+          )}
+
+          {activeTab === 'past_papers' && (
+            <PastPapersHubView
+              persona={persona}
+              selectedExamFormat={assessmentConfig.examFormat || 'waec'}
+              onStartQuiz={(quiz) => {
+                const examCfg: AssessmentConfig = {
+                  ...assessmentConfig,
+                  mode: 'exam',
+                  examFormat: quiz.examFormat || assessmentConfig.examFormat || 'waec',
+                };
+                setAssessmentConfig(examCfg);
+                handleStartQuiz(quiz);
+              }}
+              onOpenNotesGenerator={(topic, formatId) => {
+                if (topic) setNotesInitialTopic(topic);
+                if (formatId) setNotesInitialExamFormat(formatId);
+                setActiveTab('notes');
+              }}
+              onOpenWorksheet={(q) => setWorksheetQuiz(q)}
             />
           )}
 
@@ -870,6 +922,8 @@ export default function App() {
             <IntelligentNotesHubView
               persona={persona}
               activeQuiz={activeQuiz}
+              initialTopic={notesInitialTopic}
+              initialExamFormat={notesInitialExamFormat || assessmentConfig.examFormat}
               onStartPracticeQuiz={(topic) => {
                 setActiveTab('studio');
               }}
@@ -893,10 +947,11 @@ export default function App() {
           {activeTab === 'flashcards' && (
             <FlashcardStudio
               initialQuiz={activeQuiz}
-              onFlashcardMastered={(count) => {
+              onFlashcardMastered={(xpDelta, gemsDelta = 1) => {
+                if (xpDelta <= 0) return;
                 updateStats({
-                  xp: stats.xp + count * 5,
-                  gems: stats.gems + count * 2,
+                  xp: stats.xp + xpDelta,
+                  gems: stats.gems + gemsDelta,
                 });
               }}
             />
@@ -957,7 +1012,17 @@ export default function App() {
             <GamesArenaView
               persona={persona}
               stats={stats}
-              onUpdateStats={updateStats}
+              onUpdateStats={(xpEarned, correctCount, totalCount) => {
+                if (typeof xpEarned === 'number' && xpEarned > 0) {
+                  updateStats({
+                    xp: stats.xp + xpEarned,
+                    totalCorrect: stats.totalCorrect + (correctCount || 0),
+                    totalQuestions: stats.totalQuestions + (totalCount || 0),
+                  });
+                }
+              }}
+              onStartQuiz={handleStartQuiz}
+              customQuizzes={customQuizzes}
               onGenerateNotesForTopic={(topic) => {
                 setActiveTab('notes');
               }}
@@ -1199,6 +1264,8 @@ export default function App() {
               onRestartQuiz={handleRestartQuiz}
               onNewQuiz={handleNewQuiz}
               onOpenJsonView={() => handleInspectRawJson(activeQuiz)}
+              onOpenMyNotesTab={() => setActiveTab('notes')}
+              onStartQuiz={handleStartQuiz}
             />
           )}
 
@@ -1252,16 +1319,32 @@ export default function App() {
             type="button"
             onClick={() => {
               soundFx.playClick();
-              setActiveTab('curricula');
+              setActiveTab('exam');
             }}
             className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
-              activeTab === 'curricula'
+              activeTab === 'exam'
                 ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/60'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <BookOpen className="w-4 h-4 mb-0.5" />
-            <span>Quizzes</span>
+            <GraduationCap className="w-4 h-4 mb-0.5" />
+            <span>Exam Mode</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              soundFx.playClick();
+              setActiveTab('notes');
+            }}
+            className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
+              activeTab === 'notes'
+                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/60'
+                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <FileText className="w-4 h-4 mb-0.5" />
+            <span>Notes</span>
           </button>
 
           <button
@@ -1519,6 +1602,7 @@ export default function App() {
           persona={persona}
           soundEnabled={soundEnabled}
           isQuizRunning={activeTab === 'runner'}
+          activeQuiz={activeQuiz}
           onToggleSound={handleToggleSound}
           onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
           onOpenTutor={() => {

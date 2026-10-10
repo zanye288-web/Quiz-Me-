@@ -295,59 +295,7 @@ export const RecommendedQuizzesSection: React.FC<RecommendedQuizzesSectionProps>
         });
       }
 
-      // 2. Add high-yield foundational & progression tracks to round out 4 recommendations
-      adaptiveRecs.push(
-        {
-          id: 'rec_js_event_loop',
-          title: 'JavaScript Event Loop & Microtask Queues',
-          topic: 'JavaScript Concurrency Model & Promise Resolution',
-          description: 'Strengthen mental models on how the Call Stack, Microtasks, and Promises execute in order.',
-          difficulty: 'Intermediate',
-          targetDomain: 'Syntax & Execution',
-          reasonCategory: 'Remediation',
-          matchReason: 'Pedagogical Diagnostic: Identified need for precision in asynchronous order of execution and edge cases.',
-          suggestedQuestionCount: 4,
-          suggestedTypes: ['multiple_choice', 'code_media_challenge', 'fill_in_blank'],
-          estimatedMinutes: 4,
-          xpReward: 120,
-          icon: '⚡',
-          samplePrompt: 'Focus on the JavaScript event loop, microtasks (Promise.then, queueMicrotask) vs macrotasks (setTimeout, setInterval), execution order, and async/await subtleties.',
-        },
-        {
-          id: 'rec_photosynthesis_biochem',
-          title: 'Cellular Respiration vs Photosynthesis',
-          topic: 'Calvin Cycle, ATP Synthase, and Chemiosmosis',
-          description: 'Master electron transport chains, light-independent carbon fixation, and cellular energy synthesis.',
-          difficulty: 'Intermediate',
-          targetDomain: 'Analytical Reasoning',
-          reasonCategory: 'Reinforcement',
-          matchReason: 'Active Recall: Reinforce biochemical pathways and energy transformation concepts.',
-          suggestedQuestionCount: 4,
-          suggestedTypes: ['multiple_choice', 'fill_in_blank', 'open_explanation'],
-          estimatedMinutes: 5,
-          xpReward: 130,
-          icon: '🌿',
-          samplePrompt: 'Focus on the light-dependent reactions of photosynthesis, the Calvin cycle, NADPH generation, proton gradients, and ATP synthase mechanics.',
-        },
-        {
-          id: 'rec_algorithmic_complexity',
-          title: 'Algorithmic Complexity & Recursion',
-          topic: 'Big-O Asymptotics and Divide & Conquer Recurrences',
-          description: 'Deepen analytical understanding of call-stack space complexity and runtime bounds.',
-          difficulty: 'Master',
-          targetDomain: 'Applied Logic',
-          reasonCategory: 'Progression',
-          matchReason: 'Growth Milestone: Advance cognitive depth into higher-order algorithmic problem solving.',
-          suggestedQuestionCount: 5,
-          suggestedTypes: ['code_media_challenge', 'open_explanation', 'multiple_choice'],
-          estimatedMinutes: 6,
-          xpReward: 180,
-          icon: '🧠',
-          samplePrompt: 'Focus on recursive algorithms, tree traversals, call-stack frame allocations, recurrence relations, and Big-O / Big-Theta complexity calculations.',
-        }
-      );
-
-      setRecommendations(adaptiveRecs.slice(0, 4));
+      setRecommendations(adaptiveRecs);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -633,32 +581,17 @@ export const RecommendedQuizzesSection: React.FC<RecommendedQuizzesSectionProps>
               <div
                 key={rec.id}
                 id={`rec-card-${rec.id}`}
-                className={`rounded-2xl p-5 border bg-white dark:bg-slate-900 shadow-xs flex flex-col justify-between gap-4 transition-all hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 relative overflow-hidden ${
-                  isRemediation
-                    ? 'border-amber-200 dark:border-amber-900/60'
-                    : isProgression
-                    ? 'border-indigo-200 dark:border-indigo-900/60'
-                    : 'border-slate-200 dark:border-slate-800'
-                }`}
+                className="comic-panel animate-24fps-deal rounded-3xl p-5 bg-white dark:bg-slate-900 flex flex-col justify-between gap-4 transition-all relative overflow-hidden"
               >
-                {/* Accent top stripe */}
-                <div
-                  className={`absolute top-0 left-0 right-0 h-1.5 ${
-                    isRemediation
-                      ? 'bg-gradient-to-r from-rose-500 via-amber-500 to-orange-400'
-                      : isProgression
-                      ? 'bg-gradient-to-r from-indigo-500 to-purple-600'
-                      : 'bg-gradient-to-r from-emerald-500 to-teal-500'
-                  }`}
-                />
+                {/* Luminous Aurora Top Strip */}
+                <div className="absolute top-0 left-0 right-0 h-2 pattern-speed-stripes bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-400 border-b border-slate-950/30" />
 
                 <div className="space-y-3">
-                  {/* Top Badges & Meta */}
+                  {/* Top Badges & Meta (No App Thumbnail) */}
                   <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">{rec.icon || '⚡'}</span>
                       <span
-                        className={`text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${
+                        className={`text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border flex items-center gap-1 ${
                           isRemediation
                             ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
                             : isProgression
@@ -803,18 +736,31 @@ export const RecommendedQuizzesSection: React.FC<RecommendedQuizzesSectionProps>
         <div className="text-center py-8 px-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-2">
           <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
           <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">
-            No specific weak spots found in this filter!
+            No quizzes available
           </h4>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            You're performing well across these topics. Switch to "All Quizzes" or take a new diagnostic assessment to test advanced material.
+            {recommendations.length === 0
+              ? 'Take a quiz first or click Refresh so AI can generate personalized quiz recommendations based on your performance.'
+              : 'No recommendations match this filter. Switch to "All Quizzes" to view available suggestions.'}
           </p>
-          <button
-            type="button"
-            onClick={() => setActiveFilter('ALL')}
-            className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-xs"
-          >
-            Show All Suggestions
-          </button>
+          <div className="flex items-center justify-center gap-2 pt-1">
+            {activeFilter !== 'ALL' && recommendations.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveFilter('ALL')}
+                className="px-3.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold text-xs cursor-pointer"
+              >
+                Show All Suggestions
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => fetchRecommendations(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white font-bold text-xs cursor-pointer"
+            >
+              Generate AI Recommendations
+            </button>
+          </div>
         </div>
       )}
 

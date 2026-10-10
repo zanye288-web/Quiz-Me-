@@ -95,9 +95,9 @@ export const StarterTutorialModal: React.FC<StarterTutorialModalProps> = ({
       aria-modal="true"
       aria-label="Starter Interactive Tutorial"
     >
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="comic-modal-panel relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Top Progress Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-200/80 dark:border-slate-800/80 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-emerald-500/10 flex items-center justify-between gap-4">
+        <div className="pattern-halftone p-5 sm:p-6 border-b-2 border-slate-900/15 dark:border-slate-800 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-emerald-500/10 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <MascotAvatar
               mood={step === 4 ? 'streak' : step === 2 ? 'thinking' : 'happy'}

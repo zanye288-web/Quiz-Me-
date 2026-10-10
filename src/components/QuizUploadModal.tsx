@@ -234,11 +234,11 @@ export const QuizUploadModal: React.FC<QuizUploadModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-2xl my-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          className="comic-modal-panel relative w-full max-w-2xl my-8 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden flex flex-col max-h-[90vh]"
           id="quiz-upload-modal-card"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 shrink-0">
+          <div className="pattern-halftone flex items-center justify-between px-6 py-5 border-b-2 border-slate-900/15 dark:border-slate-800 bg-indigo-50/50 dark:bg-slate-800/30 shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
                 <Upload className="w-5 h-5" />

@@ -343,7 +343,7 @@ export const AudioRecorderStudio: React.FC<AudioRecorderStudioProps> = ({
       )}
 
       {/* Interactive Recording Deck */}
-      <div className="relative rounded-3xl p-6 sm:p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40 overflow-hidden text-center transition-all">
+      <div className="comic-panel pattern-halftone relative rounded-3xl p-6 sm:p-8 bg-slate-50/80 dark:bg-slate-800/60 overflow-hidden text-center transition-all">
         {/* Background glow when recording */}
         {isRecording && (
           <motion.div

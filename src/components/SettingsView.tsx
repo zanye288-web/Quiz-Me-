@@ -54,6 +54,7 @@ import {
   PARTICLE_PRESET_CATALOG,
   GRAPHICS_MODE_CATALOG,
   UI_STYLE_CATALOG,
+  UI_THEME_CATALOG,
   UiStyleMode,
   AccentColor,
   FontFamilyChoice,
@@ -134,6 +135,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setFontFamily,
     uiStyle,
     setUiStyle,
+    uiTheme,
+    setUiTheme,
     uiDensity,
     setUiDensity,
     cardRadius,
@@ -674,24 +677,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* Compact Fit-to-Screen Hero Header + Navigation Bar */}
-      <div className="shrink-0 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs p-3.5 space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="shrink-0 comic-tab-hero rounded-3xl p-4 sm:p-5 space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 relative z-10">
           <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${currentAccentConfig.badgeBg} ${currentAccentConfig.badgeText} border ${currentAccentConfig.border}`}>
+            <div className="p-2.5 rounded-2xl bg-amber-300 text-slate-950 border-2 border-slate-950 shadow-sm">
               <SlidersHorizontal className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                  Settings & Advanced Studio
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[9px] font-black uppercase tracking-wider">
+                  ISSUE #15 · UI &amp; SETTINGS
+                </span>
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-white drop-shadow-xs">
+                  Settings &amp; Advanced Studio
                 </h1>
-                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                <span className="text-[11px] font-bold text-cyan-200">
                   · Live Reactive
                   {lastSavedTimestamp ? ` · Saved ${lastSavedTimestamp}` : ''}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Customize particle visual effects, themes, mascots, audio synthesis, adaptive AI difficulty, and progression.
+              <p className="text-[11px] text-indigo-100 font-medium">
+                Customize 6 Neo-Comic UI themes, particle visual effects, mascots, audio synthesis, adaptive AI difficulty, and progression.
               </p>
             </div>
           </div>
@@ -1528,6 +1534,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* 6 Curated Neo-Comic & Arcade UI Themes Card */}
+            <div className="p-5 comic-pop-card bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-900 dark:border-slate-700 shadow-sm space-y-3.5">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className="comic-badge px-2 py-0.5 rounded bg-amber-300 text-slate-950 text-[10px] font-black">
+                    NEW!
+                  </span>
+                  <span>UI Theme Worlds (6 Comic &amp; Arcade Palettes)</span>
+                </label>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  Active: <strong className="text-indigo-600 dark:text-indigo-400">{UI_THEME_CATALOG.find((t) => t.id === uiTheme)?.name}</strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {UI_THEME_CATALOG.map((themeItem) => {
+                  const isSelected = uiTheme === themeItem.id;
+                  return (
+                    <button
+                      key={themeItem.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setUiTheme(themeItem.id);
+                        triggerSaveNotice(`Switched UI Theme to ${themeItem.name}!`);
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                        isSelected
+                          ? 'border-slate-950 dark:border-amber-300 bg-indigo-50/80 dark:bg-indigo-950/50 ring-2 ring-indigo-500/25 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-400 bg-slate-50/70 dark:bg-slate-850'
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-lg">{themeItem.emoji}</span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-900 text-amber-300 text-[9px] font-black uppercase tracking-wider">
+                            {themeItem.badge}
+                          </span>
+                        </div>
+                        <div className="text-xs font-black text-slate-900 dark:text-white">
+                          {themeItem.name}
+                        </div>
+                        <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-snug font-medium">
+                          {themeItem.tagline}
+                        </p>
+                      </div>
+                      <div className={`w-full h-2 rounded-full bg-gradient-to-r ${themeItem.swatchGradient} border border-slate-900/20 mt-1`} />
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

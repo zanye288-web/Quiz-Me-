@@ -140,7 +140,7 @@ export const PedagogicalSummary: React.FC<PedagogicalSummaryProps> = ({
   return (
     <div
       id="pedagogical-ai-summary-card"
-      className="rounded-3xl border border-indigo-200/80 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/60 dark:from-indigo-950/40 dark:via-slate-900 dark:to-purple-950/30 p-5 sm:p-7 shadow-sm relative overflow-hidden transition-all"
+      className="comic-panel pattern-halftone rounded-3xl bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/60 dark:from-indigo-950/40 dark:via-slate-900 dark:to-purple-950/30 p-5 sm:p-7 relative overflow-hidden transition-all"
     >
       {/* Decorative Glow */}
       <div
@@ -151,13 +151,16 @@ export const PedagogicalSummary: React.FC<PedagogicalSummaryProps> = ({
       />
 
       {/* Header Bar */}
-      <div className="flex items-center justify-between gap-4 pb-4 border-b border-indigo-100 dark:border-indigo-900/40">
+      <div className="flex items-center justify-between gap-4 pb-4 border-b-2 border-slate-900/15 dark:border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-600 dark:bg-indigo-500 text-white flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-600 dark:bg-indigo-500 border-2 border-slate-950 text-white flex items-center justify-center shadow-xs shrink-0">
             <Brain className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
+              <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                PEDAGOGY LAB
+              </span>
               <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 bg-indigo-100/80 dark:bg-indigo-950/80 px-2.5 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">
                 <Sparkles className="w-3 h-3 text-amber-500" />
                 <span>Learning Feedback</span>

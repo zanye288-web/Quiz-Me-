@@ -3,6 +3,7 @@ import {
   generateQuizFromAI,
   evaluateAnswerAI,
   askTutorAI,
+  explainQuestionConceptAI,
   generatePedagogicalSummaryAI,
   generateQuizRecommendationsAI,
   generateFlashcardsAI,
@@ -59,6 +60,7 @@ apiRouter.post('/generate-quiz', aiGenerationRateLimiter, async (req: Request, r
       targetAudience,
       focusSubtopics,
       creativityLevel,
+      intelligenceScope,
       language,
       languageName,
     } = req.body;
@@ -78,11 +80,12 @@ apiRouter.post('/generate-quiz', aiGenerationRateLimiter, async (req: Request, r
       }
     }
 
-    // Input bounds clamping (defense against buffer/memory and token exhaustion)
-    const boundedCount = clampInteger(questionCount, 1, 30, 5);
+    // Input bounds clamping (supports 1 to 200 questions/slides per user request)
+    const boundedCount = clampInteger(questionCount, 1, 200, 5);
     const sanitizedInput = sanitizeString(inputText, 50_000);
     const sanitizedCustom = customInstructions ? sanitizeString(customInstructions, 2_000) : undefined;
     const sanitizedSubtopics = focusSubtopics ? sanitizeString(focusSubtopics, 500) : undefined;
+    const sanitizedScope = intelligenceScope ? sanitizeString(intelligenceScope, 80) : undefined;
 
     const quiz = await generateQuizFromAI({
       inputText: sanitizedInput,
@@ -103,6 +106,7 @@ apiRouter.post('/generate-quiz', aiGenerationRateLimiter, async (req: Request, r
       creativityLevel: creativityLevel !== undefined
         ? Math.max(0.1, Math.min(1.0, Number(creativityLevel) || 0.7))
         : undefined,
+      intelligenceScope: sanitizedScope,
       language: language ? sanitizeString(language, 20) : undefined,
       languageName: languageName ? sanitizeString(languageName, 50) : undefined,
     });
@@ -189,7 +193,7 @@ apiRouter.post('/generate-flashcards', aiGenerationRateLimiter, async (req: Requ
     const { topic, notes, cardCount, difficulty, focusArea, customInstructions } = req.body;
     const sanitizedTopic = sanitizeString(topic, 200, 'General Concepts');
     const sanitizedNotes = sanitizeString(notes, 30_000);
-    const boundedCount = clampInteger(cardCount, 2, 20, 8);
+    const boundedCount = clampInteger(cardCount, 2, 60, 8);
 
     const result = await generateFlashcardsAI({
       topic: sanitizedTopic,
@@ -311,6 +315,44 @@ apiRouter.post('/ask-tutor', searchRateLimiter, async (req: Request, res: Respon
   }
 });
 
+// 5a. Explain this Concept (Simplified AI Tutor concept summary specific to the active question's context)
+apiRouter.post('/explain-concept', searchRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const {
+      question,
+      topic,
+      domain,
+      difficulty,
+      quizTitle,
+      codeSnippet,
+      explanation,
+      correctAnswer,
+      isAnswerChecked,
+      persona,
+    } = req.body;
+
+    const summary = await explainQuestionConceptAI({
+      question: sanitizeString(question, 1_500, 'Explain this concept'),
+      topic: topic ? sanitizeString(topic, 150) : undefined,
+      domain: domain ? sanitizeString(domain, 150) : undefined,
+      difficulty: difficulty ? sanitizeString(difficulty, 40) : undefined,
+      quizTitle: quizTitle ? sanitizeString(quizTitle, 200) : undefined,
+      codeSnippet: codeSnippet ? sanitizeString(codeSnippet, 2_500) : undefined,
+      explanation: explanation ? sanitizeString(explanation, 2_000) : undefined,
+      correctAnswer: correctAnswer ? sanitizeString(correctAnswer, 500) : undefined,
+      isAnswerChecked: Boolean(isAnswerChecked),
+      persona: persona === 'Teacher' ? 'Teacher' : 'Student',
+    });
+
+    res.json({ success: true, concept: summary });
+  } catch (err: unknown) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Unable to generate concept explanation right now.'),
+    });
+  }
+});
+
 // 5b. Study Recommendations & Sources (Videos, Websites, Documents, Tutor Plan)
 apiRouter.post('/study-recommendations', searchRateLimiter, async (req: Request, res: Response) => {
   try {
@@ -423,7 +465,7 @@ apiRouter.post('/pedagogical-summary', searchRateLimiter, async (req: Request, r
       score: clampInteger(score, 0, 1000, 0),
       total: clampInteger(total, 1, 1000, 1),
       accuracy: clampInteger(accuracy, 0, 100, 0),
-      answers: Array.isArray(answers) ? answers.slice(0, 50) : [],
+      answers: Array.isArray(answers) ? answers.slice(0, 100) : [],
     });
     res.json({ success: true, summary });
   } catch {
@@ -466,7 +508,7 @@ apiRouter.post('/quiz-summary', searchRateLimiter, async (req: Request, res: Res
       total: clampInteger(total, 1, 1000, 1),
       accuracy: clampInteger(accuracy, 0, 100, 0),
       timeSpentSeconds: clampInteger(timeSpentSeconds, 0, 86400, 0),
-      questions: Array.isArray(questions) ? questions.slice(0, 50) : [],
+      questions: Array.isArray(questions) ? questions.slice(0, 100) : [],
     });
 
     res.json({ success: true, summary });
@@ -629,7 +671,7 @@ apiRouter.post('/analyze-mistakes', searchRateLimiter, async (req: Request, res:
       totalQuestions: clampInteger(totalQuestions, 1, 500, 1),
       score: clampInteger(score, 0, 500, 0),
       questions: Array.isArray(questions)
-        ? questions.slice(0, 50).map((q: any) => ({
+        ? questions.slice(0, 100).map((q: any) => ({
             id: Number(q.id) || 1,
             question: sanitizeString(q.question, 500),
             options: Array.isArray(q.options) ? q.options.map((o: any) => sanitizeString(o, 200)) : undefined,
@@ -1097,7 +1139,7 @@ apiRouter.post('/verify-quiz', searchRateLimiter, async (req: Request, res: Resp
   try {
     const { quizTitle, quizSummary, difficulty, questions } = req.body || {};
     const safeQuestions = Array.isArray(questions)
-      ? questions.slice(0, 60).map((q: any) => ({
+      ? questions.slice(0, 100).map((q: any) => ({
           question: sanitizeString(q.question, 600),
           options: Array.isArray(q.options) ? q.options.slice(0, 8).map((o: any) => sanitizeString(o, 250)) : undefined,
           correct_answer: sanitizeString(q.correct_answer, 400),
@@ -1259,7 +1301,7 @@ apiRouter.post('/organize-exam', searchRateLimiter, async (req: Request, res: Re
   try {
     const { quizTitle, difficulty, questions } = req.body || {};
     const safeQuestions = Array.isArray(questions)
-      ? questions.slice(0, 50).map((q: any, i: number) => ({
+      ? questions.slice(0, 100).map((q: any, i: number) => ({
           id: Number(q.id) || i + 1,
           type: sanitizeString(q.type, 40, 'multiple_choice'),
           question: sanitizeString(q.question, 600),
@@ -1285,12 +1327,13 @@ apiRouter.post('/organize-exam', searchRateLimiter, async (req: Request, res: Re
 });
 
 // ============================================================================
-// 19. ONE BY ONE: EDUCATIONAL WORD-CHAIN GAME ENDPOINTS
+// 19. ONE BY ONE / LAST LETTER: EDUCATIONAL WORD-CHAIN GAME ENDPOINTS
 // ============================================================================
-apiRouter.post('/one-by-one/validate', searchRateLimiter, async (req: Request, res: Response) => {
+const handleWordChainValidate = async (req: Request, res: Response) => {
   try {
     const {
       word,
+      submittedWord,
       requiredLetter,
       subject,
       difficulty,
@@ -1302,9 +1345,10 @@ apiRouter.post('/one-by-one/validate', searchRateLimiter, async (req: Request, r
 
     const validDiffs = ['Easy', 'Medium', 'Hard', 'Expert'];
     const safeDiff = validDiffs.includes(difficulty) ? difficulty : 'Medium';
+    const targetWord = word || submittedWord || '';
 
     const validation = await validateWordChainAI({
-      word: sanitizeString(word, 60),
+      word: sanitizeString(targetWord, 60),
       requiredLetter: sanitizeString(requiredLetter, 5, 'A'),
       subject: sanitizeString(subject, 80, 'General Knowledge'),
       difficulty: safeDiff,
@@ -1321,9 +1365,9 @@ apiRouter.post('/one-by-one/validate', searchRateLimiter, async (req: Request, r
       error: sanitizeErrorMessage(err, 'Failed to validate word chain entry.'),
     });
   }
-});
+};
 
-apiRouter.post('/one-by-one/ai-turn', searchRateLimiter, async (req: Request, res: Response) => {
+const handleWordChainAiTurn = async (req: Request, res: Response) => {
   try {
     const { requiredLetter, subject, difficulty, usedWords, chainLength } = req.body || {};
     const validDiffs = ['Easy', 'Medium', 'Hard', 'Expert'];
@@ -1337,14 +1381,19 @@ apiRouter.post('/one-by-one/ai-turn', searchRateLimiter, async (req: Request, re
       chainLength: clampInteger(chainLength, 0, 500, 1),
     });
 
-    res.json({ success: true, aiMove });
+    res.json({ success: true, aiMove, turn: aiMove });
   } catch (err) {
     res.status(500).json({
       success: false,
       error: sanitizeErrorMessage(err, 'Failed to generate AI word turn.'),
     });
   }
-});
+};
+
+apiRouter.post('/one-by-one/validate', searchRateLimiter, handleWordChainValidate);
+apiRouter.post('/word-chain/validate', searchRateLimiter, handleWordChainValidate);
+apiRouter.post('/one-by-one/ai-turn', searchRateLimiter, handleWordChainAiTurn);
+apiRouter.post('/word-chain/ai-turn', searchRateLimiter, handleWordChainAiTurn);
 
 
 

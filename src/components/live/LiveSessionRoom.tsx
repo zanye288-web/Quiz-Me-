@@ -610,7 +610,7 @@ export const LiveSessionRoom: React.FC<LiveSessionRoomProps> = ({
       </div>
 
       {/* ================= TOP CONTROL & GAME CODE BAR ================= */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-900 text-white border border-slate-800 shadow-md">
+      <div className="comic-panel-sm pattern-halftone flex flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-900 text-white">
         <div className="flex items-center gap-3">
           {/* Code Badge */}
           <button

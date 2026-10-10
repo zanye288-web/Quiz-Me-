@@ -546,17 +546,22 @@ export const CurriculumCatalog: React.FC<CurriculumCatalogProps> = ({
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
       {/* Top Banner & Header */}
-      <div className="rounded-3xl p-6 sm:p-8 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm transition-colors">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+      <div className="comic-tab-hero rounded-3xl p-6 sm:p-8 transition-colors">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative z-10">
           <div className="space-y-2.5 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-              <Users className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span>Community Curricula & Assessment Library</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                ISSUE #03 · QUIZ DECKS
+              </span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black bg-slate-950/55 text-cyan-200 border border-white/25">
+                <Users className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                <span>Community Curricula &amp; Assessment Library</span>
+              </div>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-              Curriculum & Community Quizzes
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-xs">
+              Curriculum &amp; Community Quizzes
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-sm text-indigo-100 leading-relaxed font-medium">
               Explore curated curriculum tracks, interact with community assessments via likes and comments, bookmark your favorites, or launch interactive flashcard decks.
             </p>
           </div>
@@ -569,7 +574,7 @@ export const CurriculumCatalog: React.FC<CurriculumCatalogProps> = ({
                   soundFx.playClick();
                   onOpenUploadQuiz();
                 }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md shadow-indigo-600/25 hover:shadow-indigo-600/35 hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer whitespace-nowrap"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-300 hover:bg-amber-200 text-slate-950 border-2 border-slate-950 font-black text-xs shadow-md hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer whitespace-nowrap"
               >
                 <Upload className="w-3.5 h-3.5 shrink-0" />
                 <span>Upload Quiz File</span>
@@ -579,26 +584,26 @@ export const CurriculumCatalog: React.FC<CurriculumCatalogProps> = ({
             <button
               type="button"
               onClick={() => setSelectedCategory('Community & Cloud')}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-black border-2 transition-all cursor-pointer whitespace-nowrap ${
                 selectedCategory === 'Community & Cloud'
-                  ? 'bg-indigo-500 text-white border-indigo-500 shadow-2xs'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  ? 'bg-cyan-300 text-slate-950 border-slate-950 shadow-2xs'
+                  : 'bg-slate-950/55 border-white/25 text-white hover:bg-slate-950/75'
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               <span>Community ({customQuizzes.length})</span>
             </button>
 
             <button
               type="button"
               onClick={() => setSelectedCategory('Saved Quizzes')}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-black border-2 transition-all cursor-pointer whitespace-nowrap ${
                 selectedCategory === 'Saved Quizzes'
-                  ? 'bg-amber-500 text-white border-amber-500 shadow-2xs'
-                  : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  ? 'bg-amber-400 text-slate-950 border-slate-950 shadow-2xs'
+                  : 'bg-slate-950/55 border-white/25 text-white hover:bg-slate-950/75'
               }`}
             >
-              <Bookmark className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <Bookmark className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
               <span>Saved ({savedIds.size})</span>
             </button>
           </div>
@@ -703,25 +708,41 @@ export const CurriculumCatalog: React.FC<CurriculumCatalogProps> = ({
             )}
           </div>
           <h3 className="text-lg font-black text-slate-900 dark:text-white">
-            {selectedCategory === 'Saved Quizzes'
-              ? 'No Saved Quizzes Yet'
-              : 'No modules match your filter'}
+            No quizzes available
           </h3>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
             {selectedCategory === 'Saved Quizzes'
-              ? 'Click the bookmark icon on any community quiz or curriculum topic to save it to your personal library for quick review anytime.'
-              : 'Try clearing your search terms or choosing "All" to browse all verified learning tracks.'}
+              ? 'You have not bookmarked any quizzes yet. Click the bookmark icon on any quiz to save it to your personal library.'
+              : customQuizzes.length === 0
+              ? 'There are no quizzes available in the catalog yet. Generate an AI quiz in the Studio or upload a quiz file to get started!'
+              : 'No quizzes match your current filter. Try clearing your search terms or choosing "All".'}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedCategory('All');
-              setSearchQuery('');
-            }}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer"
-          >
-            Reset Filters
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            {(selectedCategory !== 'All' || searchQuery) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory('All');
+                  setSearchQuery('');
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-indigo-600 dark:text-indigo-400 transition-all cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            )}
+            {onOpenUploadQuiz && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  onOpenUploadQuiz();
+                }}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer"
+              >
+                + Upload Quiz File
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -739,12 +760,17 @@ export const CurriculumCatalog: React.FC<CurriculumCatalogProps> = ({
           return (
             <div
               key={preset.id}
-              className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-5 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all flex flex-col justify-between group relative"
+              className="comic-pop-card rounded-3xl border-2 border-slate-900 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 transition-all flex flex-col justify-between group relative overflow-hidden"
             >
               <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500/20 via-purple-500/20 to-pink-500/20 text-2xl flex items-center justify-center border border-indigo-200/60 dark:border-indigo-800/60 group-hover:scale-105 transition-transform shadow-2xs shrink-0">
-                    {renderPresetIcon(preset.icon, preset.pedagogical_topic)}
+                <div className="-mx-5 -mt-5 px-5 py-3 mb-2 pattern-halftone bg-slate-50/90 dark:bg-slate-800/60 border-b-2 border-slate-900/15 dark:border-slate-700 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="comic-badge px-2.5 py-1 rounded-lg bg-indigo-600 text-white border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                      DECK · {quizData.questions.length} Qs
+                    </span>
+                    <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black">
+                      +{quizData.questions.length * 30} XP
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -899,12 +925,17 @@ export const CurriculumCatalog: React.FC<CurriculumCatalogProps> = ({
           return (
             <div
               key={doc.id}
-              className="group rounded-3xl p-5 sm:p-6 border border-indigo-200/80 dark:border-indigo-800/60 bg-gradient-to-br from-white via-indigo-50/20 to-white dark:from-slate-900 dark:via-indigo-950/20 dark:to-slate-900 shadow-sm hover:shadow-md hover:border-indigo-400 dark:hover:border-indigo-600 transition-all duration-200 flex flex-col justify-between"
+              className="group rounded-3xl p-5 sm:p-6 border-2 border-b-4 border-indigo-200 dark:border-indigo-800/80 bg-white dark:bg-slate-900 shadow-xs hover:border-indigo-500 transition-all duration-200 flex flex-col justify-between"
             >
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-lg shadow-2xs">
-                    <Sparkles className="w-5 h-5" />
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider">
+                      COMMUNITY QUIZ · {quizData.questions.length} Qs
+                    </span>
+                    <span className="text-[11px] font-extrabold text-amber-600 dark:text-amber-400">
+                      +{quizData.questions.length * 30} XP
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-wrap justify-end">

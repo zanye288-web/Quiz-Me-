@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles,
@@ -27,6 +27,13 @@ import {
 import { QuizResponse, DifficultyType } from '../types/quiz';
 import { soundFx } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
+import { verifyFlashcardMasteryXp } from '../utils/xpIntegrity';
+import {
+  recordFlashcardSpacedRepetitionReview,
+  loadSpacedRepetitionSchedule,
+  SpacedRepetitionItem,
+  recordDailyPracticeMinutesAndQuestions,
+} from '../utils/adaptiveLearningEngine';
 
 export interface FlashcardItem {
   id: number;
@@ -42,7 +49,7 @@ interface FlashcardStudioProps {
   isOpen?: boolean;
   onClose?: () => void;
   initialQuiz?: QuizResponse | null;
-  onFlashcardMastered?: (totalMastered: number) => void;
+  onFlashcardMastered?: (xpDelta: number, gemsDelta?: number) => void;
 }
 
 const STARTER_FLASHCARD_TOPICS = [
@@ -74,13 +81,38 @@ export const FlashcardStudio: React.FC<FlashcardStudioProps> = ({
   const [genError, setGenError] = useState<string | null>(null);
 
   // Study Deck State
-  const [deckTitle, setDeckTitle] = useState<string>('Interactive Study Deck');
-  const [cards, setCards] = useState<FlashcardItem[]>([]);
+  const [deckTitle, setDeckTitle] = useState<string>('Spaced Repetition Study Deck');
+  const [srScheduleMap, setSrScheduleMap] = useState<Record<string, SpacedRepetitionItem>>(() =>
+    loadSpacedRepetitionSchedule()
+  );
+  const [cards, setCards] = useState<FlashcardItem[]>(() => {
+    const srItems = Object.values(loadSpacedRepetitionSchedule());
+    if (srItems.length > 0) {
+      return srItems.map((sr, idx) => ({
+        id: sr.questionId || idx + 1,
+        front: sr.questionText,
+        back: sr.correctAnswer,
+        mnemonic: `Spaced Repetition Box ${sr.box} • Next Review: ${sr.nextReviewDate}`,
+        detailedExplanation: sr.explanation,
+        category: sr.topic,
+        difficulty: 'Intermediate',
+      }));
+    }
+    return [];
+  });
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
   const [masteredIds, setMasteredIds] = useState<Set<number>>(new Set());
   const [learningIds, setLearningIds] = useState<Set<number>>(new Set());
   const [filterMode, setFilterMode] = useState<'all' | 'learning' | 'mastered'>('all');
+  const [hasFlippedCurrent, setHasFlippedCurrent] = useState<boolean>(false);
+  const [integrityToast, setIntegrityToast] = useState<{ ok: boolean; text: string } | null>(null);
+  const cardShownAtRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    cardShownAtRef.current = Date.now();
+    setHasFlippedCurrent(false);
+  }, [currentIndex, activeMode]);
 
   // Initialize from initial quiz if supplied
   useEffect(() => {
@@ -187,6 +219,9 @@ export const FlashcardStudio: React.FC<FlashcardStudioProps> = ({
 
   const handleFlip = () => {
     soundFx.playClick();
+    if (!isFlipped) {
+      setHasFlippedCurrent(true);
+    }
     setIsFlipped(!isFlipped);
   };
 
@@ -216,28 +251,81 @@ export const FlashcardStudio: React.FC<FlashcardStudioProps> = ({
 
   const handleMarkMastered = () => {
     if (!currentCard) return;
+    const dwellMs = Date.now() - cardShownAtRef.current;
+    const verification = verifyFlashcardMasteryXp({
+      front: currentCard.front,
+      back: currentCard.back,
+      wasFlipped: hasFlippedCurrent || isFlipped,
+      dwellTimeMs: dwellMs,
+    });
+
+    if (!verification.allowed && !(hasFlippedCurrent || isFlipped)) {
+      soundFx.playIncorrect();
+      setIntegrityToast({
+        ok: false,
+        text: verification.reason || 'Flip the card and review the answer first to earn Mastery XP!',
+      });
+      return;
+    }
+
     soundFx.playCorrect();
+    const srUpdated = recordFlashcardSpacedRepetitionReview({
+      questionId: currentCard.id,
+      questionText: currentCard.front,
+      correctAnswer: currentCard.back,
+      explanation: currentCard.detailedExplanation,
+      topic: currentCard.category || deckTitle,
+      knewIt: true,
+    });
+    recordDailyPracticeMinutesAndQuestions(0.4, 1);
+    setSrScheduleMap(loadSpacedRepetitionSchedule());
+
     const newMastered = new Set(masteredIds);
     newMastered.add(currentCard.id);
     const newLearning = new Set(learningIds);
     newLearning.delete(currentCard.id);
     setMasteredIds(newMastered);
     setLearningIds(newLearning);
-    if (onFlashcardMastered) {
-      onFlashcardMastered(newMastered.size);
+
+    if (verification.allowed && verification.xp > 0) {
+      onFlashcardMastered?.(verification.xp, verification.gems);
+      setIntegrityToast({
+        ok: true,
+        text: `✅ Knew It! Promoted to Spaced Repetition Box ${srUpdated.box} (Next review in ${srUpdated.intervalDays}d: ${srUpdated.nextReviewDate}) • +${verification.xp} XP`,
+      });
+    } else {
+      setIntegrityToast({
+        ok: true,
+        text: `✅ Knew It! Promoted to Spaced Repetition Box ${srUpdated.box} (Next review in ${srUpdated.intervalDays}d: ${srUpdated.nextReviewDate}).`,
+      });
     }
     handleNext();
   };
 
   const handleMarkLearning = () => {
     if (!currentCard) return;
-    soundFx.playIncorrect();
+    soundFx.playClick();
+    const srUpdated = recordFlashcardSpacedRepetitionReview({
+      questionId: currentCard.id,
+      questionText: currentCard.front,
+      correctAnswer: currentCard.back,
+      explanation: currentCard.detailedExplanation,
+      topic: currentCard.category || deckTitle,
+      knewIt: false,
+    });
+    recordDailyPracticeMinutesAndQuestions(0.4, 1);
+    setSrScheduleMap(loadSpacedRepetitionSchedule());
+
     const newLearning = new Set(learningIds);
     newLearning.add(currentCard.id);
     const newMastered = new Set(masteredIds);
     newMastered.delete(currentCard.id);
     setLearningIds(newLearning);
     setMasteredIds(newMastered);
+    setIntegrityToast({
+      ok: true,
+      text: `📚 Didn't Know It — Placed in Spaced Repetition Box ${srUpdated.box} (Due Today / Daily Challenge Queue).`,
+    });
     handleNext();
   };
 
@@ -270,34 +358,39 @@ export const FlashcardStudio: React.FC<FlashcardStudioProps> = ({
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden">
-        <div className="flex items-center gap-3 relative z-10">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+      <div className="comic-tab-hero flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 sm:p-7 rounded-3xl relative overflow-hidden">
+        <div className="flex items-center gap-3.5 relative z-10">
+          <div className="w-12 h-12 rounded-2xl bg-amber-300 text-slate-950 border-2 border-slate-950 flex items-center justify-center shadow-md shrink-0">
             <Layers className="w-6 h-6" />
           </div>
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
-              <Sparkles className="w-3 h-3 text-amber-500" />
-              <span>AI Flashcard Generator & Drill</span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                ISSUE #06 · FLASHCARD DRILL
+              </span>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-950/55 text-cyan-200 border border-white/25">
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                <span>AI Flashcard Generator &amp; Drill</span>
+              </div>
             </div>
-            <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight drop-shadow-xs">
               Flashcard Studio
             </h2>
           </div>
         </div>
 
         {/* Mode Switcher */}
-        <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl relative z-10 w-full sm:w-auto">
+        <div className="flex items-center p-1 bg-slate-950/60 border-2 border-slate-950 rounded-2xl relative z-10 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => {
               soundFx.playClick();
               setActiveMode('generate');
             }}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
               activeMode === 'generate'
-                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                ? 'bg-amber-300 text-slate-950 border-2 border-slate-950 shadow-xs'
+                : 'text-white/85 hover:text-white'
             }`}
           >
             <Wand2 className="w-4 h-4" />
@@ -308,16 +401,12 @@ export const FlashcardStudio: React.FC<FlashcardStudioProps> = ({
             type="button"
             onClick={() => {
               soundFx.playClick();
-              if (cards.length === 0) {
-                handleGenerateDeck('Core Foundations');
-              } else {
-                setActiveMode('study');
-              }
+              setActiveMode('study');
             }}
-            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
               activeMode === 'study'
-                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                ? 'bg-amber-300 text-slate-950 border-2 border-slate-950 shadow-xs'
+                : 'text-white/85 hover:text-white'
             }`}
           >
             <BookOpen className="w-4 h-4" />
@@ -586,7 +675,24 @@ export const FlashcardStudio: React.FC<FlashcardStudioProps> = ({
           </div>
 
           {/* Flashcard 3D Perspective Card */}
-          {displayedCards.length === 0 ? (
+          {cards.length === 0 ? (
+            <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 p-8 space-y-3">
+              <Layers className="w-12 h-12 text-amber-500 mx-auto" />
+              <h3 className="text-base font-black text-slate-900 dark:text-white">
+                No quizzes available
+              </h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                No flashcard deck or active quiz is loaded yet. Generate an AI flashcard deck or start a quiz first!
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveMode('generate')}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black cursor-pointer"
+              >
+                + Generate Flashcard Deck
+              </button>
+            </div>
+          ) : displayedCards.length === 0 ? (
             <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 space-y-3">
               <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
               <h3 className="text-base font-black text-slate-900 dark:text-white">
@@ -698,14 +804,37 @@ export const FlashcardStudio: React.FC<FlashcardStudioProps> = ({
                 </AnimatePresence>
               </div>
 
-              {/* Bottom Flip Indicator */}
-              <div className="flex items-center justify-between text-xs text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-4">
+              {/* Bottom Flip & Active-Recall Verification Indicator */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-4">
                 <span className="flex items-center gap-1.5">
                   <RotateCw className="w-3.5 h-3.5" />
-                  <span>{isFlipped ? 'Answer Revealed' : 'Click to Flip'}</span>
+                  <span>
+                    {hasFlippedCurrent || isFlipped
+                      ? '✅ Answer Reviewed (Eligible for Verified XP)'
+                      : '🔒 Flip card to verify recall before marking Mastered'}
+                  </span>
                 </span>
                 <span className="hidden sm:inline-block">Shortcuts: Space (Flip) &bull; 1 (Learning) &bull; 2 (Mastered)</span>
               </div>
+            </div>
+          )}
+
+          {integrityToast && (
+            <div
+              className={`px-4 py-2.5 rounded-2xl border text-xs font-extrabold flex items-center justify-between gap-2 ${
+                integrityToast.ok
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                  : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-200'
+              }`}
+            >
+              <span>{integrityToast.text}</span>
+              <button
+                type="button"
+                onClick={() => setIntegrityToast(null)}
+                className="text-[11px] underline opacity-75 hover:opacity-100 cursor-pointer"
+              >
+                Dismiss
+              </button>
             </div>
           )}
 
@@ -726,22 +855,22 @@ export const FlashcardStudio: React.FC<FlashcardStudioProps> = ({
               <button
                 type="button"
                 onClick={handleMarkLearning}
-                className="flex-1 sm:flex-initial px-3 sm:px-5 py-3 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all whitespace-nowrap"
-                title="Mark for review (Shortcut: 1)"
+                className="flex-1 sm:flex-initial px-3 sm:px-5 py-3 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 border-2 border-amber-500/40 font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all whitespace-nowrap"
+                title="Didn't Know It — Add to immediate Spaced Repetition review (Shortcut: 1)"
               >
                 <ThumbsDown className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span>Learning</span>
+                <span>Didn’t Know It</span>
                 <span className="hidden md:inline text-[10px] opacity-75">(1)</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleMarkMastered}
-                className="flex-1 sm:flex-initial px-3 sm:px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all whitespace-nowrap"
-                title="Mark as mastered (Shortcut: 2)"
+                className="flex-1 sm:flex-initial px-3 sm:px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all whitespace-nowrap"
+                title="Knew It — Advance Spaced Repetition interval (Shortcut: 2)"
               >
                 <ThumbsUp className="w-3.5 h-3.5 shrink-0" />
-                <span>Mastered</span>
+                <span>Knew It!</span>
                 <span className="hidden md:inline text-[10px] opacity-75">(2)</span>
               </button>
             </div>

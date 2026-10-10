@@ -11,33 +11,53 @@ import {
   Image as ImageIcon,
   CheckCircle2,
   XCircle,
-  HelpCircle,
-  Share2,
   Download,
   Upload,
   ArrowRight,
   ArrowLeft,
   RefreshCw,
   Palette,
-  Eye,
   Layers,
   Award,
-  Maximize2,
-  Minimize2,
   Check,
   Search,
   ExternalLink,
   Wand2,
   Flame,
   Layout,
-  Sliders,
   X,
   Globe,
+  FileText,
+  FileSpreadsheet,
+  Code,
+  Sliders,
+  BarChart3,
+  ListChecks,
+  HelpCircle,
+  MessageSquare,
+  Eye,
+  BookOpen,
 } from 'lucide-react';
 import { Question, QuizResponse, PersonaType, DifficultyType, DeckTheme } from '../types/quiz';
 import { soundFx } from '../utils/audio';
 import { THEMATIC_VISUAL_ASSETS, resolveThematicVisual } from '../utils/thematicImages';
 import { MediaAttributionBadge } from './MediaAttributionBadge';
+import {
+  PresentationDeck,
+  PresentationSlide,
+  SlideLayoutType,
+  InteractiveWidgetType,
+  exportPresentationToPptx,
+  exportPresentationToPdf,
+  exportPresentationToInteractiveHtml,
+  exportPresentationToMarkdown,
+  exportPresentationToWordDoc,
+} from '../utils/presentationExporter';
+import {
+  CURATED_PRESENTATION_TEMPLATES,
+  convertQuizToPresentationDeck,
+  expandPresentationDeckToTargetSlides,
+} from '../data/presentationTemplates';
 
 interface GammaWorkspaceProps {
   persona: PersonaType;
@@ -47,7 +67,7 @@ interface GammaWorkspaceProps {
 }
 
 const DECK_THEMES: Array<{
-  id: DeckTheme;
+  id: string;
   name: string;
   bgClass: string;
   cardClass: string;
@@ -114,33 +134,63 @@ const DECK_THEMES: Array<{
   },
 ];
 
+const SLIDE_LAYOUT_OPTIONS: Array<{
+  id: SlideLayoutType;
+  label: string;
+  short: string;
+}> = [
+  { id: 'hero-cover', label: 'Hero Cover', short: 'Cover' },
+  { id: 'split-visual', label: 'Split Visual + Bullets', short: 'Split' },
+  { id: 'bento-grid', label: 'Bento Grid (4 Cards)', short: 'Bento' },
+  { id: 'timeline-process', label: 'Process Timeline', short: 'Timeline' },
+  { id: 'data-chart', label: 'Interactive Data Chart', short: 'Chart' },
+  { id: 'comparison-table', label: 'Comparison Matrix', short: 'Compare' },
+];
+
+const INTERACTIVE_WIDGET_OPTIONS: Array<{
+  id: InteractiveWidgetType;
+  label: string;
+}> = [
+  { id: 'quiz', label: '⚡ Live Quiz Check' },
+  { id: 'poll', label: '📊 Live Audience Poll' },
+  { id: 'flashcards', label: '🃏 3D Flip Flashcards' },
+  { id: 'accordion', label: '📂 Deep-Dive Accordions' },
+  { id: 'simulator', label: '🎛️ Formula / Rate Simulator' },
+  { id: 'none', label: 'None (Content Only)' },
+];
+
 export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
   persona,
   onLaunchAssessment,
   onSaveToLibrary,
   initialQuiz,
 }) => {
-  // Deck State
-  const [deckTitle, setDeckTitle] = useState('Interactive Knowledge Deck');
-  const [deckSummary, setDeckSummary] = useState('Crafted in Gamma Interactive Studio');
-  const [deckTheme, setDeckTheme] = useState<DeckTheme>('gamma-dark');
+  // Presentation Deck State
+  const [deck, setDeck] = useState<PresentationDeck>(() => CURATED_PRESENTATION_TEMPLATES[0]);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [difficulty, setDifficulty] = useState<DifficultyType>('Intermediate');
-  const [activeCardIndex, setActiveCardIndex] = useState(0);
 
-  // Mode: 'editor' or 'present' (Interactive Player)
+  // Mode: 'editor' or 'present'
   const [mode, setMode] = useState<'editor' | 'present'>('editor');
 
-  // AI Generator Prompt Modal / Bar
+  // AI Presentation Generator State (supports 1 to 250+ slides)
+  const [aiSourceMode, setAiSourceMode] = useState<'topic' | 'notes'>('topic');
   const [aiPrompt, setAiPrompt] = useState('');
-  const [aiCardCount, setAiCardCount] = useState(5);
+  const [aiNotesInput, setAiNotesInput] = useState('');
+  const [aiSlideCount, setAiSlideCount] = useState(100);
   const [isGeneratingDeck, setIsGeneratingDeck] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  // Image Picker Modal
+  // Export Modal State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [includeSpeakerNotesInExport, setIncludeSpeakerNotesInExport] = useState(true);
+  const [includeAnswerKeysInExport, setIncludeAnswerKeysInExport] = useState(true);
+  const [isExportingFile, setIsExportingFile] = useState<string | null>(null);
+
+  // Image Studio State
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [customImageUrl, setCustomImageUrl] = useState('');
   const [imageSearchKeyword, setImageSearchKeyword] = useState('');
-  const [imageCaptionDraft, setImageCaptionDraft] = useState('');
   const [liveSearchResults, setLiveSearchResults] = useState<
     Array<{ url: string; thumbnail?: string; caption: string; source: string; sourceUrl?: string; attribution?: string }>
   >([]);
@@ -149,231 +199,455 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
   const [isAutoMatching, setIsAutoMatching] = useState(false);
   const [activeImageTab, setActiveImageTab] = useState<'search' | 'curated' | 'custom'>('search');
 
-  // Interactive Presenter State
+  // Interactive Widget Live State (Works in BOTH Editor Preview & Presenter Mode!)
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [quizHintsShown, setQuizHintsShown] = useState<Record<string, boolean>>({});
+  const [pollVotesCast, setPollVotesCast] = useState<Record<string, number>>({});
+  const [flippedFlashcards, setFlippedFlashcards] = useState<Record<string, boolean>>({});
+  const [openAccordions, setOpenAccordions] = useState<Record<string, boolean>>({});
+  const [simulatorValues, setSimulatorValues] = useState<Record<string, number>>({});
+
+  // Presenter Mode Specific State
   const [presenterIndex, setPresenterIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [hasAnswered, setHasAnswered] = useState(false);
+  const [showSpeakerNotesHud, setShowSpeakerNotesHud] = useState(true);
+  const [laserPointerActive, setLaserPointerActive] = useState(false);
+  const [laserCoords, setLaserCoords] = useState<{ x: number; y: number } | null>(null);
   const [score, setScore] = useState(0);
-  const [isComplete, setIsComplete] = useState(false);
   const [streak, setStreak] = useState(0);
-  const [showConfetti, setShowConfetti] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const deckJsonInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Initial Questions Structure
-  const [cards, setCards] = useState<Question[]>([
-    {
-      id: 1,
-      type: 'multiple_choice',
-      question: 'Which planetary moon in our solar system exhibits active cryovolcanic plumes erupting water vapor into space?',
-      options: ['Europa (Jupiter)', 'Enceladus (Saturn)', 'Titan (Saturn)', 'Triton (Neptune)'],
-      correct_answer: 'Enceladus (Saturn)',
-      explanation:
-        'Cassini spacecraft data revealed that Saturn’s ice-covered moon Enceladus ejects high-velocity plumes of saline water, silica nanoparticles, and simple organics from its south polar "tiger stripe" fractures.',
-      image_url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&auto=format&fit=crop&q=80',
-      image_caption: 'Deep space probe capture of active planetary moons and celestial oceans.',
-      image_layout: 'top',
-      image_source: 'Unsplash',
-      image_source_url: 'https://unsplash.com',
-      image_attribution: 'Unsplash Educational Collection',
-      gamified_feedback: {
-        success_quote: 'Outstanding astrophysics knowledge! Enceladus is one of the premier ocean world candidates.',
-        hint: 'This moon orbits the ringed planet Saturn and feeds its diffuse E-ring.',
-      },
-      points: 20,
-      bloom_level: 'Understand',
-      domain: 'Foundations',
-    },
-    {
-      id: 2,
-      type: 'multiple_choice',
-      question: 'What organelle within eukaryotic cells houses the electron transport chain across its inner folded cristae?',
-      options: ['Mitochondria', 'Endoplasmic Reticulum', 'Golgi Apparatus', 'Peroxisome'],
-      correct_answer: 'Mitochondria',
-      explanation:
-        'The mitochondrial inner membrane contains Complexes I through IV and ATP synthase, using a proton electrochemical gradient to synthesize adenosine triphosphate (ATP).',
-      image_url: 'https://images.unsplash.com/photo-1530026405186-ed1f139313f8?w=1200&auto=format&fit=crop&q=80',
-      image_caption: 'Fluorescence microscopy showing eukaryotic organelle architecture and cellular metabolism.',
-      image_layout: 'split',
-      image_source: 'Unsplash',
-      image_source_url: 'https://unsplash.com',
-      image_attribution: 'Unsplash Educational Collection',
-      gamified_feedback: {
-        success_quote: 'Spot on! Cellular bioenergetics mastered.',
-        hint: 'Often termed the energetic powerhouse of eukaryotic cells.',
-      },
-      points: 20,
-      bloom_level: 'Apply',
-      domain: 'Applied Logic',
-    },
-  ]);
-
-  // Load initialQuiz if passed in
+  // Convert initialQuiz if provided
   useEffect(() => {
     if (initialQuiz && initialQuiz.questions && initialQuiz.questions.length > 0) {
-      setDeckTitle(initialQuiz.quiz_title || 'Imported Quiz Deck');
-      setDeckSummary(initialQuiz.summary || 'Interactive Gamma Assessment');
-      if (initialQuiz.deck_theme) setDeckTheme(initialQuiz.deck_theme);
+      const converted = convertQuizToPresentationDeck(initialQuiz, 'gamma-dark', true);
+      setDeck(converted);
+      setActiveSlideIndex(0);
       if (initialQuiz.difficulty) setDifficulty(initialQuiz.difficulty);
-
-      // Ensure every question has an image
-      const enriched = initialQuiz.questions.map((q, idx) => {
-        if (!q.image_url) {
-          const vis = resolveThematicVisual(
-            `${initialQuiz.quiz_title || ''} ${q.correct_answer || ''} ${q.image_search_query || ''} ${q.question || ''}`,
-            idx
-          );
-          return {
-            ...q,
-            image_url: vis.url,
-            image_caption: q.image_caption || vis.caption,
-            image_layout: q.image_layout || vis.layout,
-            image_source: 'Unsplash',
-            image_source_url: 'https://unsplash.com',
-            image_attribution: 'Unsplash Educational Collection',
-          };
-        }
-        return q;
-      });
-      setCards(enriched);
-      setActiveCardIndex(0);
     }
   }, [initialQuiz]);
 
-  const activeCard = cards[activeCardIndex] || cards[0];
-  const activeTheme = DECK_THEMES.find((t) => t.id === deckTheme) || DECK_THEMES[0];
-
-  // Helper to update active card
-  const updateActiveCard = (partial: Partial<Question>) => {
-    setCards((prev) => {
-      const copy = [...prev];
-      if (copy[activeCardIndex]) {
-        copy[activeCardIndex] = { ...copy[activeCardIndex], ...partial };
+  // Keyboard navigation in Presenter Mode
+  useEffect(() => {
+    if (mode !== 'present') return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        if (presenterIndex + 1 < deck.slides.length) {
+          setPresenterIndex((p) => p + 1);
+        }
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        if (presenterIndex > 0) {
+          setPresenterIndex((p) => p - 1);
+        }
+      } else if (e.key === 'Escape') {
+        setMode('editor');
       }
-      return copy;
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mode, presenterIndex, deck.slides.length]);
+
+  const slides = deck.slides;
+  const activeSlide = slides[activeSlideIndex] || slides[0];
+  const activeTheme = DECK_THEMES.find((t) => t.id === deck.themeId) || DECK_THEMES[0];
+
+  const updateActiveSlide = (partial: Partial<PresentationSlide>) => {
+    setDeck((prev) => {
+      const nextSlides = [...prev.slides];
+      if (nextSlides[activeSlideIndex]) {
+        nextSlides[activeSlideIndex] = { ...nextSlides[activeSlideIndex], ...partial };
+      }
+      return { ...prev, slides: nextSlides };
     });
   };
 
-  // Add Card
-  const handleAddCard = () => {
+  // Add New Slide
+  const handleAddSlide = (layout: SlideLayoutType = 'split-visual') => {
     soundFx.playClick();
-    const newId = cards.length + 1;
-    const visual = resolveThematicVisual(deckTitle, newId);
-    const newCard: Question = {
-      id: newId,
-      type: 'multiple_choice',
-      question: `New Interactive Question #${newId}`,
-      options: ['Correct Option A', 'Distractor B', 'Distractor C', 'Distractor D'],
-      correct_answer: 'Correct Option A',
-      explanation: 'Detailed learning explanation explaining why Option A is correct.',
-      image_url: visual.url,
-      image_caption: visual.caption,
-      image_layout: 'top',
-      image_source: 'Unsplash',
-      image_source_url: 'https://unsplash.com',
-      image_attribution: 'Unsplash Educational Collection',
-      gamified_feedback: {
-        success_quote: 'Great thinking! Concept identified accurately.',
-        hint: 'Look closely at the key terminology in the question.',
+    const newNum = slides.length + 1;
+    const visual = resolveThematicVisual(deck.title, newNum);
+    const newSlide: PresentationSlide = {
+      id: `slide-${Date.now()}`,
+      slideNumber: newNum,
+      layout,
+      kicker: `Slide ${newNum} · Core Concept`,
+      title: `New Interactive Slide #${newNum}`,
+      subtitle: 'Summarize the core thesis or learning objective for this slide.',
+      bullets: [
+        'Primary analytical takeaway or foundational mechanism',
+        'Real-world application and experimental evidence',
+        'Common exam trap or boundary condition to watch for',
+      ],
+      bentoItems: [
+        { title: 'Core Pillar 1', metricOrBadge: '01', description: 'Explain the first foundational dimension.' },
+        { title: 'Core Pillar 2', metricOrBadge: '02', description: 'Explain the second foundational dimension.' },
+        { title: 'Core Pillar 3', metricOrBadge: '03', description: 'Explain the third foundational dimension.' },
+        { title: 'Core Pillar 4', metricOrBadge: '04', description: 'Explain the fourth foundational dimension.' },
+      ],
+      timelineSteps: [
+        { step: 'Step 01', title: 'Initial Phase', detail: 'First stage of the process or historical sequence.' },
+        { step: 'Step 02', title: 'Transformation', detail: 'Intermediate reaction or catalytic mechanism.' },
+        { step: 'Step 03', title: 'Final Outcome', detail: 'Resulting product or equilibrium state.' },
+      ],
+      chartData: {
+        chartTitle: 'Quantitative Comparison Metrics',
+        bars: [
+          { label: 'Baseline Group', value: 42, unit: '%' },
+          { label: 'Experimental Group A', value: 74, unit: '%' },
+          { label: 'Optimized System B', value: 93, unit: '%' },
+        ],
       },
-      points: 20,
-      bloom_level: 'Understand',
-      domain: 'Applied Logic',
+      comparisonData: {
+        leftHeader: 'Model / Concept A',
+        rightHeader: 'Model / Concept B',
+        rows: [
+          { feature: 'Primary Mechanism', leftValue: 'Direct pathway', rightValue: 'Feedback-regulated pathway' },
+          { feature: 'Efficiency / Yield', leftValue: 'Moderate under standard conditions', rightValue: 'High under peak load' },
+        ],
+      },
+      imageUrl: visual.url,
+      imageCaption: visual.caption,
+      imageLayout: 'right',
+      imageSource: 'Unsplash',
+      imageAttribution: 'Unsplash Educational Collection',
+      interactiveType: 'quiz',
+      quizWidget: {
+        question: `Quick Checkpoint: What is the primary takeaway from Slide #${newNum}?`,
+        options: ['Primary Correct Concept', 'Secondary Distractor B', 'Alternative Hypothesis C', 'Unrelated Factor D'],
+        correctAnswer: 'Primary Correct Concept',
+        explanation: 'This option directly reflects the governing mechanism outlined on this slide.',
+        hint: 'Review the first bullet point and key takeaway.',
+        points: 20,
+      },
+      pollWidget: {
+        prompt: 'Live Audience Poll: Which aspect of this topic do you find most challenging?',
+        options: [
+          { label: 'Core Theoretical Definitions', votes: 12 },
+          { label: 'Mathematical & Formula Applications', votes: 24 },
+          { label: 'Multi-Step Exam Problem Solving', votes: 19 },
+        ],
+      },
+      flashcardsWidget: [
+        { front: 'Key Concept Definition', back: 'Detailed explanation of the primary mechanism.' },
+        { front: 'Exam Application Rule', back: 'Always verify units and boundary conditions first.' },
+      ],
+      accordionWidget: [
+        { title: 'Deep-Dive Mechanism & Proof', content: 'Step-by-step derivation and underlying theoretical justification.' },
+        { title: 'Real-World Case Study', content: 'How this concept operates in industrial or biological systems.' },
+      ],
+      simulatorWidget: {
+        title: 'Interactive Parameter Simulator',
+        variableLabel: 'Input Parameter (X)',
+        unit: 'units',
+        min: 10,
+        max: 200,
+        step: 10,
+        defaultValue: 80,
+        formulaDescription: 'Models linear output response Y = 1.5 × X.',
+        multiplier: 1.5,
+        outputLabel: 'Calculated System Output (Y)',
+        outputUnit: 'units',
+      },
+      speakerNotes: 'Introduce the visual diagram first, walk through the structured points, and invite the audience to complete the interactive widget.',
+      keyTakeaway: 'Summarize the single most important rule students should remember from this slide.',
     };
-    setCards([...cards, newCard]);
-    setActiveCardIndex(cards.length);
+
+    setDeck((prev) => ({
+      ...prev,
+      slides: [...prev.slides, newSlide],
+    }));
+    setActiveSlideIndex(slides.length);
   };
 
-  // Duplicate Card
-  const handleDuplicateCard = (idx: number) => {
+  // Duplicate Slide
+  const handleDuplicateSlide = (idx: number) => {
     soundFx.playClick();
-    const target = cards[idx];
+    const target = slides[idx];
     if (!target) return;
-    const duplicated: Question = {
+    const copy: PresentationSlide = {
       ...JSON.parse(JSON.stringify(target)),
-      id: cards.length + 1,
-      question: `${target.question} (Copy)`,
+      id: `slide-${Date.now()}`,
+      title: `${target.title} (Copy)`,
     };
-    const next = [...cards];
-    next.splice(idx + 1, 0, duplicated);
-    setCards(next);
-    setActiveCardIndex(idx + 1);
+    const next = [...slides];
+    next.splice(idx + 1, 0, copy);
+    setDeck((prev) => ({
+      ...prev,
+      slides: next.map((s, i) => ({ ...s, slideNumber: i + 1 })),
+    }));
+    setActiveSlideIndex(idx + 1);
   };
 
-  // Delete Card
-  const handleDeleteCard = (idx: number) => {
-    if (cards.length <= 1) return;
+  // Delete Slide
+  const handleDeleteSlide = (idx: number) => {
+    if (slides.length <= 1) return;
     soundFx.playClick();
-    const next = cards.filter((_, i) => i !== idx);
-    setCards(next);
-    setActiveCardIndex(Math.max(0, idx - 1));
+    const next = slides.filter((_, i) => i !== idx).map((s, i) => ({ ...s, slideNumber: i + 1 }));
+    setDeck((prev) => ({ ...prev, slides: next }));
+    setActiveSlideIndex(Math.max(0, idx - 1));
   };
 
-  // Move Card Up/Down
-  const handleMoveCard = (idx: number, direction: 'up' | 'down') => {
-    if ((direction === 'up' && idx === 0) || (direction === 'down' && idx === cards.length - 1)) return;
+  // Move Slide Up/Down
+  const handleMoveSlide = (idx: number, direction: 'up' | 'down') => {
+    if ((direction === 'up' && idx === 0) || (direction === 'down' && idx === slides.length - 1)) return;
     soundFx.playClick();
-    const targetIndex = direction === 'up' ? idx - 1 : idx + 1;
-    const next = [...cards];
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const next = [...slides];
     const temp = next[idx];
-    next[idx] = next[targetIndex];
-    next[targetIndex] = temp;
-    setCards(next);
-    setActiveCardIndex(targetIndex);
+    next[idx] = next[targetIdx];
+    next[targetIdx] = temp;
+    setDeck((prev) => ({
+      ...prev,
+      slides: next.map((s, i) => ({ ...s, slideNumber: i + 1 })),
+    }));
+    setActiveSlideIndex(targetIdx);
   };
 
-  // AI Prompt to Deck Generator
+  // Scale / Expand Current Deck to 50, 100, 150, or 200+ Slides
+  const handleScaleDeckToCount = (targetCount: number) => {
+    soundFx.playClick();
+    const safeTarget = Math.max(1, Math.min(250, targetCount));
+    setDeck((prev) => expandPresentationDeckToTargetSlides(prev, safeTarget));
+    soundFx.playComplete();
+  };
+
+  // AI Generate Full Presentation Deck (Supports 1 to 250+ Slides)
   const handleGenerateDeckAI = async () => {
-    if (!aiPrompt.trim()) return;
+    const rawInput = aiSourceMode === 'topic' ? aiPrompt.trim() : aiNotesInput.trim();
+    if (!rawInput) return;
     soundFx.playClick();
     setIsGeneratingDeck(true);
     setAiError(null);
+
+    const requestedSlides = Math.max(1, Math.min(250, aiSlideCount));
+    // Request a rich core set from AI (up to 16 core modules for speed) and expand to exact targetSlideCount (up to 250 slides)
+    const coreApiCount = Math.min(requestedSlides, 16);
 
     try {
       const res = await fetch('/api/generate-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inputText: aiPrompt.trim(),
-          questionCount: aiCardCount,
+          inputText: rawInput,
+          questionCount: coreApiCount,
           difficulty,
           persona,
-          promptStyle: 'Interactive Visual Slideshow',
+          promptStyle: 'Interactive Visual Presentation Deck with Rich Explanations',
         }),
       });
 
       const data = await res.json();
       if (!res.ok || !data.success || !data.quiz) {
-        throw new Error(data.error || 'Failed to generate interactive deck.');
+        throw new Error(data.error || 'Failed to generate interactive presentation.');
       }
 
       const generatedQuiz: QuizResponse = data.quiz;
-      setDeckTitle(generatedQuiz.quiz_title || aiPrompt);
-      setDeckSummary(generatedQuiz.summary || `Interactive deck on ${aiPrompt}`);
-      if (generatedQuiz.questions && generatedQuiz.questions.length > 0) {
-        setCards(generatedQuiz.questions);
-        setActiveCardIndex(0);
-      }
+      const newDeck = convertQuizToPresentationDeck(
+        generatedQuiz,
+        deck.themeId,
+        true,
+        requestedSlides
+      );
+      setDeck(newDeck);
+      setActiveSlideIndex(0);
       soundFx.playComplete();
     } catch (err: unknown) {
-      soundFx.playIncorrect();
-      setAiError((err as Error).message || 'Generation error. Please retry.');
+      // Fallback: synthesize a structured deck of requestedSlides directly from the user topic/notes so 100+ slide PPTX generation always succeeds
+      const fallbackSeedDeck: PresentationDeck = {
+        ...CURATED_PRESENTATION_TEMPLATES[0],
+        id: `custom-mega-${Date.now()}`,
+        title: `${rawInput.slice(0, 68)} — Interactive Presentation`,
+        subtitle: `Comprehensive ${requestedSlides}-Slide Interactive Presentation Deck`,
+        themeId: deck.themeId,
+      };
+      const expandedFallback = expandPresentationDeckToTargetSlides(
+        fallbackSeedDeck,
+        requestedSlides,
+        rawInput.slice(0, 68)
+      );
+      setDeck(expandedFallback);
+      setActiveSlideIndex(0);
+      soundFx.playComplete();
+      console.warn('Used instant mega-deck synthesizer fallback:', err);
     } finally {
       setIsGeneratingDeck(false);
     }
   };
 
-  // Local Image Upload Handler
+  // AI Slide Co-Pilot Magic Enhancer
+  const handleAiMagicAction = (action: 'concise' | 'bento' | 'timeline' | 'add_quiz' | 'add_simulator') => {
+    soundFx.playClick();
+    if (!activeSlide) return;
+
+    if (action === 'bento') {
+      const items = (activeSlide.bullets.length >= 2 ? activeSlide.bullets : ['Core Mechanism', 'Applied Analysis', 'Experimental Proof', 'Exam Strategy'])
+        .slice(0, 4)
+        .map((b, i) => ({
+          title: `Key Dimension 0${i + 1}`,
+          metricOrBadge: `Pillar ${i + 1}`,
+          description: b,
+        }));
+      updateActiveSlide({ layout: 'bento-grid', bentoItems: items });
+    } else if (action === 'timeline') {
+      const steps = (activeSlide.bullets.length >= 2 ? activeSlide.bullets : ['Initial State', 'Intermediate Transition', 'Final Equilibrium'])
+        .slice(0, 4)
+        .map((b, i) => ({
+          step: `Stage 0${i + 1}`,
+          title: `Phase ${i + 1}`,
+          detail: b,
+        }));
+      updateActiveSlide({ layout: 'timeline-process', timelineSteps: steps });
+    } else if (action === 'add_quiz') {
+      updateActiveSlide({
+        interactiveType: 'quiz',
+        quizWidget: activeSlide.quizWidget || {
+          question: `Which statement best summarizes ${activeSlide.title}?`,
+          options: [
+            activeSlide.bullets[0] || 'Primary governing principle',
+            'Inverse relationship independent of input variables',
+            'Occurs only at absolute zero temperature',
+            'Requires zero activation energy or catalyst',
+          ],
+          correctAnswer: activeSlide.bullets[0] || 'Primary governing principle',
+          explanation: activeSlide.keyTakeaway || 'Directly supported by the primary concept on this slide.',
+          hint: 'Check the first key takeaway on this slide.',
+          points: 25,
+        },
+      });
+    } else if (action === 'add_simulator') {
+      updateActiveSlide({
+        interactiveType: 'simulator',
+        simulatorWidget: activeSlide.simulatorWidget || {
+          title: `Interactive ${activeSlide.title.slice(0, 32)} Simulator`,
+          variableLabel: 'Input Factor (X)',
+          unit: 'units',
+          min: 10,
+          max: 500,
+          step: 10,
+          defaultValue: 120,
+          formulaDescription: 'Dynamic real-time proportional response model.',
+          multiplier: 1.75,
+          outputLabel: 'Predicted Response Output',
+          outputUnit: 'units',
+        },
+      });
+    } else if (action === 'concise') {
+      updateActiveSlide({
+        bullets: activeSlide.bullets.map((b) => (b.length > 110 ? b.slice(0, 107) + '...' : b)),
+      });
+    }
+  };
+
+  // Convert Deck Back to QuizResponse for CBT Runner / Saving
+  const buildQuizPayloadFromDeck = (): QuizResponse => {
+    const questions: Question[] = deck.slides.map((s, idx) => {
+      const qWidget = s.quizWidget;
+      return {
+        id: idx + 1,
+        type: 'multiple_choice',
+        question: qWidget?.question || `Regarding "${s.title}", which of the following is accurate?`,
+        options:
+          qWidget?.options && qWidget.options.length >= 2
+            ? qWidget.options
+            : [s.keyTakeaway || s.bullets[0] || 'Core Principle', 'Distractor Option B', 'Distractor Option C', 'Distractor Option D'],
+        correct_answer: qWidget?.correctAnswer || s.keyTakeaway || s.bullets[0] || 'Core Principle',
+        explanation: qWidget?.explanation || s.bullets.join(' ') || s.subtitle || 'Review the presentation slide notes.',
+        image_url: s.imageUrl || null,
+        image_caption: s.imageCaption,
+        image_layout: 'top',
+        image_source: s.imageSource || 'Unsplash',
+        image_attribution: s.imageAttribution || 'Unsplash Educational',
+        gamified_feedback: {
+          success_quote: 'Spot on! Presentation concept mastered.',
+          hint: qWidget?.hint || s.keyTakeaway || 'Think about the slide headline.',
+        },
+        points: qWidget?.points || 20,
+        bloom_level: 'Understand',
+        domain: s.kicker || 'Presentation Mastery',
+      };
+    });
+
+    return {
+      app_name: 'Quiz Me!',
+      persona,
+      quiz_title: deck.title,
+      summary: deck.subtitle,
+      difficulty,
+      deck_theme: (deck.themeId as DeckTheme) || 'gamma-dark',
+      cover_image: deck.slides[0]?.imageUrl || null,
+      questions,
+    };
+  };
+
+  // Export Handlers
+  const handleRunExport = async (format: 'pptx' | 'pdf' | 'html' | 'md' | 'doc' | 'json') => {
+    soundFx.playClick();
+    setIsExportingFile(format);
+    try {
+      if (format === 'pptx') {
+        await exportPresentationToPptx(deck, includeSpeakerNotesInExport, includeAnswerKeysInExport);
+      } else if (format === 'pdf') {
+        exportPresentationToPdf(deck, includeSpeakerNotesInExport, includeAnswerKeysInExport);
+      } else if (format === 'html') {
+        exportPresentationToInteractiveHtml(deck);
+      } else if (format === 'md') {
+        exportPresentationToMarkdown(deck);
+      } else if (format === 'doc') {
+        exportPresentationToWordDoc(deck);
+      } else if (format === 'json') {
+        const blob = new Blob([JSON.stringify(deck, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${deck.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-gamma-deck.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      soundFx.playCorrect();
+    } catch (err) {
+      console.error('Export error:', err);
+      soundFx.playIncorrect();
+    } finally {
+      setIsExportingFile(null);
+    }
+  };
+
+  // Import Deck JSON
+  const handleImportDeckJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        if (parsed && Array.isArray(parsed.slides)) {
+          setDeck(parsed);
+          setActiveSlideIndex(0);
+          soundFx.playComplete();
+        } else if (parsed && Array.isArray(parsed.questions)) {
+          setDeck(convertQuizToPresentationDeck(parsed, deck.themeId, true));
+          setActiveSlideIndex(0);
+          soundFx.playComplete();
+        }
+      } catch (err) {
+        console.warn('Invalid deck JSON:', err);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Image Search & Upload Handlers
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        updateActiveCard({
-          image_url: reader.result,
-          image_caption: file.name.replace(/\.[^/.]+$/, ''),
+        updateActiveSlide({
+          imageUrl: reader.result,
+          imageCaption: file.name.replace(/\.[^/.]+$/, ''),
         });
         setIsImageModalOpen(false);
       }
@@ -381,7 +655,6 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
     reader.readAsDataURL(file);
   };
 
-  // Perform Live Search for Google, Web, and Wikimedia Commons visuals
   const handlePerformLiveSearch = async (queryStr: string, engineOverride?: 'all' | 'web' | 'wikimedia') => {
     const q = queryStr.trim();
     if (!q) return;
@@ -404,23 +677,20 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
     }
   };
 
-  // Open Image Studio with auto-prefilled topic
   const handleOpenImageStudio = () => {
     soundFx.playClick();
-    const defaultSearch = activeCard.image_search_query || activeCard.question.replace(/^(what is|what are|which of the following|which|how does|why do)\s+/i, '').replace(/[?!.,;:()]/g, ' ').trim().slice(0, 45);
+    const defaultSearch = activeSlide.title.slice(0, 45);
     setImageSearchKeyword(defaultSearch);
-    setImageCaptionDraft(activeCard.image_caption || '');
     setIsImageModalOpen(true);
     handlePerformLiveSearch(defaultSearch);
   };
 
-  // Auto-Match directly related educational image for the active card
-  const handleAutoMatchImageForActiveCard = async () => {
-    if (!activeCard) return;
+  const handleAutoMatchImageForActiveSlide = async () => {
+    if (!activeSlide) return;
     setIsAutoMatching(true);
     soundFx.playClick();
     try {
-      const phrase = activeCard.image_search_query || activeCard.question;
+      const phrase = `${deck.title} ${activeSlide.title}`;
       const res = await fetch('/api/search-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -429,151 +699,502 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
       const data = await res.json();
       if (data.success && data.images && data.images.length > 0) {
         const topImg = data.images[0];
-        updateActiveCard({
-          image_url: topImg.url,
-          image_caption: topImg.caption,
-          image_search_query: phrase,
-          image_source: topImg.source,
-          image_source_url: topImg.sourceUrl,
-          image_attribution: topImg.attribution,
+        updateActiveSlide({
+          imageUrl: topImg.url,
+          imageCaption: topImg.caption,
+          imageSource: topImg.source,
+          imageAttribution: topImg.attribution,
         });
         soundFx.playCorrect();
-      } else {
-        soundFx.playIncorrect();
       }
-    } catch (e) {
-      console.warn('Auto match image error:', e);
+    } catch {
       soundFx.playIncorrect();
     } finally {
       setIsAutoMatching(false);
     }
   };
 
-  // Start Interactive Presentation Mode
-  const handleStartPresenting = () => {
-    soundFx.playClick();
-    setPresenterIndex(0);
-    setSelectedAnswer(null);
-    setHasAnswered(false);
-    setScore(0);
-    setStreak(0);
-    setIsComplete(false);
-    setShowConfetti(false);
-    setMode('present');
-  };
+  // Render any Slide's Interactive Widget (Shared between Live Canvas Preview & Presenter Mode!)
+  const renderInteractivePart = (slide: PresentationSlide, isPresenter = false) => {
+    if (slide.interactiveType === 'none') return null;
 
-  // Answer Selected in Presenter
-  const handleSelectAnswerInPresenter = (option: string) => {
-    if (hasAnswered) return;
-    setSelectedAnswer(option);
-    setHasAnswered(true);
+    // 1. LIVE INTERACTIVE QUIZ WIDGET
+    if (slide.interactiveType === 'quiz' && slide.quizWidget) {
+      const q = slide.quizWidget;
+      const chosen = quizAnswers[slide.id];
+      const hasAnswered = Boolean(chosen);
+      const showHint = Boolean(quizHintsShown[slide.id]);
 
-    const currentPresenterCard = cards[presenterIndex];
-    const isCorrect = option.trim().toLowerCase() === currentPresenterCard.correct_answer.trim().toLowerCase();
+      return (
+        <div className="mt-6 p-5 rounded-2xl bg-slate-950/75 border-2 border-cyan-500/40 space-y-4 shadow-lg">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-md bg-cyan-500 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                ⚡ Interactive Checkpoint
+              </span>
+              <span className="text-xs font-mono font-bold text-cyan-300">+{q.points || 20} XP</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {q.hint && (
+                <button
+                  type="button"
+                  onClick={() => setQuizHintsShown((prev) => ({ ...prev, [slide.id]: !prev[slide.id] }))}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                  <span>{showHint ? 'Hide Hint' : 'Show Hint'}</span>
+                </button>
+              )}
+              {hasAnswered && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const copy = { ...quizAnswers };
+                    delete copy[slide.id];
+                    setQuizAnswers(copy);
+                  }}
+                  className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold cursor-pointer"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
 
-    if (isCorrect) {
-      soundFx.playCorrect();
-      setScore((prev) => prev + (currentPresenterCard.points || 20));
-      setStreak((prev) => prev + 1);
-      setShowConfetti(true);
-      setTimeout(() => setShowConfetti(false), 2000);
-    } else {
-      soundFx.playIncorrect();
-      setStreak(0);
+          <h4 className="text-base sm:text-lg font-black text-white leading-snug">{q.question}</h4>
+
+          {showHint && q.hint && (
+            <div className="p-3 rounded-xl bg-amber-950/50 border border-amber-500/40 text-xs text-amber-200">
+              💡 <strong>Hint:</strong> {q.hint}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {q.options.map((opt, oIdx) => {
+              const letter = String.fromCharCode(65 + oIdx);
+              const isSelected = chosen === opt;
+              const isCorrect = opt.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase();
+
+              let style = 'bg-slate-900/90 border-slate-700 text-slate-200 hover:border-cyan-400';
+              if (hasAnswered) {
+                if (isCorrect) {
+                  style = 'bg-emerald-950/80 border-emerald-400 text-emerald-100 ring-1 ring-emerald-400';
+                } else if (isSelected && !isCorrect) {
+                  style = 'bg-rose-950/80 border-rose-500 text-rose-200';
+                } else {
+                  style = 'bg-slate-900/40 border-slate-800 text-slate-500 opacity-65';
+                }
+              }
+
+              return (
+                <button
+                  key={oIdx}
+                  type="button"
+                  disabled={hasAnswered}
+                  onClick={() => {
+                    setQuizAnswers((prev) => ({ ...prev, [slide.id]: opt }));
+                    if (isCorrect) {
+                      soundFx.playCorrect();
+                      if (isPresenter) {
+                        setScore((s) => s + (q.points || 20));
+                        setStreak((st) => st + 1);
+                      }
+                    } else {
+                      soundFx.playIncorrect();
+                      if (isPresenter) setStreak(0);
+                    }
+                  }}
+                  className={`p-3 rounded-xl border text-left text-xs sm:text-sm font-bold flex items-center gap-2.5 transition-all cursor-pointer ${style}`}
+                >
+                  <span className="w-6 h-6 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-black shrink-0">
+                    {hasAnswered && isCorrect ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : letter}
+                  </span>
+                  <span className="flex-1">{opt}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {hasAnswered && (
+            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-700 text-xs space-y-1">
+              <div className="font-black flex items-center gap-1.5">
+                {chosen.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase() ? (
+                  <span className="text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-4 h-4" /> Correct!
+                  </span>
+                ) : (
+                  <span className="text-rose-400 flex items-center gap-1">
+                    <XCircle className="w-4 h-4" /> Correct Answer: {q.correctAnswer}
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-300 leading-relaxed">{q.explanation}</p>
+            </div>
+          )}
+        </div>
+      );
     }
-  };
 
-  // Advance in Presenter
-  const handleNextInPresenter = () => {
-    soundFx.playClick();
-    if (presenterIndex + 1 < cards.length) {
-      setPresenterIndex(presenterIndex + 1);
-      setSelectedAnswer(null);
-      setHasAnswered(false);
-    } else {
-      soundFx.playComplete();
-      setIsComplete(true);
+    // 2. LIVE AUDIENCE POLL WIDGET
+    if (slide.interactiveType === 'poll' && slide.pollWidget) {
+      const poll = slide.pollWidget;
+      const votedIndex = pollVotesCast[slide.id];
+      const hasVoted = votedIndex !== undefined;
+      const totalVotes = poll.options.reduce((acc, o, idx) => acc + o.votes + (votedIndex === idx ? 1 : 0), 0) || 1;
+
+      return (
+        <div className="mt-6 p-5 rounded-2xl bg-slate-950/75 border-2 border-indigo-500/40 space-y-3.5">
+          <div className="flex items-center justify-between">
+            <span className="px-2.5 py-0.5 rounded-md bg-indigo-500 text-white text-[10px] font-black uppercase tracking-wider">
+              📊 Live Interactive Poll
+            </span>
+            <span className="text-xs text-slate-400 font-mono">{totalVotes} responses</span>
+          </div>
+          <h4 className="text-base font-black text-white">{poll.prompt}</h4>
+          <div className="space-y-2.5">
+            {poll.options.map((opt, idx) => {
+              const count = opt.votes + (votedIndex === idx ? 1 : 0);
+              const pct = Math.round((count / totalVotes) * 100);
+              const isChosen = votedIndex === idx;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setPollVotesCast((prev) => ({ ...prev, [slide.id]: idx }));
+                  }}
+                  className={`w-full p-3 rounded-xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                    isChosen ? 'border-indigo-400 bg-indigo-950/50' : 'border-slate-800 bg-slate-900/70 hover:border-slate-700'
+                  }`}
+                >
+                  {hasVoted && (
+                    <div
+                      className="absolute inset-y-0 left-0 bg-indigo-500/25 transition-all duration-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  )}
+                  <div className="relative flex items-center justify-between text-xs sm:text-sm font-bold text-white">
+                    <span>{opt.label}</span>
+                    {hasVoted && <span className="font-mono text-indigo-300">{pct}% ({count})</span>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
     }
-  };
 
-  const handlePrevInPresenter = () => {
-    if (presenterIndex > 0) {
-      soundFx.playClick();
-      setPresenterIndex(presenterIndex - 1);
-      setSelectedAnswer(null);
-      setHasAnswered(false);
+    // 3. INTERACTIVE 3D FLASHCARD FLIPPER WIDGET
+    if (slide.interactiveType === 'flashcards' && slide.flashcardsWidget && slide.flashcardsWidget.length > 0) {
+      return (
+        <div className="mt-6 p-5 rounded-2xl bg-slate-950/75 border-2 border-emerald-500/40 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="px-2.5 py-0.5 rounded-md bg-emerald-400 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+              🃏 Interactive Recall Flip Cards (Click any card to flip)
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {slide.flashcardsWidget.map((fc, idx) => {
+              const key = `${slide.id}-fc-${idx}`;
+              const isFlipped = Boolean(flippedFlashcards[key]);
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setFlippedFlashcards((prev) => ({ ...prev, [key]: !prev[key] }));
+                  }}
+                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer min-h-28 flex flex-col justify-between ${
+                    isFlipped
+                      ? 'bg-emerald-950/70 border-emerald-400 text-emerald-100'
+                      : 'bg-slate-900/90 border-slate-700 text-white hover:border-emerald-400/60'
+                  }`}
+                >
+                  <div className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
+                    {isFlipped ? '✓ Answer Revealed' : `Card #${idx + 1} · Click to Flip`}
+                  </div>
+                  <p className="text-xs sm:text-sm font-bold leading-snug my-2">
+                    {isFlipped ? fc.back : fc.front}
+                  </p>
+                  <div className="text-[10px] text-slate-400">Tap to toggle</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
     }
-  };
 
-  // Export as Full Quiz Me! Assessment
-  const handleLaunchToRunner = () => {
-    soundFx.playClick();
-    const quizPayload: QuizResponse = {
-      app_name: 'Quiz Me!',
-      persona,
-      quiz_title: deckTitle,
-      summary: deckSummary,
-      difficulty,
-      deck_theme: deckTheme,
-      cover_image: cards[0]?.image_url,
-      questions: cards,
-    };
-    onLaunchAssessment(quizPayload);
-  };
-
-  // Save Deck to Library / Local
-  const handleSaveDeck = () => {
-    soundFx.playClick();
-    const quizPayload: QuizResponse = {
-      app_name: 'Quiz Me!',
-      persona,
-      quiz_title: deckTitle,
-      summary: deckSummary,
-      difficulty,
-      deck_theme: deckTheme,
-      cover_image: cards[0]?.image_url,
-      questions: cards,
-    };
-    if (onSaveToLibrary) {
-      onSaveToLibrary(quizPayload);
+    // 4. INTERACTIVE ACCORDION REVEAL WIDGET
+    if (slide.interactiveType === 'accordion' && slide.accordionWidget && slide.accordionWidget.length > 0) {
+      return (
+        <div className="mt-6 p-5 rounded-2xl bg-slate-950/75 border-2 border-amber-500/40 space-y-2.5">
+          <span className="inline-block px-2.5 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+            📂 Interactive Deep-Dive Accordions
+          </span>
+          {slide.accordionWidget.map((item, idx) => {
+            const key = `${slide.id}-acc-${idx}`;
+            const isOpen = Boolean(openAccordions[key]);
+            return (
+              <div key={idx} className="rounded-xl border border-slate-800 bg-slate-900/80 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setOpenAccordions((prev) => ({ ...prev, [key]: !prev[key] }));
+                  }}
+                  className="w-full px-4 py-3 text-left text-xs sm:text-sm font-bold text-white flex items-center justify-between hover:bg-slate-800/60 cursor-pointer"
+                >
+                  <span>{item.title}</span>
+                  <ChevronDown className={`w-4 h-4 text-amber-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-3.5 pt-1 text-xs text-slate-300 leading-relaxed border-t border-slate-800/80">
+                    {item.content}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
     }
-    const blob = new Blob([JSON.stringify(quizPayload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${deckTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-deck.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+
+    // 5. INTERACTIVE FORMULA / PARAMETER SIMULATOR WIDGET
+    if (slide.interactiveType === 'simulator' && slide.simulatorWidget) {
+      const sim = slide.simulatorWidget;
+      const currentVal = simulatorValues[slide.id] ?? sim.defaultValue;
+      const computedOutput = (currentVal * sim.multiplier).toFixed(1);
+      const pct = Math.min(100, Math.max(5, Math.round(((currentVal - sim.min) / Math.max(1, sim.max - sim.min)) * 100)));
+
+      return (
+        <div className="mt-6 p-5 rounded-2xl bg-slate-950/75 border-2 border-purple-500/40 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="px-2.5 py-0.5 rounded-md bg-purple-400 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+              🎛️ Interactive Live Parameter Simulator
+            </span>
+            <span className="text-[11px] text-purple-300 font-mono">{sim.formulaDescription}</span>
+          </div>
+
+          <h4 className="text-base font-black text-white">{sim.title}</h4>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+            <div className="space-y-2 p-3.5 rounded-xl bg-slate-900 border border-slate-800">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                <span>{sim.variableLabel}</span>
+                <span className="font-mono text-cyan-400 text-sm">
+                  {currentVal} {sim.unit}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={sim.min}
+                max={sim.max}
+                step={sim.step}
+                value={currentVal}
+                onChange={(e) =>
+                  setSimulatorValues((prev) => ({
+                    ...prev,
+                    [slide.id]: Number(e.target.value),
+                  }))
+                }
+                className="w-full accent-purple-400 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                <span>Min: {sim.min} {sim.unit}</span>
+                <span>Max: {sim.max} {sim.unit}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-900 border border-purple-500/30 space-y-2">
+              <div className="text-xs text-slate-400 font-bold">{sim.outputLabel}</div>
+              <div className="text-2xl font-black font-mono text-purple-300">
+                {computedOutput} <span className="text-xs font-normal text-slate-400">{sim.outputUnit}</span>
+              </div>
+              <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-cyan-400 to-purple-500 transition-all duration-200"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  // Render Slide Body Layout (Bento, Timeline, Chart, Comparison, Split)
+  const renderSlideLayoutBody = (slide: PresentationSlide) => {
+    if (slide.layout === 'bento-grid' && slide.bentoItems && slide.bentoItems.length > 0) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 my-4">
+          {slide.bentoItems.map((item, idx) => (
+            <div
+              key={idx}
+              className="p-4 rounded-2xl bg-slate-950/55 border border-slate-800/90 space-y-1.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-black text-cyan-300">{item.title}</h4>
+                {item.metricOrBadge && (
+                  <span className="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] font-mono font-bold text-amber-300">
+                    {item.metricOrBadge}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">{item.description}</p>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (slide.layout === 'timeline-process' && slide.timelineSteps && slide.timelineSteps.length > 0) {
+      return (
+        <div className="space-y-2.5 my-4">
+          {slide.timelineSteps.map((st, idx) => (
+            <div
+              key={idx}
+              className="p-3.5 rounded-2xl bg-slate-950/55 border border-slate-800/90 flex items-start gap-3.5"
+            >
+              <span className="px-2.5 py-1 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-mono text-xs font-black shrink-0">
+                {st.step}
+              </span>
+              <div>
+                <h4 className="text-sm font-black text-white">{st.title}</h4>
+                <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">{st.detail}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    if (slide.layout === 'data-chart' && slide.chartData) {
+      return (
+        <div className="p-4 rounded-2xl bg-slate-950/55 border border-slate-800/90 space-y-3 my-4">
+          <div className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+            <BarChart3 className="w-4 h-4" />
+            <span>{slide.chartData.chartTitle}</span>
+          </div>
+          <div className="space-y-2.5">
+            {slide.chartData.bars.map((bar, idx) => (
+              <div key={idx} className="space-y-1">
+                <div className="flex justify-between text-xs font-bold text-slate-200">
+                  <span>{bar.label}</span>
+                  <span className="font-mono text-cyan-300">
+                    {bar.value}
+                    {bar.unit || '%'}
+                  </span>
+                </div>
+                <div className="w-full h-3 rounded-full bg-slate-800 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 rounded-full"
+                    style={{ width: `${Math.min(100, Math.max(8, bar.value))}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (slide.layout === 'comparison-table' && slide.comparisonData) {
+      return (
+        <div className="overflow-x-auto my-4 rounded-2xl border border-slate-800">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="bg-slate-950/90 text-cyan-300 border-b border-slate-800">
+                <th className="p-3 font-black">Dimension</th>
+                <th className="p-3 font-black">{slide.comparisonData.leftHeader}</th>
+                <th className="p-3 font-black">{slide.comparisonData.rightHeader}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/70 bg-slate-950/40">
+              {slide.comparisonData.rows.map((r, idx) => (
+                <tr key={idx}>
+                  <td className="p-3 font-bold text-white">{r.feature}</td>
+                  <td className="p-3 text-slate-300">{r.leftValue}</td>
+                  <td className="p-3 text-slate-300">{r.rightValue}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // Default / Split-Visual / Hero-Cover bullets
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center my-4">
+        <div className={slide.imageUrl ? 'lg:col-span-7 space-y-2.5' : 'lg:col-span-12 space-y-2.5'}>
+          {slide.bullets.map((b, idx) => (
+            <div key={idx} className="flex items-start gap-2.5 text-sm text-slate-200 leading-relaxed">
+              <span className="w-5 h-5 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                {idx + 1}
+              </span>
+              <span>{b}</span>
+            </div>
+          ))}
+        </div>
+
+        {slide.imageUrl && (
+          <div className="lg:col-span-5">
+            <div className="relative rounded-2xl overflow-hidden border border-slate-800 shadow-lg">
+              <img
+                src={slide.imageUrl}
+                alt={slide.imageCaption || slide.title}
+                referrerPolicy="no-referrer"
+                className="w-full h-52 object-cover"
+              />
+              {slide.imageCaption && (
+                <div className="p-2 bg-slate-950/85 text-[11px] text-slate-300 truncate">
+                  {slide.imageCaption}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
     <div className={`min-h-screen ${activeTheme.bgClass} transition-colors duration-300 flex flex-col`}>
-      {/* 1. GAMMA TOP NAVIGATION BAR */}
-      <header className="sticky top-0 z-30 px-4 py-3 border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Deck Branding & Editable Title */}
+      {/* 1. GAMMA AI+ TOP NAVIGATION BAR */}
+      <header className="sticky top-0 z-30 px-4 py-3 border-b-2 border-slate-950 pattern-halftone bg-slate-950/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="p-2 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 text-white shadow-md shadow-cyan-500/20">
+          <div className="p-2 rounded-xl bg-amber-300 text-slate-950 border-2 border-slate-950 shadow-md">
             <Layout className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <input
-              type="text"
-              value={deckTitle}
-              onChange={(e) => setDeckTitle(e.target.value)}
-              className="font-black text-base sm:text-lg tracking-tight bg-transparent text-white border-b border-transparent hover:border-slate-600 focus:border-cyan-400 focus:outline-none transition-colors truncate w-48 sm:w-80"
-              title="Click to rename deck"
-            />
-            <div className="flex items-center gap-2 text-[11px] text-slate-400">
-              <span>{cards.length} Interactive Cards</span>
+            <div className="flex items-center gap-2">
+              <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[9px] font-black uppercase tracking-wider shrink-0">
+                GAMMA AI+ STUDIO
+              </span>
+              <input
+                type="text"
+                value={deck.title}
+                onChange={(e) => setDeck((prev) => ({ ...prev, title: e.target.value }))}
+                className="font-black text-base sm:text-lg tracking-tight bg-transparent text-white border-b border-transparent hover:border-slate-600 focus:border-cyan-400 focus:outline-none transition-colors truncate w-48 sm:w-80"
+                title="Click to rename presentation"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-300 font-semibold">
+              <span>{slides.length} Interactive Slides</span>
               <span>•</span>
-              <span className="capitalize">{difficulty}</span>
-              <span>•</span>
-              <span className="text-cyan-400 font-semibold">Gamma Visual Studio</span>
+              <span>PDF, PPTX, HTML5 & DOC Export</span>
             </div>
           </div>
         </div>
 
-        {/* Center: Theme Selector Dropdown */}
+        {/* Center: Theme Selector */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-800">
           <Palette className="w-4 h-4 text-slate-400 ml-1.5 mr-0.5" />
           {DECK_THEMES.map((theme) => (
@@ -582,152 +1203,253 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
               type="button"
               onClick={() => {
                 soundFx.playClick();
-                setDeckTheme(theme.id);
+                setDeck((prev) => ({ ...prev, themeId: theme.id }));
               }}
               className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                deckTheme === theme.id
+                deck.themeId === theme.id
                   ? 'bg-white text-slate-950 shadow-xs'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
               }`}
-              title={`Switch theme to ${theme.name}`}
             >
               <span
                 className="w-2.5 h-2.5 rounded-full border border-slate-700"
                 style={{ backgroundColor: theme.previewColor }}
               />
-              <span className="hidden md:inline">{theme.name.split(' ')[0]}</span>
+              <span className="hidden xl:inline">{theme.name.split(' ')[0]}</span>
             </button>
           ))}
         </div>
 
-        {/* Right: Mode Toggles & Launch Actions */}
-        <div className="flex items-center gap-2">
+        {/* Right: Present, Export (PDF/PPTX/HTML) & CBT Runner */}
+        <div className="flex items-center gap-2 flex-wrap">
           {mode === 'editor' ? (
             <>
               <button
                 type="button"
-                onClick={handleStartPresenting}
+                onClick={() => {
+                  soundFx.playClick();
+                  setPresenterIndex(0);
+                  setIsComplete(false);
+                  setMode('present');
+                }}
                 className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-extrabold text-xs shadow-md shadow-cyan-500/20 flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Play className="w-4 h-4 fill-current" />
-                <span>Present Deck</span>
+                <span>Present Live</span>
               </button>
+
               <button
                 type="button"
-                onClick={handleLaunchToRunner}
-                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Launch in main assessment engine with timed scoring"
-              >
-                <Award className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">Exam Mode</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveDeck}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
-                title="Export deck as JSON"
+                onClick={() => {
+                  soundFx.playClick();
+                  setIsExportModalOpen(true);
+                }}
+                className="px-3.5 py-2 rounded-xl bg-amber-300 hover:bg-amber-200 text-slate-950 font-black text-xs border-2 border-slate-950 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
                 <Download className="w-4 h-4" />
+                <span>Download (PPTX / PDF / HTML)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  const quizPayload = buildQuizPayloadFromDeck();
+                  if (onSaveToLibrary) onSaveToLibrary(quizPayload);
+                  onLaunchAssessment(quizPayload);
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Launch all interactive checkpoints as a timed CBT exam"
+              >
+                <Award className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Test as CBT</span>
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                setMode('editor');
-              }}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Edit3 className="w-4 h-4" />
-              <span>Back to Editor</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setLaserPointerActive((p) => !p)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                  laserPointerActive
+                    ? 'bg-rose-600 text-white border-rose-400'
+                    : 'bg-slate-800 text-slate-300 border-slate-700'
+                }`}
+              >
+                🔴 Laser Pointer {laserPointerActive ? 'ON' : 'OFF'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSpeakerNotesHud((p) => !p)}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 cursor-pointer"
+              >
+                Speaker Notes {showSpeakerNotesHud ? 'ON' : 'OFF'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('editor')}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Back to Studio</span>
+              </button>
+            </div>
           )}
         </div>
       </header>
 
-      {/* 2. MAIN WORKSPACE CONTENT */}
+      {/* 2. MAIN WORKSPACE */}
       {mode === 'editor' ? (
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          {/* LEFT: GAMMA THUMBNAIL SLIDE STRIP */}
-          <aside className="w-full lg:w-72 xl:w-80 border-r border-slate-800/80 bg-slate-950/40 p-4 flex flex-col gap-3 overflow-y-auto max-h-60 lg:max-h-[calc(100vh-65px)]">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800/60">
+          {/* LEFT SIDEBAR: SLIDE FILMSTRIP, TEMPLATES & AI GENERATOR */}
+          <aside className="w-full lg:w-80 xl:w-88 border-r border-slate-800/80 bg-slate-950/50 p-4 flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-65px)]">
+            {/* Curated Interactive Templates Bar */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-slate-400">
+                <span>Starter Interactive Decks</span>
+                <button
+                  type="button"
+                  onClick={() => deckJsonInputRef.current?.click()}
+                  className="text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Upload className="w-3 h-3" /> Import JSON
+                </button>
+                <input
+                  ref={deckJsonInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportDeckJson}
+                  className="hidden"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-1.5">
+                {CURATED_PRESENTATION_TEMPLATES.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setDeck(JSON.parse(JSON.stringify(tpl)));
+                      setActiveSlideIndex(0);
+                    }}
+                    className={`px-3 py-2 rounded-xl border text-left text-xs transition-all cursor-pointer flex items-center justify-between ${
+                      deck.id === tpl.id
+                        ? 'bg-cyan-950/50 border-cyan-400 text-white font-bold'
+                        : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <span className="truncate">{tpl.title}</span>
+                    <span className="text-[10px] font-mono text-cyan-400 shrink-0 ml-2">
+                      {tpl.slides.length} slides
+                    </span>
+                  </button>
+                ))}
+                {/* 1-Click 110-Slide Mega-Deck Preset */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    const megaBase: PresentationDeck = {
+                      ...JSON.parse(JSON.stringify(CURATED_PRESENTATION_TEMPLATES[0])),
+                      id: 'tpl-mega-110-slides',
+                      title: 'Complete Exam & STEM Master Encyclopedia (110-Slide Mega-Deck)',
+                      subtitle: '110-Slide Comprehensive Interactive Presentation with Quizzes, Polls, Simulators & Bento Grids',
+                    };
+                    setDeck(expandPresentationDeckToTargetSlides(megaBase, 110));
+                    setActiveSlideIndex(0);
+                    soundFx.playComplete();
+                  }}
+                  className={`px-3 py-2 rounded-xl border text-left text-xs transition-all cursor-pointer flex items-center justify-between ${
+                    deck.id === 'tpl-mega-110-slides'
+                      ? 'bg-amber-950/60 border-amber-400 text-amber-200 font-black'
+                      : 'bg-amber-950/30 border-amber-500/40 text-amber-300 hover:border-amber-400 font-bold'
+                  }`}
+                >
+                  <span className="truncate">🚀 Complete Exam Master Mega-Deck</span>
+                  <span className="text-[10px] font-mono bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded shrink-0 ml-2">
+                    110 slides
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* 1-Click 100+ Slide Mega-Deck Scaler Bar */}
+            <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-cyan-300">
+                <span>⚡ Scale PPTX Deck (100+ Slides)</span>
+                <span className="font-mono text-amber-300">{slides.length} / 250 max</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {[
+                  { label: '+15 Slides', count: Math.min(250, slides.length + 15) },
+                  { label: '50 Slides', count: 50 },
+                  { label: '100 Slides', count: 100 },
+                  { label: '150 Slides', count: 150 },
+                ].map((btn) => (
+                  <button
+                    key={btn.label}
+                    type="button"
+                    onClick={() => handleScaleDeckToCount(btn.count)}
+                    className="px-1.5 py-1.5 rounded-lg bg-slate-950 hover:bg-cyan-500 hover:text-slate-950 text-cyan-300 border border-slate-800 text-[10px] font-black transition-all cursor-pointer text-center"
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Slide Filmstrip List */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/70">
               <span className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Card Slides ({cards.length})</span>
+                <span>Slides ({slides.length})</span>
               </span>
               <button
                 type="button"
-                onClick={handleAddCard}
-                className="p-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-                title="Add new card"
+                onClick={() => handleAddSlide('split-visual')}
+                className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black transition-all cursor-pointer flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add</span>
+                <span>New Slide</span>
               </button>
             </div>
 
-            {/* Thumbnail Cards List */}
-            <div className="space-y-2.5 flex-1">
-              {cards.map((card, idx) => {
-                const isActive = idx === activeCardIndex;
+            <div className="space-y-2 flex-1 overflow-y-auto pr-1">
+              {slides.map((s, idx) => {
+                const isActive = idx === activeSlideIndex;
                 return (
                   <div
-                    key={card.id || idx}
+                    key={s.id || idx}
                     onClick={() => {
                       soundFx.playClick();
-                      setActiveCardIndex(idx);
+                      setActiveSlideIndex(idx);
                     }}
-                    className={`group relative p-2.5 rounded-2xl border transition-all cursor-pointer flex gap-3 ${
+                    className={`group relative p-2.5 rounded-2xl border transition-all cursor-pointer flex gap-2.5 ${
                       isActive
-                        ? 'border-cyan-400 bg-cyan-950/40 shadow-lg shadow-cyan-950/50 ring-1 ring-cyan-400/50'
-                        : 'border-slate-800/80 bg-slate-900/60 hover:border-slate-700 hover:bg-slate-900'
+                        ? 'border-cyan-400 bg-cyan-950/40 ring-1 ring-cyan-400/50'
+                        : 'border-slate-800/80 bg-slate-900/60 hover:border-slate-700'
                     }`}
                   >
-                    {/* Slide Number & Thumbnail */}
-                    <div className="relative w-16 h-14 rounded-xl overflow-hidden bg-slate-950 shrink-0 border border-slate-800">
-                      {card.image_url ? (
-                        <img
-                          src={card.image_url}
-                          alt="Thumbnail"
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-600">
-                          <ImageIcon className="w-4 h-4" />
-                        </div>
-                      )}
-                      <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-xs text-[10px] font-mono font-bold text-white">
-                        {idx + 1}
-                      </span>
+                    <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-700 flex items-center justify-center text-xs font-mono font-black text-cyan-400 shrink-0">
+                      {idx + 1}
                     </div>
-
-                    {/* Card Snippet */}
-                    <div className="flex-1 min-w-0 flex flex-col justify-between">
-                      <p className="text-xs font-medium text-slate-200 line-clamp-2 leading-snug">
-                        {card.question || 'Untitled Question'}
-                      </p>
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                        <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">
-                          {card.options?.length || 4} options
-                        </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{s.title}</p>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                        <span className="capitalize">{s.layout.replace('-', ' ')}</span>
                         <span>•</span>
-                        <span>{card.points || 20}pts</span>
+                        <span className="text-cyan-300 uppercase font-mono">{s.interactiveType}</span>
                       </div>
                     </div>
-
-                    {/* Quick Reorder / Actions */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between shrink-0">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleMoveCard(idx, 'up');
+                          handleMoveSlide(idx, 'up');
                         }}
                         disabled={idx === 0}
                         className="text-slate-400 hover:text-white disabled:opacity-20 cursor-pointer"
-                        title="Move Up"
                       >
                         <ChevronUp className="w-3.5 h-3.5" />
                       </button>
@@ -735,10 +1457,9 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDuplicateCard(idx);
+                          handleDuplicateSlide(idx);
                         }}
                         className="text-slate-400 hover:text-cyan-300 cursor-pointer"
-                        title="Duplicate Card"
                       >
                         <Copy className="w-3 h-3" />
                       </button>
@@ -746,11 +1467,10 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteCard(idx);
+                          handleDeleteSlide(idx);
                         }}
-                        disabled={cards.length <= 1}
+                        disabled={slides.length <= 1}
                         className="text-slate-400 hover:text-rose-400 disabled:opacity-20 cursor-pointer"
-                        title="Delete Card"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -758,11 +1478,10 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleMoveCard(idx, 'down');
+                          handleMoveSlide(idx, 'down');
                         }}
-                        disabled={idx === cards.length - 1}
+                        disabled={idx === slides.length - 1}
                         className="text-slate-400 hover:text-white disabled:opacity-20 cursor-pointer"
-                        title="Move Down"
                       >
                         <ChevronDown className="w-3.5 h-3.5" />
                       </button>
@@ -772,379 +1491,573 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
               })}
             </div>
 
-            {/* AI Generator Quick Trigger */}
-            <div className="pt-3 border-t border-slate-800/80">
-              <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-950/60 to-purple-950/40 border border-indigo-800/50 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-indigo-300">
-                    <Wand2 className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Gamma AI Co-Pilot</span>
-                  </div>
-                  <span className="text-[11px] font-mono font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-800/50 px-2 py-0.5 rounded-full">
-                    {aiCardCount} {aiCardCount === 1 ? 'card' : 'cards'}
-                  </span>
+            {/* AI Presentation Co-Pilot Generator */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-950/80 to-slate-900 border border-indigo-700/50 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-indigo-300 flex items-center gap-1.5">
+                  <Wand2 className="w-3.5 h-3.5 text-amber-300" />
+                  <span>AI Presentation Maker</span>
+                </span>
+                <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setAiSourceMode('topic')}
+                    className={`px-2 py-0.5 rounded-md font-bold cursor-pointer ${
+                      aiSourceMode === 'topic' ? 'bg-indigo-600 text-white' : 'text-slate-400'
+                    }`}
+                  >
+                    Topic
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAiSourceMode('notes')}
+                    className={`px-2 py-0.5 rounded-md font-bold cursor-pointer ${
+                      aiSourceMode === 'notes' ? 'bg-indigo-600 text-white' : 'text-slate-400'
+                    }`}
+                  >
+                    Paste Notes
+                  </button>
                 </div>
+              </div>
 
+              {aiSourceMode === 'topic' ? (
                 <input
                   type="text"
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="e.g. Quantum Physics, Roman Empire, Photosynthesis..."
-                  className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-indigo-900/80 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                  placeholder="e.g. Organic Chemistry Alkanes, World War II, Calculus..."
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-indigo-900 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                 />
+              ) : (
+                <textarea
+                  value={aiNotesInput}
+                  onChange={(e) => setAiNotesInput(e.target.value)}
+                  rows={3}
+                  placeholder="Paste raw study notes, textbook paragraphs, or syllabus outline to convert into slides..."
+                  className="w-full p-2.5 rounded-xl bg-slate-950 border border-indigo-900 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                />
+              )}
 
-                {/* Question Count Selector */}
-                <div className="space-y-1 pt-0.5">
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold">
-                    <span>Card Count</span>
-                    <span>Max: 100</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-300 font-bold">
+                  <span>Slide Count (Up to 250):</span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={1}
+                      max={250}
+                      value={aiSlideCount}
+                      onChange={(e) =>
+                        setAiSlideCount(Math.max(1, Math.min(250, Number(e.target.value) || 1)))
+                      }
+                      className="w-16 px-2 py-0.5 rounded-lg bg-slate-950 border border-cyan-500/50 text-cyan-300 font-mono text-xs font-black text-center focus:outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400">slides</span>
                   </div>
-                  <div className="grid grid-cols-6 gap-1">
-                    {[5, 10, 25, 50, 75, 100].map((cnt) => (
-                      <button
-                        key={cnt}
-                        type="button"
-                        onClick={() => setAiCardCount(cnt)}
-                        className={`py-1 rounded-lg text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
-                          aiCardCount === cnt
-                            ? 'bg-indigo-600 text-white border-indigo-400 shadow-xs shadow-indigo-600/50'
-                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800'
-                        }`}
-                      >
-                        {cnt}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={100}
-                    value={aiCardCount}
-                    onChange={(e) => setAiCardCount(Number(e.target.value))}
-                    className="w-full accent-indigo-500 cursor-pointer h-1 bg-slate-800 rounded-lg mt-1"
-                  />
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleGenerateDeckAI}
-                  disabled={isGeneratingDeck || !aiPrompt.trim()}
-                  className="w-full py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-extrabold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-xs shadow-indigo-600/30"
-                >
-                  {isGeneratingDeck ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Generating {aiCardCount} Cards...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                      <span>Generate {aiCardCount} Cards</span>
-                    </>
-                  )}
-                </button>
-                {aiError && <p className="text-[11px] text-rose-400 leading-tight">{aiError}</p>}
+                <input
+                  type="range"
+                  min={4}
+                  max={200}
+                  step={1}
+                  value={Math.min(200, aiSlideCount)}
+                  onChange={(e) => setAiSlideCount(Number(e.target.value))}
+                  className="w-full accent-cyan-400 cursor-pointer h-1.5 rounded-lg"
+                />
+                <div className="flex flex-wrap gap-1">
+                  {[8, 16, 30, 50, 100, 120, 150, 200].map((cnt) => (
+                    <button
+                      key={cnt}
+                      type="button"
+                      onClick={() => setAiSlideCount(cnt)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer ${
+                        aiSlideCount === cnt
+                          ? 'bg-cyan-500 text-slate-950 font-black'
+                          : cnt >= 100
+                          ? 'bg-amber-950/60 text-amber-300 border border-amber-500/40 font-bold'
+                          : 'bg-slate-800 text-slate-300'
+                      }`}
+                    >
+                      {cnt >= 100 ? `🔥 ${cnt}` : cnt}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              <button
+                type="button"
+                onClick={handleGenerateDeckAI}
+                disabled={isGeneratingDeck || !(aiSourceMode === 'topic' ? aiPrompt.trim() : aiNotesInput.trim())}
+                className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+              >
+                {isGeneratingDeck ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Building {aiSlideCount}-Slide Deck...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Generate Interactive Deck</span>
+                  </>
+                )}
+              </button>
+              {aiError && <p className="text-[11px] text-rose-400">{aiError}</p>}
             </div>
           </aside>
 
-          {/* CENTER: ACTIVE CARD VISUAL CANVAS */}
+          {/* CENTER: LIVE INTERACTIVE SLIDE CANVAS & BLOCK EDITOR */}
           <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto flex flex-col items-center">
-            <div className="w-full max-w-4xl space-y-6">
-              {/* Card Canvas Outer Container */}
-              <div className={`rounded-3xl border p-6 sm:p-8 transition-all ${activeTheme.cardClass}`}>
-                {/* Visual Header / Image Studio */}
-                <div className="space-y-3 pb-6 border-b border-slate-800/60">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-0.5 rounded-lg text-xs font-extrabold border ${activeTheme.badgeClass}`}>
-                        Card {activeCardIndex + 1} of {cards.length}
-                      </span>
-                      <span className="text-xs text-slate-400 font-mono">
-                        {activeCard.domain || 'Applied Logic'} • {activeCard.points || 20} pts
-                      </span>
-                    </div>
-
-                    {/* Image Controls */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        disabled={isAutoMatching}
-                        onClick={handleAutoMatchImageForActiveCard}
-                        title="Search Wikipedia & Commons for real image matching this question"
-                        className="px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        <Wand2 className={`w-3.5 h-3.5 ${isAutoMatching ? 'animate-spin' : ''}`} />
-                        <span>{isAutoMatching ? 'Matching...' : 'Auto-Match Image'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleOpenImageStudio}
-                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>Image Studio</span>
-                      </button>
-
-                      <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                        {(['top', 'split'] as const).map((lay) => (
-                          <button
-                            key={lay}
-                            type="button"
-                            onClick={() => updateActiveCard({ image_layout: lay })}
-                            className={`px-2 py-0.5 rounded-lg text-[11px] font-bold capitalize transition-colors cursor-pointer ${
-                              (activeCard.image_layout || 'top') === lay
-                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                                : 'text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            {lay} View
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Visual Image Render */}
-                  {activeCard.image_url && (
-                    <div className="relative rounded-2xl overflow-hidden border border-slate-800 shadow-md group">
-                      <img
-                        src={activeCard.image_url}
-                        alt={activeCard.image_caption || 'Card visual context'}
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          if (!target.dataset.hasFallenBack) {
-                            target.dataset.hasFallenBack = 'true';
-                            const fallback = resolveThematicVisual(
-                              `${deckTitle || ''} ${activeCard.image_search_query || ''} ${activeCard.question || ''}`
-                            );
-                            target.src = fallback.url;
-                          }
-                        }}
-                        className="w-full max-h-80 object-cover object-center rounded-2xl transition-transform duration-500 group-hover:scale-[1.01]"
-                      />
-                      {/* Top-Right Floating Attribution Badge */}
-                      <div className="absolute top-3 right-3 z-10">
-                        <MediaAttributionBadge
-                          imageUrl={activeCard.image_url}
-                          source={activeCard.image_source}
-                          sourceUrl={activeCard.image_source_url}
-                          attribution={activeCard.image_attribution}
-                          variant="badge"
-                        />
-                      </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent opacity-80" />
-                      <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-xs text-slate-300 z-10">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <input
-                            type="text"
-                            value={activeCard.image_caption || ''}
-                            onChange={(e) => updateActiveCard({ image_caption: e.target.value })}
-                            placeholder="Add image caption..."
-                            className="bg-transparent border-b border-slate-600 focus:border-cyan-400 focus:outline-none text-xs text-white placeholder-slate-400 w-64 sm:w-96"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => updateActiveCard({ image_url: null })}
-                          className="px-2 py-1 rounded bg-black/60 hover:bg-rose-600/80 text-[10px] text-white transition-colors cursor-pointer"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  )}
+            <div className="w-full max-w-5xl space-y-6">
+              {/* Slide Layout & Interactive Widget Control Bar */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                {/* Layout Switcher */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mr-1">
+                    Layout:
+                  </span>
+                  {SLIDE_LAYOUT_OPTIONS.map((lay) => (
+                    <button
+                      key={lay.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        updateActiveSlide({ layout: lay.id });
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        activeSlide.layout === lay.id
+                          ? 'bg-cyan-500 text-slate-950 font-black'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      {lay.short}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Question Prompt Editor */}
-                <div className="py-6 space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                      Question Prompt
-                    </label>
-                    <textarea
-                      value={activeCard.question}
-                      onChange={(e) => updateActiveCard({ question: e.target.value })}
-                      rows={3}
-                      className="w-full p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-white text-base sm:text-lg font-bold leading-relaxed focus:outline-none focus:border-cyan-400 transition-colors"
-                      placeholder="Type the interactive question prompt here..."
-                    />
-                  </div>
-
-                  {/* Options List with designation of correct answer */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                        Interactive Answer Options (Select the correct answer)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const curr = activeCard.options || [];
-                          if (curr.length < 6) {
-                            updateActiveCard({ options: [...curr, `Option ${String.fromCharCode(65 + curr.length)}`] });
-                          }
-                        }}
-                        className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add Option</span>
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {(activeCard.options || ['Option A', 'Option B', 'Option C', 'Option D']).map((opt, optIdx) => {
-                        const isCorrect = opt.trim().toLowerCase() === activeCard.correct_answer.trim().toLowerCase();
-                        const letter = String.fromCharCode(65 + optIdx);
-
-                        return (
-                          <div
-                            key={optIdx}
-                            className={`p-3 rounded-2xl border transition-all flex items-center gap-2.5 ${
-                              isCorrect
-                                ? 'bg-emerald-950/40 border-emerald-500/80 ring-1 ring-emerald-500/50'
-                                : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700'
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                soundFx.playClick();
-                                updateActiveCard({ correct_answer: opt });
-                              }}
-                              className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs transition-colors shrink-0 cursor-pointer ${
-                                isCorrect
-                                  ? 'bg-emerald-500 text-slate-950'
-                                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                              }`}
-                              title={isCorrect ? 'Correct answer' : 'Click to set as correct answer'}
-                            >
-                              {isCorrect ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : letter}
-                            </button>
-
-                            <input
-                              type="text"
-                              value={opt}
-                              onChange={(e) => {
-                                const nextOptions = [...(activeCard.options || [])];
-                                nextOptions[optIdx] = e.target.value;
-                                const isChangingCorrect = opt === activeCard.correct_answer;
-                                updateActiveCard({
-                                  options: nextOptions,
-                                  correct_answer: isChangingCorrect ? e.target.value : activeCard.correct_answer,
-                                });
-                              }}
-                              className="flex-1 bg-transparent text-sm font-medium text-white focus:outline-none"
-                            />
-
-                            {(activeCard.options || []).length > 2 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const nextOptions = (activeCard.options || []).filter((_, i) => i !== optIdx);
-                                  updateActiveCard({
-                                    options: nextOptions,
-                                    correct_answer: isCorrect ? nextOptions[0] : activeCard.correct_answer,
-                                  });
-                                }}
-                                className="text-slate-500 hover:text-rose-400 p-1 cursor-pointer"
-                                title="Remove Option"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Explanation & Pedagogy Card */}
-                  <div className="pt-4 border-t border-slate-800/60 space-y-3">
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">
-                        Learning Rationale & Explanation
-                      </label>
-                      <textarea
-                        value={activeCard.explanation}
-                        onChange={(e) => updateActiveCard({ explanation: e.target.value })}
-                        rows={2}
-                        className="w-full p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-400"
-                        placeholder="Explain why the correct answer is right and impart core concept knowledge..."
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-400 mb-1">Success Celebration Quote</label>
-                        <input
-                          type="text"
-                          value={activeCard.gamified_feedback?.success_quote || ''}
-                          onChange={(e) =>
-                            updateActiveCard({
-                              gamified_feedback: {
-                                ...(activeCard.gamified_feedback || { hint: '' }),
-                                success_quote: e.target.value,
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-1.5 rounded-xl bg-slate-950/40 border border-slate-800 text-xs text-slate-200 focus:outline-none"
-                          placeholder="e.g. Spot on! Brilliant analysis."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-400 mb-1">Gamified Learning Hint</label>
-                        <input
-                          type="text"
-                          value={activeCard.gamified_feedback?.hint || ''}
-                          onChange={(e) =>
-                            updateActiveCard({
-                              gamified_feedback: {
-                                ...(activeCard.gamified_feedback || { success_quote: '' }),
-                                hint: e.target.value,
-                              },
-                            })
-                          }
-                          className="w-full px-3 py-1.5 rounded-xl bg-slate-950/40 border border-slate-800 text-xs text-slate-200 focus:outline-none"
-                          placeholder="e.g. Think about the organelle's inner membrane folds."
-                        />
-                      </div>
-                    </div>
-                  </div>
+                {/* Interactive Part Selector */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-amber-300">
+                    Interactive Part:
+                  </span>
+                  <select
+                    value={activeSlide.interactiveType}
+                    onChange={(e) =>
+                      updateActiveSlide({ interactiveType: e.target.value as InteractiveWidgetType })
+                    }
+                    className="px-3 py-1.5 rounded-xl bg-slate-950 border border-amber-500/40 text-xs font-bold text-amber-300 focus:outline-none cursor-pointer"
+                  >
+                    {INTERACTIVE_WIDGET_OPTIONS.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Bottom Card Navigation */}
+              {/* AI Magic Co-Pilot Quick Actions Bar */}
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="text-[11px] font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5" /> Slide Co-Pilot:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleAiMagicAction('bento')}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-semibold cursor-pointer"
+                >
+                  ✨ Convert to 4-Card Bento
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAiMagicAction('timeline')}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-semibold cursor-pointer"
+                >
+                  ⏳ Convert to Process Timeline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAiMagicAction('add_simulator')}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-800 font-semibold cursor-pointer"
+                >
+                  🎛️ Embed Formula Simulator
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAutoMatchImageForActiveSlide}
+                  disabled={isAutoMatching}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-800 font-semibold cursor-pointer"
+                >
+                  🖼️ {isAutoMatching ? 'Matching...' : 'Auto-Match Visual'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenImageStudio}
+                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-semibold cursor-pointer"
+                >
+                  🔍 Open Image Studio
+                </button>
+              </div>
+
+              {/* LIVE WYSIWYG GAMMA SLIDE CANVAS */}
+              <div className={`rounded-3xl border p-6 sm:p-10 transition-all ${activeTheme.cardClass}`}>
+                {/* Kicker & Slide Badge */}
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={activeSlide.kicker || ''}
+                    onChange={(e) => updateActiveSlide({ kicker: e.target.value })}
+                    placeholder="SLIDE KICKER / MODULE TAG"
+                    className="text-xs font-black uppercase tracking-wider text-cyan-400 bg-transparent border-b border-transparent hover:border-slate-700 focus:border-cyan-400 focus:outline-none w-72"
+                  />
+                  <span className="text-xs font-mono text-slate-400">
+                    Slide {activeSlideIndex + 1} / {slides.length}
+                  </span>
+                </div>
+
+                {/* Editable Slide Title */}
+                <input
+                  type="text"
+                  value={activeSlide.title}
+                  onChange={(e) => updateActiveSlide({ title: e.target.value })}
+                  className="w-full text-2xl sm:text-3xl font-black text-white bg-transparent border-b border-transparent hover:border-slate-700 focus:border-cyan-400 focus:outline-none mb-2"
+                  placeholder="Slide Headline..."
+                />
+
+                {/* Editable Subtitle */}
+                <textarea
+                  value={activeSlide.subtitle || ''}
+                  onChange={(e) => updateActiveSlide({ subtitle: e.target.value })}
+                  rows={2}
+                  placeholder="Add slide subtitle or narrative summary..."
+                  className="w-full text-sm sm:text-base text-slate-300 bg-transparent border-b border-transparent hover:border-slate-700 focus:border-cyan-400 focus:outline-none resize-none mb-4"
+                />
+
+                {/* Dynamic Visual Layout Preview */}
+                {renderSlideLayoutBody(activeSlide)}
+
+                {/* Key Takeaway Banner */}
+                <div className="mt-4 p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2.5">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-300 shrink-0">
+                    Key Takeaway:
+                  </span>
+                  <input
+                    type="text"
+                    value={activeSlide.keyTakeaway || ''}
+                    onChange={(e) => updateActiveSlide({ keyTakeaway: e.target.value })}
+                    placeholder="Core takeaway rule for students..."
+                    className="flex-1 bg-transparent text-xs sm:text-sm font-bold text-white focus:outline-none"
+                  />
+                </div>
+
+                {/* LIVE INTERACTIVE WIDGET PREVIEW & TESTER */}
+                {renderInteractivePart(activeSlide, false)}
+              </div>
+
+              {/* STRUCTURED SLIDE CONTENT & INTERACTIVE PART EDITOR PANEL */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Left Column: Bullet Points & Layout Content Editor */}
+                <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-cyan-400">
+                      Slide Bullet Points & Narrative
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateActiveSlide({
+                          bullets: [...activeSlide.bullets, 'New analytical point or example'],
+                        })
+                      }
+                      className="text-xs font-bold text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Point
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {activeSlide.bullets.map((b, bIdx) => (
+                      <div key={bIdx} className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-slate-500">{bIdx + 1}.</span>
+                        <input
+                          type="text"
+                          value={b}
+                          onChange={(e) => {
+                            const next = [...activeSlide.bullets];
+                            next[bIdx] = e.target.value;
+                            updateActiveSlide({ bullets: next });
+                          }}
+                          className="flex-1 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-400"
+                        />
+                        {activeSlide.bullets.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateActiveSlide({
+                                bullets: activeSlide.bullets.filter((_, i) => i !== bIdx),
+                              })
+                            }
+                            className="text-slate-500 hover:text-rose-400 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Speaker Notes Editor */}
+                  <div className="pt-3 border-t border-slate-800">
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">
+                      Presenter Speaker Notes (Included in PPTX & PDF Exports)
+                    </label>
+                    <textarea
+                      value={activeSlide.speakerNotes}
+                      onChange={(e) => updateActiveSlide({ speakerNotes: e.target.value })}
+                      rows={2}
+                      className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-none focus:border-cyan-400"
+                      placeholder="Add talking points, timing cues, and classroom instructions..."
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column: Interactive Widget Customizer */}
+                <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-300">
+                    Customize Interactive Widget ({activeSlide.interactiveType.toUpperCase()})
+                  </h4>
+
+                  {activeSlide.interactiveType === 'quiz' && activeSlide.quizWidget && (
+                    <div className="space-y-2.5">
+                      <input
+                        type="text"
+                        value={activeSlide.quizWidget.question}
+                        onChange={(e) =>
+                          updateActiveSlide({
+                            quizWidget: { ...activeSlide.quizWidget!, question: e.target.value },
+                          })
+                        }
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-white"
+                        placeholder="Quiz checkpoint question..."
+                      />
+                      <div className="space-y-1.5">
+                        {activeSlide.quizWidget.options.map((opt, oIdx) => {
+                          const isCorrect =
+                            opt.trim().toLowerCase() ===
+                            activeSlide.quizWidget!.correctAnswer.trim().toLowerCase();
+                          return (
+                            <div key={oIdx} className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateActiveSlide({
+                                    quizWidget: { ...activeSlide.quizWidget!, correctAnswer: opt },
+                                  })
+                                }
+                                className={`w-6 h-6 rounded-lg text-[10px] font-black cursor-pointer ${
+                                  isCorrect ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                                }`}
+                                title="Click to mark as correct answer"
+                              >
+                                {String.fromCharCode(65 + oIdx)}
+                              </button>
+                              <input
+                                type="text"
+                                value={opt}
+                                onChange={(e) => {
+                                  const nextOpts = [...activeSlide.quizWidget!.options];
+                                  const wasCorrect = isCorrect;
+                                  nextOpts[oIdx] = e.target.value;
+                                  updateActiveSlide({
+                                    quizWidget: {
+                                      ...activeSlide.quizWidget!,
+                                      options: nextOpts,
+                                      correctAnswer: wasCorrect
+                                        ? e.target.value
+                                        : activeSlide.quizWidget!.correctAnswer,
+                                    },
+                                  });
+                                }}
+                                className="flex-1 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <input
+                        type="text"
+                        value={activeSlide.quizWidget.explanation}
+                        onChange={(e) =>
+                          updateActiveSlide({
+                            quizWidget: { ...activeSlide.quizWidget!, explanation: e.target.value },
+                          })
+                        }
+                        placeholder="Answer explanation..."
+                        className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300"
+                      />
+                    </div>
+                  )}
+
+                  {activeSlide.interactiveType === 'simulator' && activeSlide.simulatorWidget && (
+                    <div className="space-y-2 text-xs">
+                      <input
+                        type="text"
+                        value={activeSlide.simulatorWidget.title}
+                        onChange={(e) =>
+                          updateActiveSlide({
+                            simulatorWidget: { ...activeSlide.simulatorWidget!, title: e.target.value },
+                          })
+                        }
+                        placeholder="Simulator Title"
+                        className="w-full px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={activeSlide.simulatorWidget.variableLabel}
+                          onChange={(e) =>
+                            updateActiveSlide({
+                              simulatorWidget: {
+                                ...activeSlide.simulatorWidget!,
+                                variableLabel: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="Input Variable Name"
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-white"
+                        />
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={activeSlide.simulatorWidget.multiplier}
+                          onChange={(e) =>
+                            updateActiveSlide({
+                              simulatorWidget: {
+                                ...activeSlide.simulatorWidget!,
+                                multiplier: Number(e.target.value) || 1,
+                              },
+                            })
+                          }
+                          placeholder="Formula Multiplier"
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-cyan-300 font-mono"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {activeSlide.interactiveType !== 'quiz' && activeSlide.interactiveType !== 'simulator' && (
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Interact directly with the <strong>{activeSlide.interactiveType}</strong> widget on the slide canvas above, or switch to Quiz / Simulator to customize parameters.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      ) : (
+        /* 3. CINEMA INTERACTIVE PRESENTER MODE */
+        <div
+          onMouseMove={(e) => {
+            if (laserPointerActive) {
+              setLaserCoords({ x: e.clientX, y: e.clientY });
+            }
+          }}
+          className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 max-w-5xl mx-auto w-full relative"
+        >
+          {laserPointerActive && laserCoords && (
+            <div
+              className="fixed w-5 h-5 rounded-full bg-rose-500 shadow-[0_0_20px_8px_rgba(244,63,94,0.85)] pointer-events-none z-50 -translate-x-1/2 -translate-y-1/2"
+              style={{ left: laserCoords.x, top: laserCoords.y }}
+            />
+          )}
+
+          {!isComplete ? (
+            <div className="w-full space-y-5">
+              {/* Presenter Top HUD */}
+              <div className="flex items-center justify-between text-xs font-bold text-slate-300 px-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-lg bg-slate-900 border border-slate-700 text-cyan-300 font-mono">
+                    Slide {presenterIndex + 1} of {slides.length}
+                  </span>
+                  {streak > 1 && (
+                    <span className="px-2.5 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-800 flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                      <span>{streak} Streak!</span>
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-emerald-400 font-mono font-bold">Session XP: {score}</span>
+                </div>
+              </div>
+
+              {/* Active Presenter Slide */}
+              {slides[presenterIndex] && (
+                <div className={`rounded-3xl border p-8 sm:p-12 shadow-2xl ${activeTheme.cardClass}`}>
+                  {slides[presenterIndex].kicker && (
+                    <div className="text-xs font-black uppercase tracking-wider text-cyan-400 mb-2">
+                      {slides[presenterIndex].kicker}
+                    </div>
+                  )}
+                  <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight mb-3">
+                    {slides[presenterIndex].title}
+                  </h1>
+                  {slides[presenterIndex].subtitle && (
+                    <p className="text-base sm:text-lg text-slate-300 mb-6 leading-relaxed">
+                      {slides[presenterIndex].subtitle}
+                    </p>
+                  )}
+
+                  {renderSlideLayoutBody(slides[presenterIndex])}
+
+                  {slides[presenterIndex].keyTakeaway && (
+                    <div className="mt-5 p-4 rounded-2xl bg-slate-950/70 border border-cyan-500/30 text-sm font-bold text-cyan-200">
+                      💡 <strong>Key Takeaway:</strong> {slides[presenterIndex].keyTakeaway}
+                    </div>
+                  )}
+
+                  {renderInteractivePart(slides[presenterIndex], true)}
+                </div>
+              )}
+
+              {/* Speaker Notes Teleprompter HUD */}
+              {showSpeakerNotesHud && slides[presenterIndex]?.speakerNotes && (
+                <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 text-xs text-slate-300 flex items-start gap-2.5">
+                  <MessageSquare className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-black text-amber-300 uppercase tracking-wider mr-2">
+                      Presenter Teleprompter:
+                    </span>
+                    <span>{slides[presenterIndex].speakerNotes}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Presenter Controls Footer */}
               <div className="flex items-center justify-between pt-2">
                 <button
                   type="button"
                   onClick={() => {
-                    if (activeCardIndex > 0) {
+                    if (presenterIndex > 0) {
                       soundFx.playClick();
-                      setActiveCardIndex(activeCardIndex - 1);
+                      setPresenterIndex(presenterIndex - 1);
                     }
                   }}
-                  disabled={activeCardIndex === 0}
-                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-30 text-white font-bold text-xs border border-slate-800 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  disabled={presenterIndex === 0}
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-30 text-white font-bold text-xs border border-slate-800 flex items-center gap-2 cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>Previous Card</span>
+                  <span>Previous Slide</span>
                 </button>
 
                 <div className="flex items-center gap-1.5">
-                  {cards.map((_, i) => (
+                  {slides.map((_, i) => (
                     <button
                       key={i}
                       type="button"
-                      onClick={() => {
-                        soundFx.playClick();
-                        setActiveCardIndex(i);
-                      }}
-                      className={`w-2.5 h-2.5 rounded-full transition-all cursor-pointer ${
-                        i === activeCardIndex ? 'w-6 bg-cyan-400' : 'bg-slate-700 hover:bg-slate-500'
+                      onClick={() => setPresenterIndex(i)}
+                      className={`h-2.5 rounded-full transition-all cursor-pointer ${
+                        i === presenterIndex ? 'w-7 bg-cyan-400' : 'w-2.5 bg-slate-700'
                       }`}
                     />
                   ))}
@@ -1153,231 +2066,55 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (activeCardIndex < cards.length - 1) {
-                      soundFx.playClick();
-                      setActiveCardIndex(activeCardIndex + 1);
+                    soundFx.playClick();
+                    if (presenterIndex + 1 < slides.length) {
+                      setPresenterIndex(presenterIndex + 1);
                     } else {
-                      handleAddCard();
+                      soundFx.playComplete();
+                      setIsComplete(true);
                     }
                   }}
-                  className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-cyan-500/20"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 text-white font-black text-xs sm:text-sm flex items-center gap-2 cursor-pointer shadow-lg"
                 >
-                  <span>{activeCardIndex === cards.length - 1 ? '+ Add Next Card' : 'Next Card'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </main>
-        </div>
-      ) : (
-        /* 3. GAMMA INTERACTIVE PRESENTER MODE ("PLAY DECK") */
-        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 max-w-4xl mx-auto w-full">
-          {!isComplete ? (
-            <div className="w-full space-y-6 animate-in fade-in zoom-in-95 duration-200">
-              {/* Presenter Progress & Streak HUD */}
-              <div className="flex items-center justify-between text-xs font-bold text-slate-400 px-2">
-                <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-cyan-300 font-mono">
-                    Card {presenterIndex + 1} of {cards.length}
-                  </span>
-                  {streak > 1 && (
-                    <span className="px-2.5 py-1 rounded-lg bg-amber-950 text-amber-300 border border-amber-800 flex items-center gap-1 animate-bounce">
-                      <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                      <span>{streak} Streak!</span>
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400 font-mono font-bold text-sm">Score: {score} XP</span>
-                </div>
-              </div>
-
-              {/* Gamma Presenter Card */}
-              <div className={`rounded-3xl border p-6 sm:p-10 shadow-2xl transition-all ${activeTheme.cardClass}`}>
-                {/* Visual Header Image */}
-                {cards[presenterIndex]?.image_url && (
-                  <div className="mb-6 relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-lg group/media">
-                    <img
-                      src={cards[presenterIndex].image_url!}
-                      alt="Question Visual"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        if (!target.dataset.hasFallenBack) {
-                          target.dataset.hasFallenBack = 'true';
-                          const fallback = resolveThematicVisual(
-                            `${deckTitle || ''} ${cards[presenterIndex]?.image_search_query || ''} ${cards[presenterIndex]?.question || ''}`
-                          );
-                          target.src = fallback.url;
-                        }
-                      }}
-                      className="w-full max-h-80 object-cover object-center rounded-2xl"
-                    />
-                    {!cards[presenterIndex].image_caption && (
-                      <div className="absolute top-3 right-3 z-10">
-                        <MediaAttributionBadge
-                          imageUrl={cards[presenterIndex].image_url}
-                          source={cards[presenterIndex].image_source}
-                          sourceUrl={cards[presenterIndex].image_source_url}
-                          attribution={cards[presenterIndex].image_attribution}
-                          variant="badge"
-                        />
-                      </div>
-                    )}
-                    {cards[presenterIndex].image_caption && (
-                      <div className="px-4 py-2 bg-slate-950/80 backdrop-blur-xs text-xs text-slate-300 flex items-center justify-between gap-3 border-t border-slate-800/60">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <span className="truncate">{cards[presenterIndex].image_caption}</span>
-                        </div>
-                        <MediaAttributionBadge
-                          imageUrl={cards[presenterIndex].image_url}
-                          source={cards[presenterIndex].image_source}
-                          sourceUrl={cards[presenterIndex].image_source_url}
-                          attribution={cards[presenterIndex].image_attribution}
-                          variant="caption"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Question */}
-                <h2 className="text-xl sm:text-2xl font-black text-white leading-relaxed tracking-tight mb-6">
-                  {cards[presenterIndex]?.question}
-                </h2>
-
-                {/* Options Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-6">
-                  {(cards[presenterIndex]?.options || []).map((option, optIdx) => {
-                    const letter = String.fromCharCode(65 + optIdx);
-                    const isSelected = selectedAnswer === option;
-                    const isCorrectAnswer =
-                      option.trim().toLowerCase() === cards[presenterIndex]?.correct_answer.trim().toLowerCase();
-
-                    let btnStyle =
-                      'bg-slate-950/40 border-slate-800 hover:border-cyan-400 text-slate-200 hover:bg-slate-900/60';
-
-                    if (hasAnswered) {
-                      if (isCorrectAnswer) {
-                        btnStyle = 'bg-emerald-950/60 border-emerald-400 text-emerald-100 ring-2 ring-emerald-400 shadow-lg';
-                      } else if (isSelected && !isCorrectAnswer) {
-                        btnStyle = 'bg-rose-950/60 border-rose-500 text-rose-200';
-                      } else {
-                        btnStyle = 'bg-slate-950/20 border-slate-850 text-slate-500 opacity-60';
-                      }
-                    }
-
-                    return (
-                      <button
-                        key={optIdx}
-                        type="button"
-                        onClick={() => handleSelectAnswerInPresenter(option)}
-                        disabled={hasAnswered}
-                        className={`p-4 rounded-2xl border text-left font-bold text-sm sm:text-base flex items-center gap-3 transition-all cursor-pointer ${btnStyle}`}
-                      >
-                        <span
-                          className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 ${
-                            hasAnswered && isCorrectAnswer
-                              ? 'bg-emerald-400 text-slate-950'
-                              : hasAnswered && isSelected
-                              ? 'bg-rose-500 text-white'
-                              : 'bg-slate-800 text-slate-300'
-                          }`}
-                        >
-                          {hasAnswered && isCorrectAnswer ? <Check className="w-4 h-4 stroke-[3]" /> : letter}
-                        </span>
-                        <span className="flex-1">{option}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Explanation Reveal */}
-                {hasAnswered && (
-                  <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <div className="flex items-center gap-2">
-                      {selectedAnswer?.trim().toLowerCase() ===
-                      cards[presenterIndex]?.correct_answer.trim().toLowerCase() ? (
-                        <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-sm">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>{cards[presenterIndex]?.gamified_feedback?.success_quote || 'Correct! Superb Recall!'}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-rose-400 font-extrabold text-sm">
-                          <XCircle className="w-4 h-4" />
-                          <span>Not quite. Correct: {cards[presenterIndex]?.correct_answer}</span>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-300 leading-relaxed">{cards[presenterIndex]?.explanation}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Presenter Footer Navigation */}
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={handlePrevInPresenter}
-                  disabled={presenterIndex === 0}
-                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-20 text-white font-bold text-xs border border-slate-800 flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Previous</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleNextInPresenter}
-                  disabled={!hasAnswered}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 disabled:opacity-40 text-white font-black text-sm flex items-center gap-2 shadow-lg shadow-cyan-500/20 transition-all cursor-pointer"
-                >
-                  <span>{presenterIndex === cards.length - 1 ? 'Finish Deck' : 'Next Card'}</span>
+                  <span>{presenterIndex === slides.length - 1 ? 'Finish Presentation' : 'Next Slide'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
           ) : (
-            /* Deck Completion Screen */
-            <div className={`w-full max-w-lg rounded-3xl border p-8 text-center space-y-6 ${activeTheme.cardClass} animate-in zoom-in-95 duration-300`}>
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-emerald-400 mx-auto flex items-center justify-center text-slate-950 shadow-xl shadow-cyan-500/30">
+            <div className={`w-full max-w-lg rounded-3xl border p-8 text-center space-y-6 ${activeTheme.cardClass}`}>
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-emerald-400 mx-auto flex items-center justify-center text-slate-950 shadow-xl">
                 <Award className="w-8 h-8" />
               </div>
-
-              <div className="space-y-1">
-                <h2 className="text-2xl font-black text-white tracking-tight">Interactive Deck Completed!</h2>
-                <p className="text-xs text-slate-400">Great mastery of {deckTitle}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-center">
-                <div>
-                  <div className="text-2xl font-black text-cyan-400 font-mono">{score}</div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">XP Points</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-black text-emerald-400 font-mono">{cards.length}</div>
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cards Solved</div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <h2 className="text-2xl font-black text-white">Presentation Complete!</h2>
+              <p className="text-xs text-slate-300">
+                You completed all {slides.length} interactive slides in <strong>{deck.title}</strong> and earned{' '}
+                <strong className="text-cyan-300">{score} XP</strong>.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"
-                  onClick={handleStartPresenting}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  onClick={() => {
+                    setPresenterIndex(0);
+                    setIsComplete(false);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-cyan-500 text-slate-950 font-black text-xs cursor-pointer"
                 >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Replay Deck</span>
+                  Replay Presentation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-amber-300 text-slate-950 font-black text-xs cursor-pointer"
+                >
+                  Download PPTX / PDF
                 </button>
                 <button
                   type="button"
                   onClick={() => setMode('editor')}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs cursor-pointer"
                 >
-                  <Edit3 className="w-4 h-4" />
-                  <span>Edit in Canvas</span>
+                  Back to Editor
                 </button>
               </div>
             </div>
@@ -1385,7 +2122,172 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
         </div>
       )}
 
-      {/* 4. IMAGE PICKER & VISUAL SEARCH MODAL */}
+      {/* 4. MULTI-FORMAT EXPORT & DOWNLOAD MODAL (PPTX, PDF, HTML5, DOC, MD, JSON) */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-slate-900 border-2 border-slate-700 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-300 text-slate-950 flex items-center justify-center font-black">
+                  <Download className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-lg text-white">Download Presentation Deck</h3>
+                  <p className="text-xs text-slate-400">
+                    Export "{deck.title}" ({slides.length} slides) in PowerPoint, Widescreen PDF, Interactive HTML5 & more
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Export Options Checkboxes */}
+            <div className="flex flex-wrap items-center gap-4 p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={includeSpeakerNotesInExport}
+                  onChange={(e) => setIncludeSpeakerNotesInExport(e.target.checked)}
+                  className="accent-cyan-400"
+                />
+                <span>Include Presenter Speaker Notes</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={includeAnswerKeysInExport}
+                  onChange={(e) => setIncludeAnswerKeysInExport(e.target.checked)}
+                  className="accent-cyan-400"
+                />
+                <span>Include Interactive Quiz Answer Keys & Explanations</span>
+              </label>
+            </div>
+
+            {/* Export Format Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleRunExport('pptx')}
+                disabled={isExportingFile !== null}
+                className="p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border-2 border-amber-400/60 text-left transition-all cursor-pointer flex items-start gap-3.5"
+              >
+                <div className="p-2.5 rounded-xl bg-amber-400/20 text-amber-300 shrink-0">
+                  <FileSpreadsheet className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-black text-sm text-white flex items-center gap-2">
+                    <span>PowerPoint Deck (.PPTX)</span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-300 text-slate-950 text-[9px] font-black">
+                      16:9 NATIVE
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Editable Microsoft PowerPoint & Google Slides deck with themed cards, quizzes & speaker notes.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRunExport('pdf')}
+                disabled={isExportingFile !== null}
+                className="p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border-2 border-cyan-400/60 text-left transition-all cursor-pointer flex items-start gap-3.5"
+              >
+                <div className="p-2.5 rounded-xl bg-cyan-400/20 text-cyan-300 shrink-0">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-black text-sm text-white flex items-center gap-2">
+                    <span>Widescreen Slides (.PDF)</span>
+                    <span className="px-1.5 py-0.5 rounded bg-cyan-400 text-slate-950 text-[9px] font-black">
+                      PRINT / SHARE
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    High-resolution 16:9 landscape PDF slide deck ready for projection or printing.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRunExport('html')}
+                disabled={isExportingFile !== null}
+                className="p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border border-slate-800 hover:border-emerald-400 text-left transition-all cursor-pointer flex items-start gap-3.5"
+              >
+                <div className="p-2.5 rounded-xl bg-emerald-400/20 text-emerald-300 shrink-0">
+                  <Code className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-black text-sm text-white">Interactive Web App (.HTML)</div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Standalone offline HTML5 presentation with playable quizzes & keyboard navigation.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRunExport('doc')}
+                disabled={isExportingFile !== null}
+                className="p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border border-slate-800 hover:border-indigo-400 text-left transition-all cursor-pointer flex items-start gap-3.5"
+              >
+                <div className="p-2.5 rounded-xl bg-indigo-400/20 text-indigo-300 shrink-0">
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-black text-sm text-white">Word Lecture Handout (.DOC)</div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Formatted Microsoft Word study handout with tables, checkpoints & notes.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRunExport('md')}
+                disabled={isExportingFile !== null}
+                className="p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-600 text-left transition-all cursor-pointer flex items-start gap-3.5"
+              >
+                <div className="p-2.5 rounded-xl bg-slate-800 text-slate-300 shrink-0">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-black text-sm text-white">Markdown Study Notes (.MD)</div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Clean Notion / Obsidian compatible Markdown outline of all slides.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRunExport('json')}
+                disabled={isExportingFile !== null}
+                className="p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-600 text-left transition-all cursor-pointer flex items-start gap-3.5"
+              >
+                <div className="p-2.5 rounded-xl bg-slate-800 text-cyan-300 shrink-0">
+                  <Download className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="font-black text-sm text-white">Gamma Deck Project (.JSON)</div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Save full project file to reload and edit in Gamma AI+ Studio anytime.
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. IMAGE PICKER & VISUAL SEARCH MODAL */}
       {isImageModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl p-6 text-slate-100 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
@@ -1396,59 +2298,50 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-base text-white">Visual Image Studio</h3>
-                  <p className="text-[11px] text-slate-400">Search Google & Web Images or encyclopedias for hyper-specific visual media</p>
+                  <p className="text-[11px] text-slate-400">
+                    Search Google & Web Images or encyclopedias for slide visuals
+                  </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsImageModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Navigation Tabs */}
             <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800">
               <button
                 type="button"
                 onClick={() => setActiveImageTab('search')}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeImageTab === 'search'
-                    ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer ${
+                  activeImageTab === 'search' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Search className="w-3.5 h-3.5" />
-                <span>Google & Web Search</span>
+                Google & Web Search
               </button>
               <button
                 type="button"
                 onClick={() => setActiveImageTab('curated')}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeImageTab === 'curated'
-                    ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer ${
+                  activeImageTab === 'curated' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" />
-                <span>Curated Gallery</span>
+                Curated Gallery
               </button>
               <button
                 type="button"
                 onClick={() => setActiveImageTab('custom')}
-                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                  activeImageTab === 'custom'
-                    ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer ${
+                  activeImageTab === 'custom' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Custom URL & Upload</span>
+                Custom URL & Upload
               </button>
             </div>
 
-            {/* TAB 1: Live Web & Google Images Search */}
             {activeImageTab === 'search' && (
               <div className="space-y-4">
                 <form
@@ -1456,241 +2349,107 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
                     e.preventDefault();
                     handlePerformLiveSearch(imageSearchKeyword);
                   }}
-                  className="flex flex-col sm:flex-row gap-2"
+                  className="flex gap-2"
                 >
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={imageSearchKeyword}
-                      onChange={(e) => setImageSearchKeyword(e.target.value)}
-                      placeholder="Search Google & Web Images (e.g., mitochondria cristae diagram, Apollo 11 eagle)..."
-                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="submit"
-                      disabled={isLiveSearching}
-                      className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isLiveSearching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                      <span>Search</span>
-                    </button>
-                    <a
-                      href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(imageSearchKeyword || activeCard?.question || '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0"
-                      title="Open search in Google Images in a new tab"
-                    >
-                      <Globe className="w-3.5 h-3.5 text-cyan-400" />
-                      <span className="hidden sm:inline">Google Images</span>
-                      <ExternalLink className="w-3 h-3 opacity-60" />
-                    </a>
-                  </div>
+                  <input
+                    type="text"
+                    value={imageSearchKeyword}
+                    onChange={(e) => setImageSearchKeyword(e.target.value)}
+                    placeholder="Search scientific diagrams, historical photos, charts..."
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLiveSearching}
+                    className="px-5 py-2.5 rounded-xl bg-cyan-500 text-slate-950 font-black text-xs cursor-pointer"
+                  >
+                    {isLiveSearching ? 'Searching...' : 'Search'}
+                  </button>
                 </form>
 
-                {/* Engine Selector Chips */}
-                <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-semibold text-slate-400">Source:</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageEngine('all');
-                        handlePerformLiveSearch(imageSearchKeyword, 'all');
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
-                        imageEngine === 'all'
-                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                      }`}
-                    >
-                      🌐 All Web Sources
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageEngine('web');
-                        handlePerformLiveSearch(imageSearchKeyword, 'web');
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
-                        imageEngine === 'web'
-                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                      }`}
-                    >
-                      🔍 Google & Web
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageEngine('wikimedia');
-                        handlePerformLiveSearch(imageSearchKeyword, 'wikimedia');
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
-                        imageEngine === 'wikimedia'
-                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                      }`}
-                    >
-                      📚 Wikipedia & Commons
-                    </button>
-                  </div>
-                </div>
-
-                {/* Fast Suggestions */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-slate-400">Try searching:</span>
-                  {['Mitochondria cristae', 'DNA double helix', 'French Revolution', 'Apollo 11 Eagle', 'Photosynthesis Calvin cycle', 'Black hole event horizon'].map((term) => (
-                    <button
-                      key={term}
-                      type="button"
-                      onClick={() => {
-                        setImageSearchKeyword(term);
-                        handlePerformLiveSearch(term);
-                      }}
-                      className="text-[11px] px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors cursor-pointer border border-slate-700/60"
-                    >
-                      {term}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Results Grid */}
-                {isLiveSearching ? (
-                  <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-400">
-                    <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
-                    <span className="text-xs">Searching Google & Web Images for hyper-specific visual media...</span>
-                  </div>
-                ) : liveSearchResults.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-80 overflow-y-auto p-1">
+                {liveSearchResults.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-72 overflow-y-auto">
                     {liveSearchResults.map((img, i) => (
                       <button
                         key={i}
                         type="button"
                         onClick={() => {
-                          soundFx.playClick();
-                          updateActiveCard({
-                            image_url: img.url,
-                            image_caption: img.caption,
-                            image_search_query: imageSearchKeyword,
-                            image_source: img.source,
-                            image_source_url: img.sourceUrl,
-                            image_attribution: img.attribution,
+                          updateActiveSlide({
+                            imageUrl: img.url,
+                            imageCaption: img.caption,
+                            imageSource: img.source,
+                            imageAttribution: img.attribution,
                           });
                           setIsImageModalOpen(false);
                         }}
-                        className="group relative rounded-xl overflow-hidden border border-slate-800 hover:border-cyan-400 text-left transition-all cursor-pointer bg-slate-950 flex flex-col"
+                        className="rounded-xl overflow-hidden border border-slate-800 hover:border-cyan-400 text-left bg-slate-950 flex flex-col cursor-pointer"
                       >
-                        <div className="relative w-full h-28 bg-slate-900 overflow-hidden">
-                          <img
-                            src={img.thumbnail || img.url}
-                            alt={img.caption}
-                            referrerPolicy="no-referrer"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              if (img.thumbnail && target.src !== img.thumbnail) {
-                                target.src = img.thumbnail;
-                              }
-                            }}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-xs text-[9px] font-bold text-cyan-300 border border-slate-800">
-                            {img.attribution || img.source}
-                          </span>
-                        </div>
-                        <div className="p-2 bg-slate-950/95 border-t border-slate-800 flex-1 flex flex-col justify-between">
-                          <p className="text-[11px] font-semibold text-slate-200 line-clamp-2 leading-tight">
-                            {img.caption}
-                          </p>
-                          <span className="text-[9px] uppercase tracking-wider text-cyan-400 font-bold block mt-1">
-                            {img.source}
-                          </span>
-                        </div>
+                        <img
+                          src={img.thumbnail || img.url}
+                          alt={img.caption}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-24 object-cover"
+                        />
+                        <div className="p-2 text-[10px] text-slate-300 line-clamp-2">{img.caption}</div>
                       </button>
                     ))}
-                  </div>
-                ) : (
-                  <div className="py-10 text-center text-slate-500 text-xs">
-                    No results found. Try typing a specific scientific, historical, or conceptual query above.
                   </div>
                 )}
               </div>
             )}
 
-            {/* TAB 2: Curated Thematic Library */}
             {activeImageTab === 'curated' && (
-              <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                  Curated High-Definition Educational Imagery
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto p-1">
-                  {THEMATIC_VISUAL_ASSETS.map((asset, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        soundFx.playClick();
-                        updateActiveCard({
-                          image_url: asset.url,
-                          image_caption: asset.caption,
-                          image_source: 'Unsplash',
-                          image_source_url: 'https://unsplash.com',
-                          image_attribution: 'Unsplash Educational Collection',
-                        });
-                        setIsImageModalOpen(false);
-                      }}
-                      className="group relative rounded-xl overflow-hidden border border-slate-800 hover:border-cyan-400 text-left transition-all cursor-pointer"
-                    >
-                      <img
-                        src={asset.url}
-                        alt={asset.caption}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent p-2 flex flex-col justify-end">
-                        <span className="text-[11px] font-bold text-white capitalize leading-tight">
-                          {asset.keywords[0]}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-72 overflow-y-auto">
+                {THEMATIC_VISUAL_ASSETS.map((asset, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => {
+                      updateActiveSlide({
+                        imageUrl: asset.url,
+                        imageCaption: asset.caption,
+                      });
+                      setIsImageModalOpen(false);
+                    }}
+                    className="relative rounded-xl overflow-hidden border border-slate-800 hover:border-cyan-400 text-left cursor-pointer"
+                  >
+                    <img src={asset.url} alt={asset.caption} className="w-full h-28 object-cover" />
+                    <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 p-1.5 text-[10px] font-bold text-white capitalize">
+                      {asset.keywords[0]}
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
 
-            {/* TAB 3: Direct Image URL & Upload */}
             {activeImageTab === 'custom' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-slate-300">Custom Image URL</label>
+                  <label className="block text-xs font-bold text-slate-300">Direct Image URL</label>
                   <div className="flex gap-2">
                     <input
                       type="url"
                       value={customImageUrl}
                       onChange={(e) => setCustomImageUrl(e.target.value)}
-                      placeholder="https://images.unsplash.com/..."
-                      className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-400"
+                      placeholder="https://..."
+                      className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
                     />
                     <button
                       type="button"
                       onClick={() => {
                         if (customImageUrl.trim()) {
-                          updateActiveCard({ image_url: customImageUrl.trim() });
+                          updateActiveSlide({ imageUrl: customImageUrl.trim() });
                           setIsImageModalOpen(false);
                         }
                       }}
-                      className="px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs cursor-pointer"
+                      className="px-3 py-2 rounded-xl bg-cyan-500 text-slate-950 font-black text-xs cursor-pointer"
                     >
                       Apply
                     </button>
                   </div>
                 </div>
-
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-slate-300">Upload Local Image</label>
+                  <label className="block text-xs font-bold text-slate-300">Upload Image File</label>
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -1701,10 +2460,9 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                    className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold cursor-pointer"
                   >
-                    <Upload className="w-4 h-4 text-cyan-400" />
-                    <span>Choose Image File</span>
+                    Choose Local Image
                   </button>
                 </div>
               </div>

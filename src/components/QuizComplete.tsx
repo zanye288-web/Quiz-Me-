@@ -49,6 +49,13 @@ import { QuizMistakesDiagnosticsView } from './QuizMistakesDiagnosticsView';
 import { IntelligentNotesViewer } from './IntelligentNotesViewer';
 import { IntelligentNotesGeneratorModal } from './IntelligentNotesGeneratorModal';
 import { IntelligentTutorDrawer } from './IntelligentTutorDrawer';
+import { SessionReflectionHooks } from './SessionReflectionHooks';
+import { MasteryProgressPath } from './MasteryProgressPath';
+import {
+  getDetailedAnswerExplanation,
+  inferQuestionDifficulty,
+  buildInterleavedMixQuiz,
+} from '../utils/adaptiveLearningEngine';
 
 interface QuizCompleteProps {
   quiz: QuizResponse;
@@ -61,12 +68,17 @@ interface QuizCompleteProps {
     gemsEarned: number;
     timeSpentSeconds?: number;
     flaggedIds?: number[];
+    fixedQuestionIds?: number[];
+    summaryTags?: string[];
+    integrityNotice?: string;
     answers: Array<{ questionId: number; isCorrect: boolean; userAnswer: string }>;
   };
   onRestartQuiz: () => void;
   onNewQuiz: () => void;
   onOpenJsonView: () => void;
   onOpenTutor?: (questionId?: number) => void;
+  onOpenMyNotesTab?: () => void;
+  onStartQuiz?: (quiz: QuizResponse) => void;
 }
 
 export const QuizComplete: React.FC<QuizCompleteProps> = ({
@@ -78,6 +90,8 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
   onNewQuiz,
   onOpenJsonView,
   onOpenTutor,
+  onOpenMyNotesTab,
+  onStartQuiz,
 }) => {
   const [copiedJson, setCopiedJson] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'review' | 'matrix' | 'study_guide' | 'flashcards' | 'recommendations' | 'diagnostics' | 'notes'>('review');
@@ -246,8 +260,8 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
       )}
 
       {/* Quiz Summary Header Card with Mascot Companion */}
-      <div className="rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm relative overflow-hidden transition-colors">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div className="comic-tab-hero rounded-3xl p-6 sm:p-8 relative overflow-hidden transition-colors">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="flex items-center gap-4 max-w-2xl min-w-0">
             <MascotAvatar
               mood={isPerfectScore ? 'streak' : accuracy >= 70 ? 'happy' : 'encourage'}
@@ -255,8 +269,11 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
             />
             <div className="space-y-1.5 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                  <Award className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                  FINAL PANEL · SCORECARD
+                </span>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-slate-950/60 text-emerald-300 border border-emerald-400/40">
+                  <Award className="w-3.5 h-3.5 text-emerald-400" />
                   <span>{isPerfectScore ? '🌟 100% Perfection!' : accuracy >= 80 ? '🎉 High Score!' : 'Quiz Complete!'}</span>
                 </div>
 
@@ -265,7 +282,7 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
                   const tierCfg = AUDIENCE_TIER_CONFIG[tier];
                   return (
                     <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black border ${tierCfg.badgeBg} ${tierCfg.badgeBorder} ${tierCfg.badgeText}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black border border-white/25 bg-slate-950/50 text-cyan-200"
                     >
                       <span>{tierCfg.emoji}</span>
                       <span>{tierCfg.shortLabel}</span>
@@ -274,7 +291,7 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
                 })()}
               </div>
 
-              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight drop-shadow-xs">
                 {isPerfectScore
                   ? 'Phenomenal! Flawless Mastery!'
                   : accuracy >= 80
@@ -283,28 +300,28 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
                   ? 'Good effort! Keep expanding your knowledge!'
                   : 'Great practice session! Review and grow!'}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed truncate">
-                Quiz: <span className="font-bold text-slate-900 dark:text-slate-100">{quiz.quiz_title}</span>
+              <p className="text-xs sm:text-sm text-indigo-100 leading-relaxed truncate font-medium">
+                Quiz: <span className="font-black text-amber-300">{quiz.quiz_title}</span>
               </p>
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-            <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-4 bg-slate-950/65 p-4 rounded-2xl border-2 border-slate-950">
               <div className="text-center">
-                <div className="text-3xl font-black text-slate-900 dark:text-white">
+                <div className="text-3xl font-black text-white">
                   {results.score}/{results.total}
                 </div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">
                   Score
                 </div>
               </div>
-              <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
+              <div className="h-8 w-px bg-white/20" />
               <div className="text-center">
-                <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400">
+                <div className="text-3xl font-black text-emerald-400">
                   {accuracy}%
                 </div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-200">
                   Accuracy
                 </div>
               </div>
@@ -353,12 +370,14 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center space-y-1">
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-            XP Earned
+            Verified XP Earned
           </span>
-          <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-            +{results.xpEarned || 80} XP
+          <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tabular-nums">
+            +{results.xpEarned ?? 0} XP
           </div>
-          <p className="text-xs font-bold text-slate-500">Scholar Points</p>
+          <p className="text-xs font-bold text-slate-500">
+            {(results.xpEarned ?? 0) > 0 ? 'Effort Verified' : 'Replay / 0 Score'}
+          </p>
         </div>
 
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs text-center space-y-1">
@@ -375,17 +394,80 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
           <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400">
             Mascot Coins
           </span>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1">
+          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1 tabular-nums">
             <Coins className="w-5 h-5 text-amber-500" />
             <span>
-              +{calculateQuizMascotCoinsEarned(results.score, results.total, quiz.difficulty, stats.streak).coins}
+              +{(results.xpEarned ?? 0) > 0 ? calculateQuizMascotCoinsEarned(results.score, results.total, quiz.difficulty, stats.streak).coins : 0}
             </span>
           </div>
           <p className="text-[11px] font-bold text-slate-500">
-            {accuracy >= 80 ? 'Added to Mascot Shop!' : 'Need 80%+ for Coins'}
+            {(results.xpEarned ?? 0) > 0 && accuracy >= 80 ? 'Added to Mascot Shop!' : 'Need 80%+ Verified'}
           </p>
         </div>
       </div>
+
+      {/* Effort-Verified XP Ledger Breakdown Banner */}
+      {(results.integrityNotice || (results.summaryTags && results.summaryTags.length > 0)) && (
+        <div
+          className={`rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            results.integrityNotice
+              ? 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200'
+              : 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/70 text-emerald-900 dark:text-emerald-200'
+          }`}
+        >
+          <div className="flex items-start gap-2.5">
+            <ShieldCheck
+              className={`w-5 h-5 shrink-0 mt-0.5 ${
+                results.integrityNotice ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+              }`}
+            />
+            <div className="space-y-1">
+              <div className="text-xs font-black uppercase tracking-wider">
+                {results.integrityNotice ? 'XP Anti-Farming & Replay Shield' : 'Verified Effort XP Breakdown'}
+              </div>
+              {results.integrityNotice && (
+                <p className="text-xs font-semibold">{results.integrityNotice}</p>
+              )}
+              {results.summaryTags && results.summaryTags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {results.summaryTags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2.5 py-0.5 rounded-lg bg-white/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700 text-[11px] font-bold text-slate-800 dark:text-slate-200"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* End-of-Session Reflection Hooks: Strongest/Shakiest Topics, Missed Questions, Next Suggestion, Explain in Own Words, & One-Line Takeaway */}
+      <SessionReflectionHooks
+        quiz={quiz}
+        answers={results.answers}
+        fixedQuestionIds={results.fixedQuestionIds}
+        onPracticeSuggestedTopic={() => {
+          if (onStartQuiz) {
+            onStartQuiz(buildInterleavedMixQuiz(persona));
+          } else {
+            onRestartQuiz();
+          }
+        }}
+        onOpenMyNotesScreen={onOpenMyNotesTab}
+      />
+
+      {/* Fun Layer Tied to Learning: Mastery Progress Map & Unlockable Cosmetics */}
+      <MasteryProgressPath
+        streakDays={stats.streak}
+        onLaunchInterleavedQuiz={
+          onStartQuiz ? () => onStartQuiz(buildInterleavedMixQuiz(persona)) : undefined
+        }
+        onOpenMyNotes={onOpenMyNotesTab}
+      />
 
       {/* AI Synopsis & Learning Takeaways Card */}
       <QuizSummaryCard
@@ -712,6 +794,9 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                               {q.domain || 'Foundations'}
                             </span>
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
+                              Difficulty: {inferQuestionDifficulty(q, idx, quiz.difficulty)}
+                            </span>
                             {q.bloom_level && (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                                 Bloom: {q.bloom_level}
@@ -780,13 +865,25 @@ export const QuizComplete: React.FC<QuizCompleteProps> = ({
                           </div>
                         )}
 
-                        <div className="pt-1">
-                          <span className="font-bold text-slate-500 dark:text-slate-400 block mb-0.5">
-                            Explanation & Rationale:
-                          </span>
-                          <p className="text-slate-700 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                            {q.explanation}
-                          </p>
+                        <div className="pt-1 space-y-2">
+                          {!isCorrect && ans?.userAnswer && (
+                            <div className="p-2.5 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-slate-800 dark:text-slate-200">
+                              <span className="font-black text-[10px] uppercase tracking-wider text-amber-800 dark:text-amber-300 block mb-0.5">
+                                Why Your Choice Was Incorrect:
+                              </span>
+                              <p className="text-xs leading-relaxed">
+                                {getDetailedAnswerExplanation(q, ans.userAnswer, false).whyChosenWasIncorrect}
+                              </p>
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-bold text-slate-500 dark:text-slate-400 block mb-0.5">
+                              Why the Correct Answer Is Right:
+                            </span>
+                            <p className="text-slate-700 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+                              {q.explanation}
+                            </p>
+                          </div>
                         </div>
 
                         {q.pedagogy_note && (

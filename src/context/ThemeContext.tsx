@@ -20,6 +20,87 @@ export type CardCornerRadius = '3xl' | '2xl' | 'xl' | 'md';
 export type UiDensity = 'comfortable' | 'compact';
 export type QuestionLayoutStyle = 'stacked' | 'split' | 'focus';
 export type UiStyleMode = 'default' | '3d' | 'modern' | 'legacy' | 'playful';
+export type UiThemeId =
+  | 'comic_pop'
+  | 'sunset_manga'
+  | 'cyber_arcade'
+  | 'emerald_academy'
+  | 'royal_amethyst'
+  | 'paper_ink';
+
+export interface UiThemeCatalogItem {
+  id: UiThemeId;
+  name: string;
+  tagline: string;
+  emoji: string;
+  badge: string;
+  swatchGradient: string;
+  recommendedMode: 'light' | 'dark';
+  recommendedAccent: AccentColor;
+}
+
+export const UI_THEME_CATALOG: UiThemeCatalogItem[] = [
+  {
+    id: 'comic_pop',
+    name: 'Comic Pop Studio',
+    tagline: 'Royal Blue & Electric Indigo command deck with Ben-Day halftone dots & crisp ink borders.',
+    emoji: '⚡',
+    badge: 'Default Comic',
+    swatchGradient: 'from-blue-600 via-indigo-600 to-violet-600',
+    recommendedMode: 'light',
+    recommendedAccent: 'indigo',
+  },
+  {
+    id: 'sunset_manga',
+    name: 'Sunset Manga Action',
+    tagline: 'Fiery Coral-Rose, Crimson & Amber Gold action panels with warm speed-stripe energy.',
+    emoji: '🔥',
+    badge: 'Action Pop',
+    swatchGradient: 'from-rose-600 via-orange-500 to-amber-400',
+    recommendedMode: 'light',
+    recommendedAccent: 'rose',
+  },
+  {
+    id: 'cyber_arcade',
+    name: 'Cyber Neon Arcade',
+    tagline: 'Electric Cyan & Neon Emerald championship arena with high-contrast midnight surfaces.',
+    emoji: '🕹️',
+    badge: 'Esports Neon',
+    swatchGradient: 'from-cyan-500 via-sky-600 to-indigo-700',
+    recommendedMode: 'dark',
+    recommendedAccent: 'cyan',
+  },
+  {
+    id: 'emerald_academy',
+    name: 'Emerald Botanical Lab',
+    tagline: 'Official Ivy-League Emerald & Teal scientific blueprint theme with crisp mint clarity.',
+    emoji: '🌿',
+    badge: 'STEM Official',
+    swatchGradient: 'from-emerald-600 via-teal-600 to-cyan-600',
+    recommendedMode: 'light',
+    recommendedAccent: 'emerald',
+  },
+  {
+    id: 'royal_amethyst',
+    name: 'Royal Amethyst Velvet',
+    tagline: 'Regal Purple, Fuchsia & Championship Gold tournament deck with diamond-weave textures.',
+    emoji: '👑',
+    badge: 'Prestige',
+    swatchGradient: 'from-purple-600 via-fuchsia-600 to-pink-600',
+    recommendedMode: 'dark',
+    recommendedAccent: 'violet',
+  },
+  {
+    id: 'paper_ink',
+    name: 'Sunday Ink & Paper',
+    tagline: 'Warm vintage comic-strip newsprint cream canvas with bold editorial black ink frames.',
+    emoji: '📰',
+    badge: 'Editorial Strip',
+    swatchGradient: 'from-amber-600 via-stone-700 to-slate-900',
+    recommendedMode: 'light',
+    recommendedAccent: 'amber',
+  },
+];
 
 export interface UiStyleCatalogItem {
   id: UiStyleMode;
@@ -565,6 +646,8 @@ interface ThemeContextType {
   setFontFamily: (font: FontFamilyChoice) => void;
   uiStyle: UiStyleMode;
   setUiStyle: (style: UiStyleMode) => void;
+  uiTheme: UiThemeId;
+  setUiTheme: (themeId: UiThemeId) => void;
   uiDensity: UiDensity;
   setUiDensity: (density: UiDensity) => void;
   cardRadius: CardCornerRadius;
@@ -628,6 +711,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const THEME_KEY = 'quizme_theme_mode_v3';
 const UI_STYLE_KEY = 'quizme_ui_style_v1';
+const UI_THEME_KEY = 'quizme_ui_theme_v1';
 const ACCENT_KEY = 'quizme_accent_v3';
 const DENSITY_KEY = 'quizme_density_v3';
 const FONT_KEY = 'quizme_font_v1';
@@ -681,6 +765,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const saved = safeGetStorage(UI_STYLE_KEY) as UiStyleMode;
     if (['default', '3d', 'modern', 'legacy', 'playful'].includes(saved)) return saved;
     return 'default';
+  });
+
+  const [uiTheme, setUiThemeState] = useState<UiThemeId>(() => {
+    const saved = safeGetStorage(UI_THEME_KEY) as UiThemeId;
+    if (UI_THEME_CATALOG.some((t) => t.id === saved)) return saved;
+    return 'comic_pop';
   });
 
   const [uiDensity, setUiDensityState] = useState<UiDensity>(() => {
@@ -859,6 +949,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     root.setAttribute('data-accent', currentAccent);
     root.setAttribute('data-ui-style', uiStyle);
+    root.setAttribute('data-ui-theme', uiTheme);
     root.setAttribute('data-font', currentFont);
     root.setAttribute('data-density', currentDensity);
     root.setAttribute('data-radius', currentRadius);
@@ -921,6 +1012,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [
     theme,
     uiStyle,
+    uiTheme,
     accent,
     fontFamily,
     uiDensity,
@@ -1007,6 +1099,18 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setFontFamily('sans');
       setCardRadius('3xl');
       setAnimationStyle('smooth');
+    }
+  };
+
+  const setUiTheme = (newUiTheme: UiThemeId) => {
+    setUiThemeState(newUiTheme);
+    safeSetStorage(UI_THEME_KEY, newUiTheme);
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-ui-theme', newUiTheme);
+    }
+    const meta = UI_THEME_CATALOG.find((t) => t.id === newUiTheme);
+    if (meta) {
+      setAccent(meta.recommendedAccent);
     }
   };
 
@@ -1351,6 +1455,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setFontFamily,
         uiStyle,
         setUiStyle,
+        uiTheme,
+        setUiTheme,
         uiDensity,
         setUiDensity,
         cardRadius,

@@ -10,12 +10,20 @@ import {
   Calendar,
   BookOpen,
   Check,
+  Shield,
+  Bell,
+  Clock,
 } from 'lucide-react';
 import { QuizHistoryRecord } from './HistoryView';
 import { QuizResponse } from '../types/quiz';
 import { soundFx } from '../utils/audio';
+import {
+  loadStreakFreezeAndReminderConfig,
+  saveStreakFreezeAndReminderConfig,
+  StreakFreezeAndReminderState,
+} from '../utils/adaptiveLearningEngine';
 
-export type GoalMetric = 'questions' | 'xp' | 'concepts';
+export type GoalMetric = 'questions' | 'minutes' | 'xp' | 'concepts';
 
 export interface GenericGoalMetadata {
   statement: string;
@@ -48,7 +56,8 @@ const DEFAULT_CONFIG: DailyGoalConfig = {
 };
 
 const PRESET_TARGETS: Record<GoalMetric, number[]> = {
-  questions: [10, 20, 30, 50],
+  questions: [5, 10, 20, 30],
+  minutes: [5, 10, 15, 30],
   xp: [100, 250, 500, 1000],
   concepts: [15, 30, 50, 100],
 };
@@ -232,6 +241,49 @@ export const DailyLearningGoalTracker: React.FC<DailyLearningGoalTrackerProps> =
     return () => window.removeEventListener('quizme-concepts-updated', syncConcepts);
   }, []);
 
+  const [freezeReminderState, setFreezeReminderState] = useState<StreakFreezeAndReminderState>(() =>
+    loadStreakFreezeAndReminderConfig()
+  );
+
+  useEffect(() => {
+    const syncFreeze = () => {
+      setFreezeReminderState(loadStreakFreezeAndReminderConfig());
+    };
+    window.addEventListener('streak-freeze-updated', syncFreeze);
+    return () => window.removeEventListener('streak-freeze-updated', syncFreeze);
+  }, []);
+
+  const handleToggleGentleReminders = () => {
+    soundFx.playClick();
+    const updated: StreakFreezeAndReminderState = {
+      ...freezeReminderState,
+      gentleRemindersEnabled: !freezeReminderState.gentleRemindersEnabled,
+      reminderDismissedToday: false,
+    };
+    setFreezeReminderState(updated);
+    saveStreakFreezeAndReminderConfig(updated);
+  };
+
+  const handleUpdateReminderTime = (newTime: string) => {
+    soundFx.playSelect();
+    const updated: StreakFreezeAndReminderState = {
+      ...freezeReminderState,
+      preferredReminderTime: newTime,
+    };
+    setFreezeReminderState(updated);
+    saveStreakFreezeAndReminderConfig(updated);
+  };
+
+  const handleToggleStreakFreezeAuto = () => {
+    soundFx.playClick();
+    const updated: StreakFreezeAndReminderState = {
+      ...freezeReminderState,
+      streakFreezeAutoApply: !freezeReminderState.streakFreezeAutoApply,
+    };
+    setFreezeReminderState(updated);
+    saveStreakFreezeAndReminderConfig(updated);
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem(GOAL_STORAGE_KEY, JSON.stringify(config));
@@ -263,6 +315,9 @@ export const DailyLearningGoalTracker: React.FC<DailyLearningGoalTrackerProps> =
     const questionsAnswered = todayRecords.reduce((sum, r) => sum + (r.total || 0), 0);
     const correctCount = todayRecords.reduce((sum, r) => sum + (r.score || 0), 0);
     const xpEarned = todayRecords.reduce((sum, r) => sum + (r.xpEarned || 0), 0);
+    const minutesSpent = Math.round(
+      todayRecords.reduce((sum, r) => sum + (r.timeSpentSeconds || 90), 0) / 60
+    );
     const quizzesCount = todayRecords.length;
 
     return {
@@ -270,13 +325,22 @@ export const DailyLearningGoalTracker: React.FC<DailyLearningGoalTrackerProps> =
       questionsAnswered,
       correctCount,
       xpEarned,
+      minutesSpent,
       quizzesCount,
     };
   }, [historyRecords]);
 
   const currentValue =
     config.metric === 'questions'
-      ? todaysStats.questionsAnswered + oneByOneConceptsCount
+      ? Math.max(
+          freezeReminderState.dailyQuestionsAnsweredToday,
+          todaysStats.questionsAnswered + oneByOneConceptsCount
+        )
+      : config.metric === 'minutes'
+      ? Math.max(
+          Math.round(freezeReminderState.dailyMinutesPracticedToday),
+          todaysStats.minutesSpent
+        )
       : config.metric === 'concepts'
       ? oneByOneConceptsCount + todaysStats.correctCount
       : todaysStats.xpEarned;
@@ -340,10 +404,10 @@ export const DailyLearningGoalTracker: React.FC<DailyLearningGoalTrackerProps> =
 
   return (
     <div
-      className={`rounded-3xl border border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-slate-900/95 p-6 shadow-sm relative overflow-hidden transition-all ${className}`}
+      className={`comic-panel pattern-halftone rounded-3xl bg-white dark:bg-slate-900 p-6 relative overflow-hidden transition-all ${className}`}
     >
       <div
-        className={`absolute -top-16 -right-16 w-52 h-52 rounded-full blur-3xl pointer-events-none opacity-40 transition-colors ${
+        className={`absolute -top-16 -right-16 w-52 h-52 rounded-full blur-3xl pointer-events-none opacity-30 transition-colors ${
           isGoalReached
             ? 'bg-emerald-400 dark:bg-emerald-600'
             : 'bg-indigo-400 dark:bg-indigo-600'
@@ -353,11 +417,14 @@ export const DailyLearningGoalTracker: React.FC<DailyLearningGoalTrackerProps> =
       <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
         <div className="space-y-3 flex-1 text-center lg:text-left">
           <div className="flex items-center justify-center lg:justify-start gap-2 flex-wrap">
+            <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+              DAILY QUEST
+            </span>
             <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border shadow-2xs ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border-2 border-slate-900 dark:border-slate-700 shadow-2xs ${
                 isGoalReached
-                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
-                  : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'
+                  : 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300'
               }`}
             >
               {isGoalReached ? (
@@ -393,19 +460,109 @@ export const DailyLearningGoalTracker: React.FC<DailyLearningGoalTrackerProps> =
           </div>
 
           <div className="flex items-center justify-center lg:justify-start gap-2.5 pt-1 flex-wrap">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-xs font-bold text-slate-700 dark:text-slate-300">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-              <span>{todaysStats.quizzesCount} Quizzes Today</span>
+            {/* Quick Daily Goal Unit Switcher: Questions vs Minutes */}
+            <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playSelect();
+                  setConfig((prev) => ({
+                    ...prev,
+                    metric: 'questions',
+                    target: prev.metric === 'questions' ? prev.target : 10,
+                  }));
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                  config.metric === 'questions'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                🎯 Questions Goal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playSelect();
+                  setConfig((prev) => ({
+                    ...prev,
+                    metric: 'minutes',
+                    target: prev.metric === 'minutes' ? prev.target : 10,
+                  }));
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                  config.metric === 'minutes'
+                    ? 'bg-indigo-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                ⏱️ Minutes Goal
+              </button>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-xs font-bold text-slate-700 dark:text-slate-300">
-              <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-              <span>+{todaysStats.xpEarned} XP Earned</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-xs font-bold text-slate-700 dark:text-slate-300">
-              <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
-              <span>{oneByOneConceptsCount} Word-Chain Concepts</span>
+
+            {/* Streak Freeze Earned Through Consistent Practice */}
+            <button
+              type="button"
+              onClick={handleToggleStreakFreezeAuto}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-300 dark:border-cyan-800 text-xs font-black text-cyan-800 dark:text-cyan-200 cursor-pointer"
+              title="Earn Streak Freezes by completing 10+ questions, 10+ minutes, or the Daily Challenge!"
+            >
+              <Shield className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span>
+                ❄️ {freezeReminderState.streakFreezesAvailable}/{freezeReminderState.maxStreakFreezes} Streak Freezes ({freezeReminderState.streakFreezeAutoApply ? 'Auto-Protect ON' : 'Manual'})
+              </span>
+            </button>
+
+            {/* Optional & Encouraging Gentle Reminder Toggle */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-xs font-bold text-amber-900 dark:text-amber-200">
+              <Bell className="w-3.5 h-3.5 text-amber-600" />
+              <button
+                type="button"
+                onClick={handleToggleGentleReminders}
+                className="font-black hover:underline cursor-pointer"
+              >
+                Gentle Reminder: {freezeReminderState.gentleRemindersEnabled ? 'ON' : 'OFF'}
+              </button>
+              {freezeReminderState.gentleRemindersEnabled && (
+                <select
+                  value={freezeReminderState.preferredReminderTime}
+                  onChange={(e) => handleUpdateReminderTime(e.target.value)}
+                  aria-label="Preferred gentle reminder time"
+                  className="ml-1 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-amber-300 dark:border-amber-700 rounded px-1.5 py-0.5 text-[10px] font-mono font-bold cursor-pointer"
+                >
+                  <option value="09:00">9:00 AM</option>
+                  <option value="14:00">2:00 PM</option>
+                  <option value="18:00">6:00 PM</option>
+                  <option value="20:00">8:00 PM</option>
+                </select>
+              )}
             </div>
           </div>
+
+          {/* Encouraging Gentle Nudge Banner (Optional & Dismissible) */}
+          {freezeReminderState.gentleRemindersEnabled &&
+            !isGoalReached &&
+            !freezeReminderState.reminderDismissedToday && (
+              <div className="p-3 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between gap-3 text-left text-xs">
+                <div className="flex items-center gap-2 font-semibold text-indigo-950 dark:text-indigo-200">
+                  <Clock className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>
+                    🌱 <strong>Friendly Nudge ({freezeReminderState.preferredReminderTime}):</strong> Even 5 minutes or a couple of questions today keeps your momentum strong — and your ❄️ Streak Freeze has your back if life gets busy!
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = { ...freezeReminderState, reminderDismissedToday: true };
+                    setFreezeReminderState(next);
+                    saveStreakFreezeAndReminderConfig(next);
+                  }}
+                  className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 hover:underline shrink-0 cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
         </div>
 
         {/* Center: Progress Ring */}
@@ -568,10 +725,10 @@ export const DailyLearningGoalTracker: React.FC<DailyLearningGoalTrackerProps> =
 
             <div className="space-y-1.5">
               <label className="text-xs font-extrabold text-slate-700 dark:text-slate-300 block">
-                2. Tracking Metric
+                2. Tracking Metric (Minutes or Questions)
               </label>
-              <div className="grid grid-cols-3 gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800">
-                {(['questions', 'concepts', 'xp'] as GoalMetric[]).map((m) => (
+              <div className="grid grid-cols-4 gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800">
+                {(['questions', 'minutes', 'concepts', 'xp'] as GoalMetric[]).map((m) => (
                   <button
                     key={m}
                     type="button"

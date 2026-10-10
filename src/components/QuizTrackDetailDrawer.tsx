@@ -284,11 +284,14 @@ ${takeaways.coreConcepts.map((c) => `• ${c.term}: ${c.explanation}`).join('\n'
       }}
       className="fixed inset-0 z-50 overflow-hidden bg-slate-950/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
     >
-      <div className="w-full max-w-xl bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col justify-between border-l border-slate-200 dark:border-slate-800 animate-in slide-in-from-right duration-300 transition-colors">
+      <div className="comic-modal-panel w-full max-w-xl bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col justify-between border-l-2 border-slate-950 dark:border-slate-700 animate-in slide-in-from-right duration-300 transition-colors">
         {/* Drawer Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between bg-slate-50 dark:bg-slate-900/80 gap-4">
+        <div className="pattern-halftone p-5 sm:p-6 border-b-2 border-slate-900/15 dark:border-slate-800 flex items-start justify-between bg-indigo-50/50 dark:bg-slate-900/80 gap-4">
           <div className="space-y-2 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                DECK BRIEFING
+              </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-black bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                 <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
                 <span>QuizTrack Overview</span>

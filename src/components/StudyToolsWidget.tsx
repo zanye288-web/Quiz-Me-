@@ -293,10 +293,10 @@ export const StudyToolsWidget: React.FC<StudyToolsWidgetProps> = ({
               soundFx.playClick();
               setActiveTool((prev) => (prev === 'calculator' ? 'none' : 'calculator'));
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 border transition-all cursor-pointer ${
+            className={`comic-panel-sm px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
               activeTool === 'calculator'
-                ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-500/20'
-                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:border-indigo-400'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-indigo-400'
             }`}
           >
             <Calculator className="w-3.5 h-3.5" />
@@ -311,10 +311,10 @@ export const StudyToolsWidget: React.FC<StudyToolsWidgetProps> = ({
               soundFx.playClick();
               setActiveTool((prev) => (prev === 'dictionary' ? 'none' : 'dictionary'));
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 border transition-all cursor-pointer ${
+            className={`comic-panel-sm px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer ${
               activeTool === 'dictionary'
-                ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
-                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:border-emerald-400'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-emerald-400'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
@@ -326,7 +326,7 @@ export const StudyToolsWidget: React.FC<StudyToolsWidgetProps> = ({
       {/* Customizable Scientific Calculator Panel */}
       {activeTool === 'calculator' && calculatorEnabled && (
         <div
-          className={`mt-3 rounded-2xl border p-4 transition-all ${currentSkin.panel} ${
+          className={`comic-panel mt-3 rounded-3xl p-4 transition-all ${currentSkin.panel} ${
             isCompact ? 'max-w-xs' : 'max-w-md'
           }`}
         >

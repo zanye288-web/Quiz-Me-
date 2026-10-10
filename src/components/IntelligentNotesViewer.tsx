@@ -110,12 +110,15 @@ ${note.selfCheckQuestions.map((q, i) => `### Question ${i + 1}: ${q.question}\n*
   };
 
   return (
-    <div className={`bg-white dark:bg-slate-900 ${isModal ? 'max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800' : 'rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm'} transition-colors`}>
+    <div className={`bg-white dark:bg-slate-900 ${isModal ? 'comic-modal-panel max-h-[90vh] overflow-y-auto rounded-3xl' : 'comic-panel rounded-3xl'} overflow-hidden transition-colors`}>
       {/* Note Header */}
-      <div className="p-6 sm:p-7 border-b border-slate-200/80 dark:border-slate-800/80 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/50 dark:from-slate-900 dark:via-slate-900/90 dark:to-indigo-950/30">
+      <div className="pattern-halftone p-6 sm:p-7 border-b-2 border-slate-900/15 dark:border-slate-800 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/50 dark:from-slate-900 dark:via-slate-900/90 dark:to-indigo-950/30">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                STUDY SHEET
+              </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-indigo-600 text-white shadow-2xs">
                 <BookOpen className="w-3.5 h-3.5" />
                 <span>AI Intelligent Notes</span>

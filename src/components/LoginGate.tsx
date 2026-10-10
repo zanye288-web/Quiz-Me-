@@ -258,154 +258,162 @@ export const LoginGate: React.FC = () => {
     }
   };
 
+  const [warmupSelected, setWarmupSelected] = useState<string | null>(null);
   const isAnyLoading = isAuthLoading || activeProvider !== null;
 
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors selection:bg-indigo-500 selection:text-white overflow-x-hidden">
+    <div className="relative min-h-screen w-full flex flex-col justify-between atelier-canvas-bg text-slate-900 dark:text-slate-100 transition-colors selection:bg-indigo-500 selection:text-white overflow-x-hidden">
       {/* Dynamic Animated Ambient Mesh Backdrop */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute -top-[20%] -left-[10%] w-[60vw] h-[60vw] rounded-full bg-gradient-to-tr from-indigo-500/15 via-purple-500/15 to-pink-500/10 blur-3xl transform -translate-x-1/2 -translate-y-1/2 animate-pulse" />
-        <div className="absolute top-[60%] -right-[15%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-bl from-cyan-500/15 via-blue-500/15 to-emerald-500/10 blur-3xl transform translate-x-1/3 -translate-y-1/3 animate-pulse" />
+        <div className="absolute -top-[20%] -left-[10%] w-[60vw] h-[60vw] rounded-full bg-gradient-to-tr from-violet-500/15 via-indigo-500/15 to-fuchsia-500/10 blur-3xl animate-24fps-float" />
+        <div className="absolute top-[60%] -right-[15%] w-[55vw] h-[55vw] rounded-full bg-gradient-to-bl from-cyan-500/15 via-blue-500/15 to-emerald-500/10 blur-3xl animate-24fps-float" />
       </div>
 
       {/* Header with Brand & Theme Switcher */}
       <header className="w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-        <AppLogo size="md" mood="happy" subtitleText="AI Multimodal Assessment Platform" />
+        <AppLogo size="md" mood="happy" subtitleText="Interactive Quiz Lounge · 24fps Motion" />
 
-        <button
-          type="button"
-          onClick={() => {
-            soundFx.playClick();
-            toggleTheme();
-          }}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-xs"
-          title="Toggle Theme"
-        >
-          {resolvedTheme === 'dark' ? (
-            <>
-              <Sun className="w-4 h-4 text-amber-400" />
-              <span>Light</span>
-            </>
-          ) : (
-            <>
-              <Moon className="w-4 h-4 text-indigo-600" />
-              <span>Dark</span>
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleInstantScholarAccess}
+            disabled={isAnyLoading}
+            className="arcade-btn px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 text-xs font-black border-b-2 border-emerald-700 shadow-sm cursor-pointer"
+          >
+            ⚡ Quick Play as Guest
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              soundFx.playClick();
+              toggleTheme();
+            }}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-xs"
+            title="Toggle Theme"
+          >
+            {resolvedTheme === 'dark' ? (
+              <>
+                <Sun className="w-4 h-4 text-amber-400" />
+                <span>Light</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4 text-indigo-600" />
+                <span>Dark</span>
+              </>
+            )}
+          </button>
+        </div>
       </header>
 
-      {/* Main Login Card Section */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col items-center justify-center">
-        <div className="w-full max-w-lg mx-auto">
-          {/* Main Card */}
-          <div className="relative rounded-3xl border border-slate-200/90 dark:border-slate-800/90 bg-white/95 dark:bg-slate-900/95 shadow-xl shadow-slate-200/50 dark:shadow-black/50 p-6 sm:p-8 backdrop-blur-xl transition-all">
-            {/* Top Badge */}
-            <div className="flex justify-center mb-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Scholar Access Required</span>
+      {/* Main 2-Column Interactive Quiz Lounge Portal */}
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col justify-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+          {/* Left Column (7 Cols): Live Playable Warmup Trivia & Quiz World Showcase */}
+          <div className="lg:col-span-7 space-y-5 animate-24fps-deal">
+            <div className="comic-tab-hero rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden">
+              <div className="pointer-events-none absolute -right-12 -top-12 w-56 h-56 rounded-full bg-white/10 blur-2xl animate-24fps-float" />
+              <div className="relative z-10 space-y-4">
+                <div className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-100 flex-wrap">
+                  <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                    QUIZME ARCADE
+                  </span>
+                  <span>Interactive Quiz Worlds</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Word-Chain &amp; Math Bee</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Live Multiplayer</span>
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight text-balance">
+                  Escape boring lectures. Play your way to mastery.
+                </h2>
+                <p className="text-sm text-indigo-100 leading-relaxed max-w-xl">
+                  Turn any topic, PDF, voice note, or YouTube video into an interactive quiz run, 3D flashcard deck, or word-chain battle in seconds.
+                </p>
+
+                {/* Live Playable Warmup Trivia Card right on the Welcome Screen */}
+                <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-slate-950/35 backdrop-blur-md border border-white/20 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-amber-300">
+                    <span>🎯 Warmup Trivia Challenge</span>
+                    <span>+50 XP Bonus</span>
+                  </div>
+                  <p className="text-sm sm:text-base font-extrabold text-white">
+                    Which planet in our solar system spins clockwise on its axis (retrograde rotation)?
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Mars', 'Venus', 'Jupiter', 'Saturn'].map((opt, idx) => {
+                      const isRight = opt === 'Venus';
+                      const isPicked = warmupSelected === opt;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => {
+                            setWarmupSelected(opt);
+                            if (isRight) soundFx.playCorrect();
+                            else soundFx.playIncorrect();
+                          }}
+                          className={`arcade-btn px-3 py-2.5 rounded-xl text-xs font-extrabold text-left flex items-center gap-2 transition-all cursor-pointer border ${
+                            warmupSelected
+                              ? isRight
+                                ? 'bg-emerald-500 border-emerald-300 text-slate-950 font-black'
+                                : isPicked
+                                ? 'bg-rose-500/80 border-rose-300 text-white'
+                                : 'bg-white/5 border-white/10 text-white/50'
+                              : 'bg-white/15 hover:bg-white/25 border-white/20 text-white'
+                          }`}
+                        >
+                          <span className="w-5 h-5 rounded-md bg-black/25 flex items-center justify-center font-mono text-[11px]">
+                            {['A', 'B', 'C', 'D'][idx]}
+                          </span>
+                          <span>{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {warmupSelected && (
+                    <div className="flex items-center justify-between gap-2 pt-1 text-xs text-emerald-200 font-bold">
+                      <span>
+                        {warmupSelected === 'Venus'
+                          ? '🎉 Spot on! Venus rotates clockwise once every 243 Earth days.'
+                          : '💡 It’s Venus! Its sun rises in the west and sets in the east.'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleInstantScholarAccess}
+                        className="px-3 py-1 rounded-lg bg-amber-400 text-slate-950 font-black shrink-0 cursor-pointer"
+                      >
+                        Enter Lounge ▶
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Switch Account Notice */}
-            {isSwitchingAccount && (
-              <div className="mb-5 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 flex items-start gap-3">
-                <Compass className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <div className="text-xs space-y-0.5 text-left">
-                  <p className="font-extrabold text-amber-900 dark:text-amber-200">
-                    Switching Scholar Account
-                  </p>
-                  <p className="text-amber-700 dark:text-amber-300 leading-relaxed">
-                    Select a different Google account or enter new credentials to switch your active profile.
-                  </p>
+            {/* Companion Mascot Bar (No App Thumbnail Image) */}
+            <div className="comic-panel-sm pattern-halftone p-4 rounded-2xl bg-white/95 dark:bg-slate-900/95 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="animate-24fps-float shrink-0">
+                  <MascotAvatar
+                    character={currentShowcaseMascot.id}
+                    theme={currentShowcaseMascot.defaultTheme}
+                    accessory={currentShowcaseMascot.defaultAccessory || 'none'}
+                    mood="happy"
+                    size="md"
+                    interactive={false}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                    Companion {showcaseIndex + 1} of {MASCOT_CATALOG.length} · {currentShowcaseMascot.uniquePose}
+                  </div>
+                  <div className="text-sm font-black text-slate-900 dark:text-white truncate">
+                    {currentShowcaseMascot.title} — {currentShowcaseMascot.tagline}
+                  </div>
                 </div>
               </div>
-            )}
-
-            {/* Animated Mascot Showcase — All Mascots & Official App Icons Fade In & Out */}
-            <div className="mb-5 p-4 rounded-2xl bg-gradient-to-br from-indigo-50/90 via-white to-violet-50/90 dark:from-slate-800/90 dark:via-slate-900 dark:to-indigo-950/60 border border-indigo-200/70 dark:border-indigo-800/60 shadow-inner">
-              <div className="flex items-center justify-between gap-3">
-                <div className="relative flex items-center gap-2 shrink-0">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentShowcaseMascot.id}
-                      initial={{ opacity: 0, scale: 0.85, y: 6 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.85, y: -6 }}
-                      transition={{ duration: 0.55, ease: 'easeInOut' }}
-                      className="flex items-center gap-2"
-                    >
-                      <img
-                        src={currentShowcaseAppIconUrl}
-                        alt={`${currentShowcaseMascot.title} App Icon`}
-                        referrerPolicy="no-referrer"
-                        className="w-16 h-16 rounded-2xl object-cover shadow-md border-2 border-indigo-400/50"
-                      />
-                      <MascotAvatar
-                        character={currentShowcaseMascot.id}
-                        theme={currentShowcaseMascot.defaultTheme}
-                        accessory={currentShowcaseMascot.defaultAccessory || 'none'}
-                        mood="happy"
-                        size="md"
-                        interactive={false}
-                      />
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentShowcaseMascot.id}
-                      initial={{ opacity: 0, x: 8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -8 }}
-                      transition={{ duration: 0.45, ease: 'easeInOut' }}
-                      className="space-y-1"
-                    >
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-indigo-600 text-white">
-                          Mascot {showcaseIndex + 1} of {MASCOT_CATALOG.length}
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60">
-                          {currentShowcaseMascot.uniquePose}
-                        </span>
-                      </div>
-                      <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white truncate">
-                        {currentShowcaseMascot.title}
-                      </h2>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 font-medium truncate">
-                        {currentShowcaseMascot.species} • {currentShowcaseMascot.tagline}
-                      </p>
-                      <div className="flex items-center justify-between gap-2 pt-0.5">
-                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold truncate">
-                          {currentShowcaseAccessory.previewEmoji} {currentShowcaseAccessory.name}
-                        </span>
-                        {unlockedMascots.includes(currentShowcaseMascot.id) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              soundFx.playPop();
-                              setMascotCharacter(currentShowcaseMascot.id, true);
-                            }}
-                            className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all cursor-pointer shrink-0 ${
-                              mascotCharacter === currentShowcaseMascot.id
-                                ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                                : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                            }`}
-                          >
-                            {mascotCharacter === currentShowcaseMascot.id ? 'Active App Icon' : 'Use This App Icon'}
-                          </button>
-                        )}
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-              </div>
-
-              {/* Dots to preview any mascot or watch them fade in and out */}
-              <div className="flex items-center justify-center gap-1.5 mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/70">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {MASCOT_CATALOG.map((m, idx) => (
                   <button
                     key={m.id}
@@ -413,36 +421,58 @@ export const LoginGate: React.FC = () => {
                     onClick={() => {
                       soundFx.playClick();
                       setShowcaseIndex(idx);
+                      if (unlockedMascots.includes(m.id)) {
+                        setMascotCharacter(m.id, true);
+                      }
                     }}
-                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                    className={`h-2 rounded-full transition-all cursor-pointer ${
                       idx === showcaseIndex
                         ? 'w-6 bg-indigo-600 dark:bg-indigo-400'
                         : 'w-2 bg-slate-300 dark:bg-slate-700 hover:bg-indigo-400'
                     }`}
-                    title={`Preview ${m.title} (${m.uniquePose})`}
-                    aria-label={`Preview ${m.title}`}
+                    title={`Select ${m.title}`}
+                    aria-label={`Select ${m.title}`}
                   />
                 ))}
               </div>
             </div>
+          </div>
 
-            {/* Title & Subtitle */}
-            <div className="text-center mb-6">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white mb-2">
-                {authMode === 'signup'
-                  ? 'Create Your Scholar Account'
-                  : authMode === 'forgot_password'
-                  ? 'Reset Your Password'
-                  : 'Welcome Back to QuizMe'}
-              </h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                {authMode === 'signup'
-                  ? 'Join QuizMe to generate custom AI assessments, track Bloom taxonomy mastery, and sync your study journey.'
-                  : authMode === 'forgot_password'
-                  ? 'Enter your registered email and we will send you a secure link to reset your password.'
-                  : 'Sign in to access your quizzes, analytics dashboard, and cloud-synced study progress.'}
-              </p>
-            </div>
+          {/* Right Column (5 Cols): Sign In / Instant Play Card */}
+          <div className="lg:col-span-5 w-full max-w-lg mx-auto">
+            <div className="comic-panel animate-24fps-deal delay-24fps-1 relative rounded-3xl bg-white/95 dark:bg-slate-900/95 p-6 sm:p-7 backdrop-blur-xl transition-all">
+              {/* Switch Account Notice */}
+              {isSwitchingAccount && (
+                <div className="mb-5 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 flex items-start gap-3">
+                  <Compass className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-0.5 text-left">
+                    <p className="font-extrabold text-amber-900 dark:text-amber-200">
+                      Switching Player Profile
+                    </p>
+                    <p className="text-amber-700 dark:text-amber-300 leading-relaxed">
+                      Select a different Google account or enter credentials below.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Title & Subtitle */}
+              <div className="text-center mb-5">
+                <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white mb-1.5">
+                  {authMode === 'signup'
+                    ? 'Create Your Player Profile'
+                    : authMode === 'forgot_password'
+                    ? 'Reset Your Password'
+                    : 'Jump Into the Quiz Lounge'}
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {authMode === 'signup'
+                    ? 'Save your XP, streaks, custom decks, and leaderboard rank across devices.'
+                    : authMode === 'forgot_password'
+                    ? 'Enter your email and we will send a password reset link.'
+                    : 'Play immediately as a guest or sign in to sync your XP and streaks.'}
+                </p>
+              </div>
 
             {/* Auth Mode Toggle Tabs (Sign In vs Create Account) */}
             {authMode !== 'forgot_password' && (
@@ -988,12 +1018,13 @@ export const LoginGate: React.FC = () => {
             <div className="p-3.5 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-slate-200/70 dark:border-slate-800/70 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-1 text-emerald-600 dark:text-emerald-400">
                 <Cloud className="w-4 h-4" />
-                <span className="text-xs font-bold">Cloud Persistence</span>
+                <span className="text-xs font-bold">Cloud Synced XP &amp; Ranks</span>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
-                Automatic synchronization for XP, diplomas, and history.
+                Automatic synchronization for XP, streaks, certificates, and leaderboards.
               </p>
             </div>
+          </div>
           </div>
         </div>
       </main>

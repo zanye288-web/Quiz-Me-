@@ -274,18 +274,21 @@ ${summaryData.quickStudyTip}
   return (
     <div
       id="quiz-summary-card"
-      className={`rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-colors ${className}`}
+      className={`comic-panel rounded-3xl bg-white dark:bg-slate-900 overflow-hidden transition-colors ${className}`}
     >
       {/* Top Banner Header */}
-      <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-50/60 dark:bg-slate-800/40">
+      <div className="pattern-halftone p-5 sm:p-6 border-b-2 border-slate-900/15 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-indigo-50/50 dark:bg-slate-800/40">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shadow-indigo-600/30 shrink-0">
+          <div className="w-10 h-10 rounded-2xl bg-indigo-600 border-2 border-slate-950 text-white flex items-center justify-center shadow-xs shrink-0">
             <Brain className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
+              <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                AI SYNOPSIS
+              </span>
               <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                AI Quiz Synopsis & Diagnostic
+                AI Quiz Synopsis &amp; Diagnostic
               </h2>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                 <Sparkles className="w-3 h-3 text-indigo-500" />

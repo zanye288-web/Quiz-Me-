@@ -39,6 +39,7 @@ import {
   QuizResponse,
   AssessmentConfig,
   UserStats,
+  ExamFormatId,
 } from '../types/quiz';
 import { PRESET_TOPICS, PresetTopic } from '../data/presets';
 import { soundFx } from '../utils/audio';
@@ -50,6 +51,20 @@ import { QuizTrackDetailDrawer, SelectedTrackInfo } from './QuizTrackDetailDrawe
 import { SUPPORTED_LANGUAGES, SupportedLanguage, getLanguageByCode } from '../data/languages';
 import { MascotAvatar } from './MascotAvatar';
 import { getLevelProgress, getDailyRetentionCheckIn } from '../utils/levelingSystem';
+import {
+  verifyDailyTriviaBlitzXp,
+  getRewardedTriviaIdsToday,
+  getDailyEffortVerificationStatus,
+} from '../utils/xpIntegrity';
+import { SavedQuizDocument } from '../services/firestore';
+import { buildInterleavedMixQuiz } from '../utils/adaptiveLearningEngine';
+import {
+  EXAM_FORMAT_CATALOG,
+  getExamFormatSpec,
+  buildPrebuiltExamByFormat,
+} from '../utils/examFormats';
+import { IntelligentNote } from '../types/learningSystem';
+import { IntelligentNotesViewer } from './IntelligentNotesViewer';
 
 interface IngestStudioProps {
   persona: PersonaType;
@@ -66,6 +81,8 @@ interface IngestStudioProps {
   onOpenUploadQuiz?: () => void;
   onOpenTutor?: (questionId?: number) => void;
   onOpenLevelRoadmap?: () => void;
+  onNavigateTab?: (tab: string) => void;
+  customQuizzes?: SavedQuizDocument[];
   stats?: UserStats;
   historyRecords?: QuizHistoryRecord[];
 }
@@ -84,6 +101,8 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   onOpenUploadQuiz,
   onOpenTutor,
   onOpenLevelRoadmap,
+  onNavigateTab,
+  customQuizzes = [],
   stats = {
     streak: 1,
     hearts: 5,
@@ -102,10 +121,144 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   const { currentAccentConfig } = useTheme();
   // Top-level Studio Workspace Organization: 'builder' | 'tracks' | 'recommended'
   const [studioSection, setStudioSection] = useState<'builder' | 'tracks' | 'recommended'>('builder');
-  // Input Tabs: 'presets' | 'text' | 'file' | 'audio' | 'url'
-  const [activeTab, setActiveTab] = useState<'presets' | 'text' | 'file' | 'audio' | 'url'>('text');
+  // Input Tabs: 'presets' | 'text' | 'file' | 'audio' | 'url' | 'exam' | 'notes_generator'
+  const [activeTab, setActiveTab] = useState<'presets' | 'text' | 'file' | 'audio' | 'url' | 'exam' | 'notes_generator'>('text');
+  const [inlineGeneratedNote, setInlineGeneratedNote] = useState<IntelligentNote | null>(null);
+  const [isGeneratingNoteInline, setIsGeneratingNoteInline] = useState<boolean>(false);
+  const selectedExamFormat: ExamFormatId = assessmentConfig.examFormat || 'waec';
+  const activeExamSpec = getExamFormatSpec(selectedExamFormat);
+
+  const handleGenerateInlineStudyNote = async (overrideTopic?: string) => {
+    const rawTopic = (overrideTopic ?? inputText).trim() || `${activeExamSpec.shortName} Core Syllabus`;
+    soundFx.playClick();
+    setIsGeneratingNoteInline(true);
+    setErrorMessage(null);
+    const saveNoteToLibrary = (noteToSave: IntelligentNote) => {
+      try {
+        const raw = localStorage.getItem('quizme_intelligent_notes_library');
+        const list: IntelligentNote[] = raw ? JSON.parse(raw) : [];
+        const updated = [noteToSave, ...list.filter((n) => n.id !== noteToSave.id)];
+        localStorage.setItem('quizme_intelligent_notes_library', JSON.stringify(updated));
+      } catch {
+        // ignore storage error
+      }
+    };
+    try {
+      const enrichedTopic =
+        assessmentConfig.mode === 'exam'
+          ? `${rawTopic} (${activeExamSpec.fullName} Syllabus, Key Formulas, Marking Scheme Keywords & Worked Examples)`
+          : rawTopic;
+      const res = await fetch('/api/intelligent-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          topic: enrichedTopic,
+          subject: activeExamSpec.shortName,
+          sourceType: 'topic',
+          contextDetails:
+            assessmentConfig.mode === 'exam'
+              ? `Tailor this study guide specifically for ${activeExamSpec.fullName} (${activeExamSpec.governingBody}). Highlight command words, marking scheme keywords, worked examples, and common candidate pitfalls.`
+              : '',
+          persona,
+          learnerLevel: difficulty,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.notes) {
+        throw new Error(data.error || 'Failed to generate AI Study Notes.');
+      }
+      const note: IntelligentNote = {
+        ...data.notes,
+        id: `note_${Date.now()}`,
+        sourceType: 'topic',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      saveNoteToLibrary(note);
+      soundFx.playComplete();
+      setInlineGeneratedNote(note);
+    } catch {
+      const fallbackNote: IntelligentNote = {
+        id: `note-inline-${Date.now()}`,
+        title: `${rawTopic} — ${activeExamSpec.shortName} Study Guide`,
+        subject: activeExamSpec.shortName,
+        topic: rawTopic,
+        sourceType: 'topic',
+        topicIntroduction: `Comprehensive revision notes, key definitions, worked examples, and marking-scheme checkpoints for ${rawTopic} (${activeExamSpec.fullName}).`,
+        keyConcepts: [
+          {
+            title: `${rawTopic}: Core Principles & Definitions`,
+            explanation: `Master the foundational laws, precise terminology, and marking-scheme keywords required by ${activeExamSpec.governingBody} for ${rawTopic}.`,
+          },
+          {
+            title: `${activeExamSpec.shortName} High-Yield Application`,
+            explanation: `Understand how ${rawTopic} is tested across ${activeExamSpec.paperStructure} and how to structure step-by-step solutions.`,
+          },
+        ],
+        detailedExplanation: [
+          `Step 1: Identify the command words and given parameters in ${rawTopic} problems.`,
+          `Step 2: State the governing formula, law, or principle clearly before substituting values.`,
+          `Step 3: Express your final answer with appropriate SI units and significant figures as required by ${activeExamSpec.shortName} examiners.`,
+        ],
+        examples: [
+          {
+            scenario: `${activeExamSpec.shortName} Worked Example on ${rawTopic}`,
+            explanation: `Apply first principles to break down the question stem, eliminate distractors, and verify the result against boundary conditions.`,
+          },
+        ],
+        commonMistakes: [
+          {
+            mistake: `Omitting units or intermediate working steps in ${rawTopic}`,
+            whyItHappens: `Rushing through calculations without writing down the formula or state symbols.`,
+            correction: `Always write the governing equation and check unit consistency at every step.`,
+          },
+        ],
+        rememberThis: [
+          `Review ${activeExamSpec.shortName} past paper command words for ${rawTopic}.`,
+          `Always state definitions using exact syllabus terminology.`,
+        ],
+        selfCheckQuestions: [
+          {
+            id: 1,
+            question: `Which strategy is most critical when answering a ${activeExamSpec.shortName} question on ${rawTopic}?`,
+            options: [
+              'State the governing principle/formula clearly and include proper units',
+              'Skip intermediate working steps to save time',
+              'Guess based on option length',
+              'Ignore command words in the prompt',
+            ],
+            correctAnswer: 'State the governing principle/formula clearly and include proper units',
+            explanation: `${activeExamSpec.governingBody} marking schemes award method marks (M1) for explicit principles/formulas and accuracy marks (A1) for correct units.`,
+          },
+        ],
+        tags: [activeExamSpec.shortName, rawTopic, 'Exam Revision'],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      saveNoteToLibrary(fallbackNote);
+      soundFx.playComplete();
+      setInlineGeneratedNote(fallbackNote);
+    } finally {
+      setIsGeneratingNoteInline(false);
+    }
+  };
+
+  const handleSelectExamFormat = (formatId: ExamFormatId) => {
+    soundFx.playSelect();
+    const spec = getExamFormatSpec(formatId);
+    setSelectedQuestionTypes(spec.defaultQuestionTypes);
+    setCalculatorEnabled(spec.calculatorAllowed);
+    onUpdateAssessmentConfig?.({
+      mode: 'exam',
+      examFormat: formatId,
+      timeLimitMinutes: spec.defaultTimeMinutes,
+      passingScorePercent: spec.defaultPassingScore,
+      allowHints: spec.allowHintsInExam,
+      calculatorEnabled: spec.calculatorAllowed,
+    });
+  };
   const [showAllPresetsInBuilder, setShowAllPresetsInBuilder] = useState<boolean>(false);
-  const [selectedPresetId, setSelectedPresetId] = useState<string>(PRESET_TOPICS[0].id);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>(PRESET_TOPICS[0]?.id || '');
   const [selectedTrackForDetail, setSelectedTrackForDetail] = useState<SelectedTrackInfo | null>(null);
   const [inputText, setInputText] = useState('');
   const [mediaUrl, setMediaUrl] = useState('');
@@ -115,7 +268,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   const [isInputShaking, setIsInputShaking] = useState<boolean>(false);
   const [generationStep, setGenerationStep] = useState<string>('');
 
-  const selectedPreset = PRESET_TOPICS.find((p) => p.id === selectedPresetId) || PRESET_TOPICS[0];
+  const selectedPreset = PRESET_TOPICS.find((p) => p.id === selectedPresetId) || PRESET_TOPICS[0] || null;
 
   const handleOpenTrackDetail = (preset: PresetTopic) => {
     soundFx.playSelect();
@@ -152,7 +305,10 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   const [dictionaryEnabled, setDictionaryEnabled] = useState<boolean>(true);
   const [miniTriviaIndex, setMiniTriviaIndex] = useState<number>(0);
   const [miniTriviaSelected, setMiniTriviaSelected] = useState<string | null>(null);
-  const [miniTriviaSolvedIds, setMiniTriviaSolvedIds] = useState<number[]>([]);
+  const [miniTriviaSolvedIds, setMiniTriviaSolvedIds] = useState<number[]>(() =>
+    getRewardedTriviaIdsToday()
+  );
+  const [miniTriviaNotice, setMiniTriviaNotice] = useState<string | null>(null);
 
   const MINI_TRIVIA_QUESTIONS = [
     {
@@ -193,6 +349,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   const [promptStyle, setPromptStyle] = useState<string>('Standard');
   const [targetAudience, setTargetAudience] = useState<string>('All Ages / Family Fun');
   const [creativityLevel, setCreativityLevel] = useState<number>(0.7);
+  const [intelligenceScope, setIntelligenceScope] = useState<string>('omniscient_synthesis');
   const [focusSubtopics, setFocusSubtopics] = useState<string>('');
 
   const PROMPT_MODIFIERS = [
@@ -407,6 +564,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
           targetAudience,
           focusSubtopics: focusSubtopics.trim() || undefined,
           creativityLevel,
+          intelligenceScope,
           language: selectedLanguage.code,
           languageName: selectedLanguage.name,
         }),
@@ -439,12 +597,25 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
     const hasFiles = uploadedFiles.length > 0;
     const hasUrl = mediaUrl.trim().length > 0;
 
-    // If no text was manually provided, and on presets tab - use the selected preset!
+    // If no text was manually provided, and on presets or exam tab - use the selected preset or exam topic!
     if (!effectiveText && !hasFiles && !hasUrl) {
       if (activeTab === 'presets' && selectedPreset) {
         effectiveText = selectedPreset.inputText;
+      } else if (activeTab === 'exam' || assessmentConfig.mode === 'exam') {
+        effectiveText = activeExamSpec.sampleTopics[0] || `${activeExamSpec.fullName} Comprehensive Mock Examination`;
       }
     }
+
+    // Inject Exam Format Blueprint Directive when in Exam Mode or Exam tab
+    const isExamRun = activeTab === 'exam' || assessmentConfig.mode === 'exam';
+    const combinedInstructions = [
+      customInstructions.trim(),
+      isExamRun
+        ? `[OFFICIAL EXAM FORMAT BLUEPRINT — ${activeExamSpec.fullName.toUpperCase()}]: ${activeExamSpec.aiBlueprintDirective} Structure Paper: ${activeExamSpec.paperStructure}. Grading Scale: ${activeExamSpec.gradingScaleLabel}.`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
 
     if (!effectiveText && !hasFiles && !hasUrl) {
       soundFx.playIncorrect();
@@ -469,14 +640,23 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
       : (['multiple_choice', 'fill_in_blank'] as QuestionType[]);
 
     setIsLoading(true);
-    setGenerationStep('Reading your topic...');
+    const numBatches = questionCount > 15 ? Math.ceil(questionCount / 15) : 1;
+    setGenerationStep(
+      questionCount > 30
+        ? `Launching ${numBatches} parallel AI pillars for ${questionCount} questions...`
+        : 'Analyzing topic & mapping cognitive scope...'
+    );
 
     const stepTimer1 = setTimeout(() => {
-      setGenerationStep('Writing questions and helpful hints...');
+      setGenerationStep(
+        questionCount > 30
+          ? `Synthesizing ${questionCount} unique questions & misconception distractors...`
+          : 'Writing questions, rationales & helpful hints...'
+      );
     }, 1500);
 
     const stepTimer2 = setTimeout(() => {
-      setGenerationStep('Getting your quiz ready...');
+      setGenerationStep(`Finalizing ${questionCount}-question deck & study guide...`);
     }, 3200);
 
     try {
@@ -491,11 +671,12 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
           questionTypes: typesToUse,
           difficulty,
           questionCount,
-          customInstructions: customInstructions.trim() || undefined,
-          promptStyle,
+          customInstructions: combinedInstructions || undefined,
+          promptStyle: isExamRun ? 'Exam Cram & High-Yield' : promptStyle,
           targetAudience,
           focusSubtopics: focusSubtopics.trim() || undefined,
           creativityLevel,
+          intelligenceScope: isExamRun ? 'exam_olympiad_rigor' : intelligenceScope,
           language: selectedLanguage.code,
           languageName: selectedLanguage.name,
         }),
@@ -513,6 +694,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
       soundFx.playComplete();
       onStartQuiz({
         ...data.quiz,
+        examFormat: isExamRun ? selectedExamFormat : data.quiz.examFormat,
         calculatorEnabled,
         dictionaryEnabled,
       });
@@ -541,63 +723,141 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
   const displayedPresets = showAllPresetsInBuilder ? PRESET_TOPICS : PRESET_TOPICS.slice(0, 4);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 space-y-4">
-      {/* Top Studio Header & Segmented Workspace Switcher */}
-      <div className="rounded-2xl p-3.5 sm:p-4 border border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xs relative overflow-hidden transition-all">
-        <div className="absolute -top-16 -right-16 w-64 h-64 bg-gradient-to-bl from-indigo-500/10 via-purple-500/5 to-transparent rounded-full blur-2xl pointer-events-none" />
-
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 relative z-10">
-          <div className="flex items-center gap-3 min-w-0">
-            <MascotAvatar
-              mood={persona === 'Teacher' ? 'teacher' : 'happy'}
-              size="sm"
-              className="shrink-0 hidden sm:inline-flex"
-            />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Create a Quiz in Seconds
-                </h2>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80">
-                  <Sparkles className="w-3 h-3 text-indigo-500" />
-                  <span>Quick Quiz Maker</span>
+    <div className="max-w-[1420px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-6">
+      {/* 1. VIBRANT OFFICIAL & FUN HERO BANNER & 1-CLICK INSTANT PLAY BAR */}
+      <div className="animate-24fps-deal holo-command-deck holo-grid-overlay holo-shimmer-bar relative rounded-3xl p-5 sm:p-7 border-2 border-indigo-400/60 border-b-[6px] border-b-indigo-950 text-white overflow-hidden">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-3 max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-950/35 border border-white/25 text-xs font-extrabold tracking-wide text-white shadow-2xs">
+                <span className="animate-24fps-float">⚡</span>
+                <span>OFFICIAL QUIZ ARENA</span>
+                <span className="opacity-60">•</span>
+                <span className="text-amber-300 font-black tabular-nums">
+                  <span className="animate-24fps-flame">🔥</span> {stats.streak}d Streak
+                </span>
+                <span className="opacity-60">•</span>
+                <span className="text-emerald-300 font-black tabular-nums">
+                  Lv.{currentLevel} ({stats.xp.toLocaleString()} XP)
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                Turn any topic, notes, document, or voice memo into an interactive quiz.
-              </p>
+
+              <div
+                className="xp-integrity-badge inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-400 text-slate-950 border-b-2 border-emerald-700 text-[11px] font-black shadow-2xs"
+                title="Every XP point is verified by active recall, dwell-time checks, and anti-replay protection"
+              >
+                <span>🛡️ Effort-Verified XP</span>
+              </div>
             </div>
+
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight text-white">
+              Master any subject with{' '}
+              <span className="inline-block px-3 py-0.5 rounded-xl bg-amber-300 text-slate-950 border-b-3 border-amber-600 font-black shadow-sm">
+                1 to 100 smart questions
+              </span>{' '}
+              in seconds.
+            </h1>
+            <p className="text-xs sm:text-sm text-white/95 font-semibold max-w-xl leading-relaxed">
+              Multi-disciplinary AI synthesis across 12 cognitive dimensions, timed math &amp; spelling championships, and 100% effort-verified XP progression.
+            </p>
           </div>
 
-          {/* Segmented Workspace Switcher (Matches 3-View Clean Organization) */}
-          <div className="flex items-center p-1 rounded-xl bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 self-start lg:self-center shrink-0">
+          {/* Segmented Official Arcade Mode Switcher */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-2xl bg-slate-950/45 border-2 border-white/25 self-start lg:self-center shrink-0">
             {[
-              { id: 'builder', label: 'Make a Quiz', icon: Sparkles },
-              { id: 'tracks', label: `Starter Quizzes (${PRESET_TOPICS.length})`, icon: BookOpen },
-              { id: 'recommended', label: 'For You', icon: Compass },
+              { id: 'builder', emoji: '⚡', label: 'Quiz Maker' },
+              { id: 'exam_shortcut', emoji: '🎓', label: 'Exam Mode' },
+              { id: 'past_papers_shortcut', emoji: '📚', label: 'Past Papers Hub' },
+              { id: 'presentation_shortcut', emoji: '🖥️', label: 'Presentation Maker' },
+              { id: 'notes_shortcut', emoji: '📝', label: 'Notes Generator' },
+              { id: 'tracks', emoji: '🎯', label: `Quiz Decks (${customQuizzes.length})` },
             ].map((view) => {
-              const Icon = view.icon;
-              const isSelected = studioSection === view.id;
+              const isSelected =
+                (view.id === 'exam_shortcut' && studioSection === 'builder' && activeTab === 'exam') ||
+                (view.id === 'notes_shortcut' && studioSection === 'builder' && activeTab === 'notes_generator') ||
+                (view.id === studioSection && activeTab !== 'exam' && activeTab !== 'notes_generator');
               return (
                 <button
                   key={view.id}
                   type="button"
                   onClick={() => {
                     soundFx.playClick();
-                    setStudioSection(view.id as 'builder' | 'tracks' | 'recommended');
+                    if (view.id === 'exam_shortcut') {
+                      setStudioSection('builder');
+                      setActiveTab('exam');
+                      onUpdateAssessmentConfig?.({
+                        mode: 'exam',
+                        examFormat: selectedExamFormat,
+                      });
+                    } else if (view.id === 'past_papers_shortcut') {
+                      if (onNavigateTab) {
+                        onNavigateTab('past_papers');
+                      } else {
+                        setStudioSection('builder');
+                        setActiveTab('exam');
+                      }
+                    } else if (view.id === 'presentation_shortcut') {
+                      if (onNavigateTab) {
+                        onNavigateTab('gamma');
+                      }
+                    } else if (view.id === 'notes_shortcut') {
+                      setStudioSection('builder');
+                      setActiveTab('notes_generator');
+                    } else {
+                      setStudioSection(view.id as 'builder' | 'tracks' | 'recommended');
+                      if (view.id === 'builder' && (activeTab === 'exam' || activeTab === 'notes_generator')) {
+                        setActiveTab('text');
+                      }
+                    }
                   }}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                  className={`arcade-btn flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
                     isSelected
-                      ? `${currentAccentConfig.activeBtn} text-white shadow-xs`
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-amber-300 text-slate-950 shadow-sm border-b-2 border-amber-600'
+                      : 'text-white hover:bg-white/15'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <span>{view.emoji}</span>
                   <span>{view.label}</span>
                 </button>
               );
             })}
           </div>
+        </div>
+
+        {/* 1-Click Instant Play Arcade Strip */}
+        <div className="relative z-10 mt-5 pt-4 border-t border-white/25 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-black uppercase tracking-wider text-amber-300 mr-1 flex items-center gap-1">
+            <Zap className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+            <span>1-Click Play:</span>
+          </span>
+          {QUICK_STARTER_TOPICS.slice(0, 5).map((topic) => (
+            <button
+              key={topic.label}
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                setActiveTab('text');
+                setInputText(topic.prompt);
+                setValidationWarning(null);
+                setErrorMessage(null);
+                handleGenerateQuiz(topic.prompt);
+              }}
+              className="arcade-btn px-3.5 py-1.5 rounded-xl bg-white hover:bg-amber-300 text-slate-900 hover:text-slate-950 border-b-3 border-slate-300 hover:border-amber-600 text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+              title={`Launch instant quiz on ${topic.label}`}
+            >
+              <span>{topic.icon}</span>
+              <span>{topic.label}</span>
+              <span className="text-[10px] text-indigo-600 font-black">▶</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={handleSurpriseMe}
+            className="arcade-btn ml-auto px-4 py-1.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-slate-950 border-b-3 border-amber-600 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+          >
+            <span>🎲</span>
+            <span>Surprise Me!</span>
+          </button>
         </div>
       </div>
 
@@ -630,19 +890,19 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
         />
       )}
 
-      {/* VIEW 2: Dedicated Curated Curriculum Tracks View */}
+      {/* VIEW 2: Dedicated Saved Quiz Decks View */}
       {studioSection === 'tracks' && (
         <div className="rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 shadow-xs space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <span>Curated Curriculum Tracks</span>
+                <span>Saved &amp; Community Quiz Decks</span>
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold border border-indigo-200 dark:border-indigo-800">
-                  {PRESET_TOPICS.length} Tracks
+                  {customQuizzes.length} Decks
                 </span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Launch a prebuilt track immediately or generate fresh AI questions tailored to your settings.
+                Launch any saved quiz deck immediately or create a new AI quiz in the Studio Builder.
               </p>
             </div>
             <button
@@ -657,407 +917,571 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {PRESET_TOPICS.map((preset) => {
-              const isSelected = selectedPresetId === preset.id;
-              return (
+          {customQuizzes.length === 0 ? (
+            <div className="p-10 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <h4 className="text-base font-black text-slate-900 dark:text-white">
+                No quizzes available
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                There are no saved quizzes in your database yet. Create a new AI quiz from any topic or upload a quiz file to get started!
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setStudioSection('builder');
+                  setActiveTab('text');
+                }}
+                className="arcade-btn px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black cursor-pointer shadow-sm"
+              >
+                + Create Your First Quiz
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {customQuizzes.map((q) => (
                 <div
-                  key={preset.id}
-                  onClick={() => {
-                    soundFx.playClick();
-                    setSelectedPresetId(preset.id);
-                    setInputText(preset.inputText);
-                    setSelectedQuestionTypes(preset.suggestedTypes);
-                    setValidationWarning(null);
-                    setErrorMessage(null);
-                  }}
-                  className={`p-4 rounded-2xl border transition-all text-left cursor-pointer relative flex flex-col justify-between ${
-                    isSelected
-                      ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 shadow-sm ring-2 ring-indigo-500/20'
-                      : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 hover:border-indigo-300 dark:hover:border-indigo-700'
-                  }`}
+                  key={q.id}
+                  className="p-4 rounded-2xl border-2 border-b-4 border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/50 hover:border-indigo-400 transition-all text-left flex flex-col justify-between relative overflow-hidden"
                 >
+                  <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400" />
                   <div>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-2xl">{preset.icon}</span>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          isSelected
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        {isSelected ? '✓ Selected' : preset.category}
+                    <div className="flex items-center justify-between gap-2 mb-2 pt-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                        {q.difficulty} · {q.questions.length} Qs
+                      </span>
+                      <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                        By {q.creatorName || 'Scholar'}
                       </span>
                     </div>
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenTrackDetail(preset);
-                      }}
-                      className="cursor-pointer group/title"
-                    >
-                      <div className="font-extrabold text-sm text-slate-900 dark:text-white group-hover/title:text-indigo-600 dark:group-hover/title:text-indigo-400 transition-colors">
-                        {preset.title}
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                        {preset.description}
-                      </p>
+                    <div className="font-extrabold text-sm text-slate-900 dark:text-white">
+                      {q.quiz_title}
                     </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                      {q.summary}
+                    </p>
                   </div>
-
-                  <div className="space-y-2 mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
+                  <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-700/60">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenTrackDetail(preset);
+                      onClick={() => {
+                        soundFx.playClick();
+                        onStartQuiz({
+                          app_name: 'Quiz Me!',
+                          persona: q.persona || persona,
+                          quiz_title: q.quiz_title,
+                          summary: q.summary,
+                          difficulty: q.difficulty,
+                          questions: q.questions,
+                          study_guide: q.study_guide,
+                          tags: q.tags,
+                        });
                       }}
-                      className="w-full py-1.5 px-2.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-indigo-200/80 dark:border-indigo-800/80"
+                      className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
                     >
-                      <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
-                      <span>Key Takeaways</span>
+                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Play Quiz Deck</span>
                     </button>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          soundFx.playClick();
-                          setSelectedPresetId(preset.id);
-                          setInputText(preset.inputText);
-                          handleGenerateQuiz(preset.inputText);
-                        }}
-                        className="py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>AI Quiz</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLoadPreset(preset);
-                        }}
-                        className="py-2 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
-                      >
-                        <Zap className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Prebuilt</span>
-                      </button>
-                    </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* VIEW 1: Default Studio Builder (12-Column Bento Dashboard Grid) */}
+      {/* VIEW 1: Modern Quiz Lounge & Bento Game Hub */}
       {studioSection === 'builder' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-          {/* Left Primary Creation Column (8 Cols) */}
+        <div className="space-y-6">
+          {/* ZONE A: CENTER-STAGE SPOTLIGHT QUIZ LAUNCHER OMNIBOX */}
           <div
             id="creation-card-main"
-            className="lg:col-span-8 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-sm overflow-hidden transition-colors"
+            className="animate-24fps-deal delay-24fps-1 comic-pop-card rounded-3xl border-2 border-b-[6px] border-indigo-300 dark:border-indigo-800 border-b-indigo-600 dark:border-b-indigo-500 bg-white dark:bg-slate-900 overflow-hidden transition-colors"
           >
-            {/* Creation Mode Tabs */}
-            <div className="flex border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 p-2 gap-1.5 overflow-x-auto scrollbar-none items-center">
-              {[
-                { id: 'text', label: 'Topic or Notes', icon: FileText },
-                { id: 'file', label: 'Upload File', icon: Upload },
-                { id: 'audio', label: 'Record Voice', icon: Mic },
-                { id: 'url', label: 'Web Link', icon: Link2 },
-                { id: 'presets', label: 'Starter Topics', icon: Lightbulb },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
+            {/* Tactile Source Mode Switcher Bar with Diagonal Comic Speed Stripes */}
+            <div className="pattern-speed-stripes flex flex-wrap items-center justify-between border-b-2 border-slate-200/90 dark:border-slate-800 px-4 py-3 gap-2 bg-indigo-50/50 dark:bg-slate-950/80">
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                {[
+                  { id: 'text', emoji: '✨', label: 'Any Topic' },
+                  { id: 'exam', emoji: '🎓', label: 'Exam Mode' },
+                  { id: 'notes_generator', emoji: '📝', label: 'Notes Generator' },
+                  { id: 'presets', emoji: '🎯', label: 'Starter Decks' },
+                  { id: 'file', emoji: '📄', label: 'Upload PDF / Doc' },
+                  { id: 'audio', emoji: '🎙️', label: 'Voice Prompt' },
+                  { id: 'url', emoji: '🎬', label: 'YouTube / Web' },
+                ].map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      id={`tab-select-${tab.id}`}
+                      onClick={() => {
+                        soundFx.playClick();
+                        setActiveTab(tab.id as 'presets' | 'text' | 'file' | 'audio' | 'url' | 'exam' | 'notes_generator');
+                        if (tab.id === 'exam' && onUpdateAssessmentConfig) {
+                          onUpdateAssessmentConfig({
+                            mode: 'exam',
+                            examFormat: selectedExamFormat,
+                          });
+                        }
+                      }}
+                      className={`arcade-btn px-3.5 py-2 rounded-2xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                        isActive
+                          ? tab.id === 'exam'
+                            ? 'bg-gradient-to-r from-amber-500 to-rose-600 text-white shadow-sm border-b-2 border-rose-950'
+                            : tab.id === 'notes_generator'
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm border-b-2 border-emerald-950'
+                            : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm border-b-2 border-indigo-950'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>{tab.emoji}</span>
+                      <span>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-1.5 ml-auto">
+                { ALL_AGES_EXPERIENCE_MODES.slice(0, 3).map((m) => {
+                  const isPicked = targetAudience === m.audience && difficulty === m.diff;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playSelect();
+                        setTargetAudience(m.audience);
+                        setDifficulty(m.diff);
+                        setActiveTab('text');
+                        if (!inputText.trim()) setInputText(m.prompt);
+                      }}
+                      className={`hidden md:inline-flex arcade-btn px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap border ${
+                        isPicked
+                          ? 'bg-indigo-600 border-indigo-700 text-white shadow-2xs'
+                          : 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-indigo-300'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  );
+                })}
+                {onOpenUploadQuiz && (
                   <button
-                    key={tab.id}
                     type="button"
-                    id={`tab-select-${tab.id}`}
                     onClick={() => {
                       soundFx.playClick();
-                      setActiveTab(tab.id as 'presets' | 'text' | 'file' | 'audio' | 'url');
+                      onOpenUploadQuiz();
                     }}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                      isActive
-                        ? `${currentAccentConfig.activeBtn} text-white shadow-xs`
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
-                    }`}
+                    className="arcade-btn px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-violet-400 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                    title="Import a saved Quiz JSON or text file"
                   >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{tab.label}</span>
-                    {tab.id === 'audio' && (
-                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                    )}
+                    📂 Import
                   </button>
-                );
-              })}
-
-              {onOpenUploadQuiz && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playClick();
-                    onOpenUploadQuiz();
-                  }}
-                  className="ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-xs font-black border border-indigo-200/80 dark:border-indigo-800/80 transition-all cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
-                  title="Upload your own created quiz (JSON or text)"
-                >
-                  <Upload className="w-3.5 h-3.5 text-indigo-500" />
-                  <span className="hidden sm:inline">Upload Quiz</span>
-                </button>
-              )}
+                )}
+              </div>
             </div>
 
-            {/* Tab Body Contents */}
-            <div className="p-4 sm:p-5">
-              {/* All-Ages & Purposes Experience Mode Picker + Surprise Me Button */}
-              <div className="mb-3.5 pb-3 border-b border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">
-                    For Any Age & Goal:
-                  </span>
-                  {ALL_AGES_EXPERIENCE_MODES.map((m) => {
-                    const isPicked = targetAudience === m.audience && difficulty === m.diff;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          soundFx.playSelect();
-                          setTargetAudience(m.audience);
-                          setDifficulty(m.diff);
-                          setActiveTab('text');
-                          if (!inputText.trim()) {
-                            setInputText(m.prompt);
-                          }
-                        }}
-                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 border ${
-                          isPicked
-                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-black'
-                            : 'border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:border-indigo-300'
-                        }`}
-                      >
-                        <span>{m.emoji}</span>
-                        <span>{m.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSurpriseMe}
-                  className="px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-black shadow-2xs transition-all cursor-pointer flex items-center gap-1"
-                  title="Pick a fun random topic for all ages!"
-                >
-                  <span>🎲</span>
-                  <span>Surprise Me!</span>
-                </button>
-              </div>
-              {/* Tab 1: Popular Starter Topics (Compact 4-Card Featured View inside Builder) */}
+            {/* Spotlight Body */}
+            <div className="p-5 sm:p-6">
+              {/* Tab 1: Saved & Community Quizzes */}
               {activeTab === 'presets' && (
                 <div className="space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <h3 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <span>Popular Starter Quizzes</span>
+                        <span>Saved &amp; Community Quizzes</span>
                         <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold border border-indigo-200 dark:border-indigo-800">
-                          {selectedPreset.title}
+                          {customQuizzes.length} Available
                         </span>
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Pick any topic below to start right away.
+                        Pick any saved quiz deck below to start right away.
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        soundFx.playClick();
-                        setShowAllPresetsInBuilder((prev) => !prev);
-                      }}
-                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer shrink-0 self-start sm:self-center"
-                    >
-                      {showAllPresetsInBuilder ? 'Show Featured (4)' : `Show All (${PRESET_TOPICS.length}) →`}
-                    </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {displayedPresets.map((preset) => {
-                      const isSelected = selectedPresetId === preset.id;
-                      return (
+                  {customQuizzes.length === 0 ? (
+                    <div className="p-8 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 text-center space-y-2.5">
+                      <div className="text-sm font-black text-slate-900 dark:text-white">
+                        No quizzes available
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                        No saved quizzes are currently in the database. Switch to "Any Topic" to generate an AI quiz in seconds!
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          setActiveTab('text');
+                        }}
+                        className="arcade-btn px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black cursor-pointer"
+                      >
+                        ✨ Generate a Quiz Now
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {customQuizzes.slice(0, 8).map((q) => (
                         <div
-                          key={preset.id}
+                          key={q.id}
                           onClick={() => {
                             soundFx.playClick();
-                            setSelectedPresetId(preset.id);
-                            setInputText(preset.inputText);
-                            setSelectedQuestionTypes(preset.suggestedTypes);
-                            setValidationWarning(null);
-                            setErrorMessage(null);
+                            onStartQuiz({
+                              app_name: 'Quiz Me!',
+                              persona: q.persona || persona,
+                              quiz_title: q.quiz_title,
+                              summary: q.summary,
+                              difficulty: q.difficulty,
+                              questions: q.questions,
+                              study_guide: q.study_guide,
+                              tags: q.tags,
+                            });
                           }}
-                          className={`p-4 rounded-2xl border transition-all text-left cursor-pointer relative flex flex-col justify-between ${
-                            isSelected
-                              ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/40 shadow-sm ring-2 ring-indigo-500/20'
-                              : 'border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 hover:border-indigo-300 dark:hover:border-indigo-700'
+                          className="p-4 rounded-2xl border-2 border-b-4 border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/50 hover:border-indigo-400 transition-all text-left cursor-pointer relative flex flex-col justify-between overflow-hidden"
+                        >
+                          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400" />
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-1.5 pt-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                              <span>{q.difficulty}</span>
+                              <span>⚡ {q.questions.length} Qs</span>
+                            </div>
+                            <div className="font-extrabold text-sm text-slate-900 dark:text-white line-clamp-1">
+                              {q.quiz_title}
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                              {q.summary}
+                            </p>
+                          </div>
+                          <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60">
+                            <span className="w-full py-1.5 px-2 rounded-xl bg-indigo-600 text-white text-[11px] font-black flex items-center justify-center gap-1">
+                              <Zap className="w-3 h-3 text-amber-300" />
+                              <span>Play Now</span>
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab: Official Exam Mode (Checkpoint, WAEC, JAMB, NECO, IGCSE, SAT, AP/IB) */}
+              {activeTab === 'exam' && (
+                <div className="space-y-4">
+                  {/* Exam Mode Header & Strict vs Guided Toggle */}
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border-2 border-slate-950">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-md bg-amber-300 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                          🎓 OFFICIAL EXAM MODE &amp; CBT SIMULATOR
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-md bg-white/10 text-emerald-300 text-[11px] font-bold">
+                          {activeExamSpec.badgeEmoji} {activeExamSpec.shortName} • {activeExamSpec.gradingScaleLabel}
+                        </span>
+                      </div>
+                      <h3 className="text-base sm:text-lg font-black tracking-tight">
+                        Choose Your Examination Board Format (Checkpoint, WAEC, JAMB, NECO, IGCSE, SAT, AP/IB)
+                      </h3>
+                      <p className="text-xs text-indigo-200">
+                        Automatically configures authentic question styles, command words, paper structure, timers, and official board grading scales.
+                      </p>
+                    </div>
+
+                    {/* Feedback Timing Switcher & Past Papers Hub Link for Exam Mode */}
+                    <div className="flex flex-wrap items-center gap-2 shrink-0 self-start lg:self-center">
+                      {onNavigateTab && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFx.playClick();
+                            onNavigateTab('past_papers');
+                          }}
+                          className="arcade-btn px-3.5 py-2 rounded-xl bg-amber-300 hover:bg-amber-200 text-slate-950 border-2 border-slate-950 text-xs font-black cursor-pointer flex items-center gap-1.5 shadow-xs"
+                        >
+                          <span>📚</span>
+                          <span>Download Past Papers &amp; Textbooks</span>
+                        </button>
+                      )}
+                      <div className="flex items-center gap-1.5 bg-slate-950/70 p-1.5 rounded-xl border border-white/15">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFx.playSelect();
+                            onUpdateAssessmentConfig?.({
+                              mode: 'exam',
+                              feedbackTiming: 'deferred',
+                            });
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                            assessmentConfig.feedbackTiming === 'deferred'
+                              ? 'bg-rose-600 text-white shadow-2xs'
+                              : 'text-slate-300 hover:text-white'
+                          }`}
+                          title="Withholds answers and mark scheme until you submit the entire exam paper"
+                        >
+                          📋 Strict Proctored Exam
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFx.playSelect();
+                            onUpdateAssessmentConfig?.({
+                              mode: 'exam',
+                              feedbackTiming: 'instant',
+                            });
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                            assessmentConfig.feedbackTiming === 'instant'
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'text-slate-300 hover:text-white'
+                          }`}
+                          title="Shows official mark scheme explanation after each question"
+                        >
+                          💡 Guided Past-Paper Drill
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Standardized Exam Format Cards Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {EXAM_FORMAT_CATALOG.map((fmt) => {
+                      const isPicked = selectedExamFormat === fmt.id;
+                      return (
+                        <button
+                          key={fmt.id}
+                          type="button"
+                          onClick={() => handleSelectExamFormat(fmt.id)}
+                          className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-2 relative overflow-hidden ${
+                            isPicked
+                              ? 'border-indigo-600 dark:border-amber-400 bg-indigo-50/90 dark:bg-indigo-950/70 shadow-md ring-2 ring-indigo-500/25'
+                              : 'border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 hover:border-indigo-400'
                           }`}
                         >
                           <div>
-                            <div className="flex items-center justify-between gap-2 mb-1.5">
-                              <span className="text-xl">{preset.icon}</span>
+                            <div className="flex items-center justify-between gap-1.5 mb-1">
+                              <span className="text-lg">{fmt.badgeEmoji}</span>
                               <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  isSelected
+                                className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                                  isPicked
                                     ? 'bg-indigo-600 text-white'
                                     : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                                 }`}
                               >
-                                {isSelected ? '✓ Selected' : preset.category}
+                                {fmt.regionTag}
                               </span>
                             </div>
-                            <div
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenTrackDetail(preset);
-                              }}
-                              className="cursor-pointer group/title"
-                            >
-                              <div className="font-extrabold text-sm text-slate-900 dark:text-white group-hover/title:text-indigo-600 dark:group-hover/title:text-indigo-400 transition-colors">
-                                {preset.title}
-                              </div>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                                {preset.description}
-                              </p>
+                            <div className="text-sm font-black text-slate-900 dark:text-white">
+                              {fmt.shortName}
                             </div>
+                            <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 mt-0.5 leading-snug">
+                              {fmt.description}
+                            </p>
                           </div>
-
-                          <div className="grid grid-cols-3 gap-1.5 mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenTrackDetail(preset);
-                              }}
-                              className="py-1.5 px-2 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer border border-indigo-200/80 dark:border-indigo-800/80"
-                            >
-                              <BookOpen className="w-3 h-3 text-indigo-500" />
-                              <span>Review</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                soundFx.playClick();
-                                setSelectedPresetId(preset.id);
-                                setInputText(preset.inputText);
-                                handleGenerateQuiz(preset.inputText);
-                              }}
-                              className="py-1.5 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-black flex items-center justify-center gap-1 shadow-2xs transition-all cursor-pointer"
-                            >
-                              <Sparkles className="w-3 h-3" />
-                              <span>AI Quiz</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleLoadPreset(preset);
-                              }}
-                              className="py-1.5 px-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 text-[11px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
-                            >
-                              <Zap className="w-3 h-3 text-amber-500" />
-                              <span>Play</span>
-                            </button>
+                          <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between text-[10px] font-extrabold text-indigo-700 dark:text-amber-300">
+                            <span className="truncate">{fmt.gradingScaleLabel}</span>
+                            {isPicked && <span className="shrink-0 ml-1">✓ ACTIVE</span>}
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
+                  </div>
+
+                  {/* Active Exam Format Blueprint & Instant Launch / Custom Topic Generator */}
+                  <div className="p-4 rounded-2xl border-2 border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/40 dark:bg-slate-900/90 space-y-3.5">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-base font-black text-slate-900 dark:text-white">
+                            {activeExamSpec.badgeEmoji} {activeExamSpec.fullName}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 text-[11px] font-black border border-slate-950">
+                            {activeExamSpec.paperStructure}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                          <strong>Official Grading Scale:</strong> {activeExamSpec.gradingScaleLabel} ·{' '}
+                          <strong>Default Time:</strong> {activeExamSpec.defaultTimeMinutes} mins ·{' '}
+                          <strong>Pass Mark:</strong> {activeExamSpec.defaultPassingScore}%
+                        </p>
+                      </div>
+
+                      {/* 1-Click Instant Official Mock Paper Launch */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.playComplete();
+                          onUpdateAssessmentConfig?.({
+                            mode: 'exam',
+                            examFormat: selectedExamFormat,
+                            timeLimitMinutes: activeExamSpec.defaultTimeMinutes,
+                            passingScorePercent: activeExamSpec.defaultPassingScore,
+                          });
+                          onStartQuiz(buildPrebuiltExamByFormat(selectedExamFormat, persona));
+                        }}
+                        className="arcade-btn px-4 py-2.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-slate-950 border-2 border-slate-950 font-black text-xs shadow-sm cursor-pointer flex items-center gap-2 shrink-0 self-start lg:self-center"
+                      >
+                        <span>⚡ Launch Instant {activeExamSpec.shortName} Mock Paper</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Custom Exam Subject / Syllabus Topic Input */}
+                    <div className="flex flex-col lg:flex-row gap-2.5 items-stretch">
+                      <input
+                        type="text"
+                        value={inputText}
+                        onChange={(e) => {
+                          setInputText(e.target.value);
+                          if (validationWarning) setValidationWarning(null);
+                          if (errorMessage) setErrorMessage(null);
+                        }}
+                        placeholder={`Enter any subject or syllabus topic for your ${activeExamSpec.shortName} exam (e.g., ${activeExamSpec.sampleTopics[0]})...`}
+                        className="flex-1 px-4 py-3 rounded-xl border-2 border-indigo-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                      />
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() => {
+                          onUpdateAssessmentConfig?.({
+                            mode: 'exam',
+                            examFormat: selectedExamFormat,
+                          });
+                          handleGenerateQuiz();
+                        }}
+                        className="arcade-btn px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs border-2 border-indigo-800 cursor-pointer flex items-center justify-center gap-2 shrink-0 disabled:opacity-50"
+                      >
+                        <span>
+                          {isLoading
+                            ? generationStep || `Building ${activeExamSpec.shortName} Exam...`
+                            : `✨ Generate AI ${activeExamSpec.shortName} Paper (${questionCount} Qs)`}
+                        </span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* 1-Click Syllabus Sample Topics for Selected Exam Board */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 mr-1">
+                        {activeExamSpec.shortName} Past-Paper Topics:
+                      </span>
+                      {activeExamSpec.sampleTopics.map((sample) => (
+                        <button
+                          key={sample}
+                          type="button"
+                          onClick={() => {
+                            soundFx.playSelect();
+                            setInputText(sample);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-indigo-400 text-[11px] font-bold text-slate-700 dark:text-slate-200 cursor-pointer transition-all"
+                        >
+                          {activeExamSpec.badgeEmoji} {sample}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
 
-          {/* Tab 2: Paste Notes / Text */}
-          {activeTab === 'text' && (
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label htmlFor="notes-input" className="block text-sm font-extrabold text-slate-900 dark:text-white">
-                  What would you like to be quizzed on?
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playClick();
-                    setActiveTab('audio');
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/40 cursor-pointer transition-all"
-                >
-                  <Mic className="w-3.5 h-3.5 text-rose-500" />
-                  <span>Or Speak Your Topic</span>
-                </button>
-              </div>
-              <textarea
-                id="notes-input"
-                rows={4}
-                maxLength={5000}
-                value={inputText}
-                onChange={(e) => {
-                  setInputText(e.target.value.slice(0, 5000));
-                  if (validationWarning) setValidationWarning(null);
-                  if (errorMessage) setErrorMessage(null);
-                }}
-                placeholder="Type any topic or paste your class notes here (for example: Photosynthesis, World War II, Python loops, or Basic Fractions)..."
-                className={`w-full p-3.5 rounded-2xl border text-sm transition-all focus:outline-none focus:ring-2 ${
-                  isInputShaking
-                    ? 'border-amber-500 bg-amber-50/20 dark:bg-amber-950/20 ring-2 ring-amber-500 animate-shake'
-                    : 'border-slate-200/80 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-indigo-500'
-                }`}
-              />
-              <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-                <span>{inputText.length} / 5,000 characters • Press Ctrl+Enter to build (Enter moves downwards)</span>
-                {inputText.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundFx.playClick();
-                      setInputText('');
-                    }}
-                    className="text-slate-500 hover:text-red-500 cursor-pointer"
-                  >
-                    Clear Text
-                  </button>
-                )}
-              </div>
+              {/* Tab 2: Spotlight Topic Input + Instant Launch Bar */}
+              {activeTab === 'text' && (
+                <div className="space-y-3">
+                  <div className="flex flex-col lg:flex-row gap-3 items-stretch">
+                    <div className="flex-1 relative">
+                      <textarea
+                        id="notes-input"
+                        rows={2}
+                        maxLength={5000}
+                        value={inputText}
+                        onChange={(e) => {
+                          setInputText(e.target.value.slice(0, 5000));
+                          if (validationWarning) setValidationWarning(null);
+                          if (errorMessage) setErrorMessage(null);
+                        }}
+                        placeholder="What do you want to play today? Type any topic or paste study notes (e.g., Solar System, Anime Trivia, World War II, Python Loops)..."
+                        className={`w-full h-full min-h-[76px] p-4 rounded-2xl border-2 text-sm sm:text-base font-medium transition-all focus:outline-none focus:ring-2 ${
+                          isInputShaking
+                            ? 'border-amber-500 bg-amber-50/20 dark:bg-amber-950/20 ring-2 ring-amber-500 animate-shake'
+                            : 'border-indigo-200/90 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80 text-slate-900 dark:text-white placeholder-slate-400 focus:border-indigo-500 focus:ring-indigo-500/30'
+                        }`}
+                      />
+                      {inputText.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFx.playClick();
+                            setInputText('');
+                          }}
+                          className="absolute right-3 bottom-2.5 text-[11px] font-bold text-slate-400 hover:text-rose-500 cursor-pointer bg-white/90 dark:bg-slate-900/90 px-2 py-0.5 rounded-md"
+                        >
+                          Clear ({inputText.length}/5,000)
+                        </button>
+                      )}
+                    </div>
 
-              {/* Quick Topic Starter Chips */}
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
-                <div className="text-[11px] font-bold text-slate-400 mb-1.5 flex items-center gap-1">
-                  <Lightbulb className="w-3 h-3 text-amber-500" />
-                  <span>Quick Starter Ideas (Click to populate):</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {QUICK_STARTER_TOPICS.map((topic) => (
+                    {/* Integrated Primary Launch Button right next to Spotlight Input */}
                     <button
-                      key={topic.label}
                       type="button"
-                      onClick={() => {
-                        soundFx.playClick();
-                        setInputText(topic.prompt);
-                        setValidationWarning(null);
-                        setErrorMessage(null);
-                      }}
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 transition-all cursor-pointer"
+                      id="generate-quiz-btn"
+                      disabled={isLoading}
+                      onClick={() => handleGenerateQuiz()}
+                      className="arcade-btn lg:w-64 py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 border-2 border-emerald-700 border-b-[5px] border-b-emerald-900 text-white font-black text-base shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2.5 cursor-pointer group disabled:opacity-50 shrink-0"
                     >
-                      {topic.icon} {topic.label}
+                      {isLoading ? (
+                        <div className="flex items-center gap-2.5 text-white">
+                          <div className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                          <span className="font-black text-xs sm:text-sm truncate">
+                            {generationStep || 'Building Quiz...'}
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="w-9 h-9 rounded-xl bg-amber-300 text-slate-950 flex items-center justify-center text-lg shadow-xs shrink-0">
+                            🚀
+                          </span>
+                          <div className="text-left">
+                            <span className="block tracking-tight font-black leading-none text-white">
+                              PLAY QUIZ NOW
+                            </span>
+                            <span className="block text-[11px] font-bold text-emerald-100 mt-1">
+                              Ctrl + Enter · {questionCount} Qs
+                            </span>
+                          </div>
+                          <ArrowRight className="w-5 h-5 text-white group-hover:translate-x-1 transition-transform ml-auto" />
+                        </>
+                      )}
                     </button>
-                  ))}
+                  </div>
+
+                  {/* Quick Starter Topic Chips */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[11px] font-bold text-slate-400 mr-1 flex items-center gap-1">
+                      <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Popular ideas:</span>
+                    </span>
+                    {QUICK_STARTER_TOPICS.map((topic) => (
+                      <button
+                        key={topic.label}
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          setInputText(topic.prompt);
+                          setValidationWarning(null);
+                          setErrorMessage(null);
+                        }}
+                        className="px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:border-indigo-300 transition-all cursor-pointer"
+                      >
+                        {topic.icon} {topic.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
+              )}
 
           {/* Tab 3: Upload Files */}
           {activeTab === 'file' && (
@@ -1168,368 +1592,465 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
               </p>
             </div>
           )}
-        </div>
 
-        {/* Assessment Matrix Configuration & Generate Footer */}
-        <div className="p-4 sm:p-5 border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            {/* 1. Number of Questions (Limit Increased to 100) */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Questions
-                </label>
-                <span className="text-[11px] font-black px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  {questionCount} Qs {questionCount >= 50 ? '• Big Test' : questionCount >= 25 ? '• Full Quiz' : questionCount >= 10 ? '• Standard' : '• Quick'}
-                </span>
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {[5, 10, 15, 25, 50, 75, 100].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => {
-                      soundFx.playSelect();
-                      setQuestionCount(num);
-                    }}
-                    className={`py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                      questionCount === num
-                        ? `${currentAccentConfig.activeBtn} text-white shadow-2xs`
-                        : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {num}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playSelect();
-                    setQuestionCount((prev) => Math.max(1, prev - 1));
-                  }}
-                  disabled={questionCount <= 1}
-                  className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 cursor-pointer"
-                  title="Decrease question count"
-                >
-                  <Minus className="w-3 h-3" />
-                </button>
-                <input
-                  type="range"
-                  min={1}
-                  max={100}
-                  value={questionCount}
-                  onChange={(e) => setQuestionCount(Number(e.target.value))}
-                  className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playSelect();
-                    setQuestionCount((prev) => Math.min(100, prev + 1));
-                  }}
-                  disabled={questionCount >= 100}
-                  className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 cursor-pointer"
-                  title="Increase question count"
-                >
-                  <Plus className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Difficulty */}
-            <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                Difficulty
-              </label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(['Beginner', 'Intermediate', 'Advanced'] as DifficultyType[]).map((lvl) => (
-                  <button
-                    key={lvl}
-                    type="button"
-                    onClick={() => {
-                      soundFx.playSelect();
-                      setDifficulty(lvl);
-                    }}
-                    className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                      difficulty === lvl
-                        ? `${currentAccentConfig.activeBtn} text-white shadow-2xs`
-                        : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {lvl === 'Beginner' ? 'Easy' : lvl === 'Intermediate' ? 'Medium' : 'Hard'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 3. Persona Target */}
-            <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                Mode
-              </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playSelect();
-                    onPersonaChange('Student');
-                  }}
-                  className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    persona === 'Student'
-                      ? `${currentAccentConfig.activeBtn} text-white shadow-2xs`
-                      : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  Student
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playSelect();
-                    onPersonaChange('Teacher');
-                  }}
-                  className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    persona === 'Teacher'
-                      ? `${currentAccentConfig.activeBtn} text-white shadow-2xs`
-                      : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  Teacher
-                </button>
-              </div>
-            </div>
-
-            {/* 4. Multilingual Target (50+ Languages) */}
-            <div className="relative">
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Quiz Language
-                </label>
-                <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
-                  50+ Languages
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  soundFx.playClick();
-                  setIsLangPickerOpen(!isLangPickerOpen);
-                }}
-                className="w-full py-2 px-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800 text-slate-900 dark:text-white flex items-center justify-between hover:border-indigo-400 transition-colors cursor-pointer text-xs"
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <span className="text-base">{selectedLanguage.flag}</span>
-                  <span className="font-bold truncate">{selectedLanguage.name}</span>
-                </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isLangPickerOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Language Picker Dropdown */}
-              {isLangPickerOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 p-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl z-50 max-h-60 flex flex-col animate-in fade-in zoom-in-95">
-                  <div className="relative mb-1.5">
-                    <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Search language..."
-                      value={langSearch}
-                      onChange={(e) => setLangSearch(e.target.value)}
-                      className="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-0 focus:ring-1 focus:ring-indigo-500 outline-none"
-                      autoFocus
-                    />
+          {/* Tab 6: AI Study Notes Generator */}
+          {activeTab === 'notes_generator' && (
+            <div className="space-y-4">
+              {inlineGeneratedNote ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                      ✨ Generated Interactive Study Guide
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setInlineGeneratedNote(null)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 cursor-pointer"
+                    >
+                      ← Generate Another Note
+                    </button>
                   </div>
-                  <div className="overflow-y-auto space-y-0.5 pr-0.5">
-                    {SUPPORTED_LANGUAGES.filter((l) => {
-                      const q = langSearch.toLowerCase().trim();
-                      if (!q) return true;
-                      return (
-                        l.name.toLowerCase().includes(q) ||
-                        l.nativeName.toLowerCase().includes(q) ||
-                        l.code.toLowerCase().includes(q)
-                      );
-                    }).map((lang) => {
-                      const isSelected = lang.code === selectedLanguage.code;
-                      return (
-                        <button
-                          key={lang.code}
-                          type="button"
-                          onClick={() => {
-                            soundFx.playSelect();
-                            setSelectedLanguage(lang);
-                            setIsLangPickerOpen(false);
-                            setLangSearch('');
-                          }}
-                          className={`w-full p-2 rounded-lg flex items-center justify-between text-left text-xs transition-colors cursor-pointer ${
-                            isSelected
-                              ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold'
-                              : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 truncate">
-                            <span>{lang.flag}</span>
-                            <span className="truncate">{lang.name}</span>
-                            <span className="text-[10px] text-slate-400 truncate">({lang.nativeName})</span>
-                          </div>
-                          {isSelected && <Check className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />}
-                        </button>
-                      );
-                    })}
+                  <IntelligentNotesViewer
+                    note={inlineGeneratedNote}
+                    onClose={() => setInlineGeneratedNote(null)}
+                    onLaunchPracticeQuiz={(topic) => {
+                      setInlineGeneratedNote(null);
+                      setActiveTab('text');
+                      setInputText(topic);
+                      handleGenerateQuiz(topic);
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="p-5 rounded-3xl border-2 border-emerald-300 dark:border-emerald-800/80 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/20 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider mb-1">
+                        <FileText className="w-3 h-3" />
+                        <span>AI Study Notes &amp; Exam Cram Sheet Generator</span>
+                      </div>
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                        Turn any topic or syllabus into structured revision notes
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        Generates key concepts, step-by-step explanations, worked examples, flashcards &amp; embedded mini-quizzes tailored to Checkpoint, WAEC, JAMB, IGCSE, or general study.
+                      </p>
+                    </div>
+                    {onNavigateTab && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          onNavigateTab('notes');
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border-2 border-emerald-300 dark:border-emerald-700 text-xs font-black text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 transition-all cursor-pointer shrink-0 flex items-center gap-1.5 self-start"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Open Full Notes Library →</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Exam Format Lens Selector for Notes */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Curriculum / Exam Board Lens:
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {EXAM_FORMAT_CATALOG.map((spec) => {
+                        const isPicked = selectedExamFormat === spec.id;
+                        return (
+                          <button
+                            key={spec.id}
+                            type="button"
+                            onClick={() => handleSelectExamFormat(spec.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isPicked
+                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-emerald-400'
+                            }`}
+                          >
+                            <span>{spec.badgeEmoji}</span>
+                            <span>{spec.shortName}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Topic Input for Notes Generator */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-extrabold text-slate-700 dark:text-slate-300">
+                      Enter Topic, Syllabus Unit, or Paste Lecture Text:
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <input
+                        type="text"
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        placeholder={`e.g., Electrolysis & Faraday's Laws, Quadratic Equations, Photosynthesis, Organic Chemistry...`}
+                        className="flex-1 px-4 py-3 rounded-2xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-sm font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        disabled={isGeneratingNoteInline}
+                        onClick={() => handleGenerateInlineStudyNote()}
+                        className="arcade-btn px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white text-xs sm:text-sm font-black border-2 border-slate-950 shadow-sm cursor-pointer flex items-center justify-center gap-2 shrink-0"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>
+                          {isGeneratingNoteInline ? 'Synthesizing Study Notes...' : 'Generate AI Study Notes'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 1-Click Quick Study Note Topics */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 mr-1">
+                      Instant Notes:
+                    </span>
+                    {activeExamSpec.sampleSubjects.map((subj) => (
+                      <button
+                        key={subj}
+                        type="button"
+                        disabled={isGeneratingNoteInline}
+                        onClick={() => {
+                          setInputText(subj);
+                          handleGenerateInlineStudyNote(subj);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-400 text-[11px] font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                      >
+                        📝 {subj}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Quiz Timer Range System Bar (Puts a Min–Max Time Range on the Quiz) */}
-          <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-900/60 bg-gradient-to-r from-emerald-50/50 via-white to-teal-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-emerald-950/20 p-3 space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider">
-                  ⏱️ Time Range
-                </span>
-                <span className="text-xs font-black text-slate-900 dark:text-white">
-                  Quiz Time Range Window
-                </span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:inline">
-                  {assessmentConfig.timerRangeEnabled
-                    ? `Target: ${assessmentConfig.minTimeMinutes ?? 2}m – ${assessmentConfig.maxTimeMinutes ?? 10}m (+35% Target Range XP)`
-                    : assessmentConfig.timeLimitMinutes > 0
-                    ? `${assessmentConfig.timeLimitMinutes}m Cutoff`
-                    : 'No time limit (Relaxed)'}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[
-                  { id: 'untimed', label: 'No Timer', min: 0, max: 0 },
-                  { id: 'blitz_1_3', label: '⚡ 1–3m Blitz', min: 1, max: 3 },
-                  { id: 'standard_3_10', label: '🎯 3–10m Gold Range', min: 3, max: 10 },
-                  { id: 'exam_10_25', label: '🏛️ 10–25m Exam', min: 10, max: 25 },
-                  { id: 'custom_range', label: '⚙️ Custom Range', min: assessmentConfig.minTimeMinutes || 2, max: assessmentConfig.maxTimeMinutes || 12 },
-                ].map((tr) => {
-                  const isActive =
-                    tr.id === 'untimed'
-                      ? !assessmentConfig.timerRangeEnabled && assessmentConfig.timeLimitMinutes === 0
-                      : tr.id === 'custom_range'
-                      ? assessmentConfig.timerRangeEnabled && assessmentConfig.timerRangePreset === 'custom_range'
-                      : assessmentConfig.timerRangeEnabled &&
-                        assessmentConfig.minTimeMinutes === tr.min &&
-                        assessmentConfig.maxTimeMinutes === tr.max;
-                  return (
-                    <button
-                      key={tr.id}
-                      type="button"
-                      onClick={() => {
-                        soundFx.playSelect();
-                        if (!onUpdateAssessmentConfig) return;
-                        if (tr.id === 'untimed') {
-                          onUpdateAssessmentConfig({
-                            timerRangeEnabled: false,
-                            timeLimitMinutes: 0,
-                            timerRangePreset: 'untimed',
-                          });
-                        } else {
-                          onUpdateAssessmentConfig({
-                            timerRangeEnabled: true,
-                            minTimeMinutes: tr.min,
-                            maxTimeMinutes: tr.max,
-                            timeLimitMinutes: tr.max,
-                            timerRangePreset: tr.id as any,
-                          });
-                        }
-                      }}
-                      className={`px-2.5 py-1 rounded-xl text-[11px] font-extrabold border transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                          : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
-                      }`}
-                    >
-                      {tr.label}
-                    </button>
-                  );
-                })}
-              </div>
+        {/* Compact 1-Row Interactive Game Rules Bar with Blueprint Graph Pattern */}
+        <div className="pattern-blueprint-grid px-4 sm:px-6 py-3.5 border-t-2 border-slate-200/90 dark:border-slate-800/90 bg-slate-50/90 dark:bg-slate-950/70">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            {/* Quick Question Count Pills + Custom 1-100 Input */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-0.5">
+                Questions:
+              </span>
+              {[5, 10, 15, 25, 50, 75, 100].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => {
+                    soundFx.playSelect();
+                    setQuestionCount(num);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition-all cursor-pointer tabular-nums ${
+                    questionCount === num
+                      ? 'bg-indigo-600 border-indigo-700 text-white shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-indigo-400'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={questionCount}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!Number.isNaN(val)) {
+                    setQuestionCount(Math.max(1, Math.min(100, val)));
+                  }
+                }}
+                title="Custom question count (1 to 100)"
+                aria-label="Custom question count (1 to 100)"
+                className="w-14 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-extrabold text-center text-indigo-700 dark:text-indigo-300 tabular-nums focus:outline-none focus:border-indigo-500"
+              />
             </div>
 
-            {assessmentConfig.timerRangeEnabled && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-emerald-200/50 dark:border-emerald-900/40">
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                    Min Pace: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">{assessmentConfig.minTimeMinutes ?? 2}m</strong>
-                  </span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={20}
-                    value={assessmentConfig.minTimeMinutes ?? 2}
-                    onChange={(e) => {
-                      const minVal = Number(e.target.value);
-                      const maxVal = Math.max(minVal + 1, assessmentConfig.maxTimeMinutes ?? 10);
-                      onUpdateAssessmentConfig?.({
-                        timerRangeEnabled: true,
-                        minTimeMinutes: minVal,
-                        maxTimeMinutes: maxVal,
-                        timeLimitMinutes: maxVal,
-                        timerRangePreset: 'custom_range',
-                      });
-                    }}
-                    className="w-full accent-emerald-500 cursor-pointer h-1.5"
-                  />
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                    Max Cutoff: <strong className="text-indigo-600 dark:text-indigo-400 font-mono">{assessmentConfig.maxTimeMinutes ?? 10}m</strong>
-                  </span>
-                  <input
-                    type="range"
-                    min={2}
-                    max={60}
-                    value={assessmentConfig.maxTimeMinutes ?? 10}
-                    onChange={(e) => {
-                      const maxVal = Number(e.target.value);
-                      const minVal = Math.min(maxVal - 1, assessmentConfig.minTimeMinutes ?? 2);
-                      onUpdateAssessmentConfig?.({
-                        timerRangeEnabled: true,
-                        minTimeMinutes: Math.max(1, minVal),
-                        maxTimeMinutes: maxVal,
-                        timeLimitMinutes: maxVal,
-                        timerRangePreset: 'custom_range',
-                      });
-                    }}
-                    className="w-full accent-indigo-600 cursor-pointer h-1.5"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+            {/* Quick AI Intelligence Scope Selector */}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-0.5">
+                AI Scope:
+              </span>
+              <select
+                value={intelligenceScope}
+                onChange={(e) => {
+                  soundFx.playSelect();
+                  setIntelligenceScope(e.target.value);
+                }}
+                aria-label="AI Intelligence and Curriculum Scope"
+                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-extrabold text-indigo-700 dark:text-indigo-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
+              >
+                <option value="omniscient_synthesis">🧠 Omniscient Synthesis (Full Scope)</option>
+                <option value="deep_first_principles">🔬 Deep First Principles &amp; Why/How</option>
+                <option value="exam_olympiad_rigor">🏆 Board Exam &amp; Olympiad Rigor</option>
+                <option value="source_faithful">📌 Strict Source-Locked Extraction</option>
+                <option value="cross_disciplinary">🌐 Cross-Disciplinary Systems</option>
+              </select>
+            </div>
 
-          {/* Unified Collapsible Formats & AI Prompter Directives */}
-          <div className="rounded-2xl border border-indigo-200/70 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 p-3 transition-all">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-xs shrink-0">
-                  <SlidersHorizontal className="w-3.5 h-3.5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                      Question Types & Extra Options
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                      {selectedQuestionTypes.length} {selectedQuestionTypes.length === 1 ? 'Type' : 'Types'}
-                    </span>
-                    {(customInstructions.trim() || promptStyle !== 'Standard' || focusSubtopics.trim()) && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                        Customized
-                      </span>
-                    )}
+            {/* Quick Difficulty Pills */}
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-0.5">
+                Difficulty:
+              </span>
+              {(['Beginner', 'Intermediate', 'Master'] as DifficultyType[]).map((lvl) => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => {
+                    soundFx.playSelect();
+                    setDifficulty(lvl);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition-all cursor-pointer ${
+                    difficulty === lvl
+                      ? 'bg-violet-600 border-violet-700 text-white shadow-2xs'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:border-violet-400'
+                  }`}
+                >
+                  {lvl === 'Beginner' ? 'Easy' : lvl === 'Intermediate' ? 'Medium' : 'Master'}
+                </button>
+              ))}
+            </div>
+
+            {/* Quick Timer Toggle Pills */}
+            <div className="hidden xl:flex items-center gap-1">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-0.5">
+                Pace:
+              </span>
+              {[
+                { id: 'untimed', label: '∞ Relaxed', min: 0, max: 0 },
+                { id: 'blitz_1_3', label: '⚡ 1–3m', min: 1, max: 3 },
+                { id: 'standard_3_10', label: '🎯 3–10m', min: 3, max: 10 },
+              ].map((tr) => {
+                const isActive =
+                  tr.id === 'untimed'
+                    ? !assessmentConfig.timerRangeEnabled && assessmentConfig.timeLimitMinutes === 0
+                    : assessmentConfig.timerRangeEnabled &&
+                      assessmentConfig.minTimeMinutes === tr.min &&
+                      assessmentConfig.maxTimeMinutes === tr.max;
+                return (
+                  <button
+                    key={tr.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playSelect();
+                      if (!onUpdateAssessmentConfig) return;
+                      if (tr.id === 'untimed') {
+                        onUpdateAssessmentConfig({
+                          timerRangeEnabled: false,
+                          timeLimitMinutes: 0,
+                          timerRangePreset: 'untimed',
+                        });
+                      } else {
+                        onUpdateAssessmentConfig({
+                          timerRangeEnabled: true,
+                          minTimeMinutes: tr.min,
+                          maxTimeMinutes: tr.max,
+                          timeLimitMinutes: tr.max,
+                          timerRangePreset: tr.id as any,
+                        });
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
+                    }`}
+                  >
+                    {tr.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick Exam Mode & Format Selector Pills in Rules Bar */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playSelect();
+                  const nextIsExam = assessmentConfig.mode !== 'exam';
+                  onUpdateAssessmentConfig?.({
+                    mode: nextIsExam ? 'exam' : 'practice',
+                    examFormat: selectedExamFormat,
+                  });
+                  if (nextIsExam) {
+                    setActiveTab('exam');
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition-all cursor-pointer ${
+                  assessmentConfig.mode === 'exam'
+                    ? 'bg-rose-600 text-white border-rose-700 shadow-2xs'
+                    : 'bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:border-rose-400'
+                }`}
+                title="Switch between Practice Mode and Standardized Exam Mode (Checkpoint, WAEC, JAMB, IGCSE, SAT)"
+              >
+                🎓 {assessmentConfig.mode === 'exam' ? `Exam: ${activeExamSpec.shortName}` : 'Exam Mode'}
+              </button>
+
+              {(['checkpoint', 'waec', 'jamb', 'igcse'] as ExamFormatId[]).map((fmtId) => {
+                const spec = getExamFormatSpec(fmtId);
+                const isSelectedFmt =
+                  assessmentConfig.mode === 'exam' && selectedExamFormat === fmtId;
+                return (
+                  <button
+                    key={fmtId}
+                    type="button"
+                    onClick={() => {
+                      handleSelectExamFormat(fmtId);
+                      setActiveTab('exam');
+                    }}
+                    className={`px-2 py-1 rounded-lg text-[11px] font-extrabold border transition-all cursor-pointer ${
+                      isSelectedFmt
+                        ? 'bg-amber-300 text-slate-950 border-slate-950 shadow-2xs font-black'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                    }`}
+                    title={`Launch or configure ${spec.fullName}`}
+                  >
+                    {spec.badgeEmoji} {spec.shortName.split(' ')[0]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Interleaved Mix & Optional Speed Round Toggles */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playSelect();
+                  if (onUpdateAssessmentConfig) {
+                    onUpdateAssessmentConfig({
+                      interleavedMode: !assessmentConfig.interleavedMode,
+                      adaptiveDifficulty: true,
+                    });
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition-all cursor-pointer ${
+                  assessmentConfig.interleavedMode
+                    ? 'bg-teal-600 text-white border-teal-700 shadow-2xs'
+                    : 'bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:border-teal-400'
+                }`}
+                title="Mixes questions from different topics and adapts difficulty to keep accuracy around 70-80%"
+              >
+                🧬 {assessmentConfig.interleavedMode ? 'Interleaved Mix: ON' : 'Interleave Topics'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playSelect();
+                  if (onUpdateAssessmentConfig) {
+                    onUpdateAssessmentConfig({
+                      interleavedMode: true,
+                      adaptiveDifficulty: true,
+                    });
+                  }
+                  onStartQuiz(buildInterleavedMixQuiz(persona));
+                }}
+                className="px-2.5 py-1 rounded-lg text-xs font-black border-2 border-slate-950 bg-amber-300 hover:bg-amber-200 text-slate-950 transition-all cursor-pointer shadow-2xs"
+                title="Launch an instant Interleaved Multi-Topic Mix session with 70-80% Adaptive Difficulty"
+              >
+                🚀 Play Multi-Topic Mix
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  if (onUpdateAssessmentConfig) {
+                    const nextSpeed = !assessmentConfig.speedRoundMode;
+                    onUpdateAssessmentConfig({
+                      speedRoundMode: nextSpeed,
+                      challengeMode: nextSpeed,
+                    });
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition-all cursor-pointer ${
+                  assessmentConfig.speedRoundMode || assessmentConfig.challengeMode
+                    ? 'bg-orange-500 text-white border-orange-600 shadow-2xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-orange-400'
+                }`}
+                title="Optional Speed Round timer — kept separate so it never affects your mastery levels"
+              >
+                ⚡ {assessmentConfig.speedRoundMode || assessmentConfig.challengeMode ? 'Speed Round: ON' : 'Optional Speed Round'}
+              </button>
+            </div>
+
+            {/* Language Picker + Customize Drawer Button */}
+            <div className="flex items-center gap-2 ml-auto">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setIsLangPickerOpen(!isLangPickerOpen);
+                  }}
+                  className="py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 flex items-center gap-1.5 hover:border-indigo-400 transition-colors cursor-pointer text-xs font-bold"
+                >
+                  <span>{selectedLanguage.flag}</span>
+                  <span className="max-w-[85px] truncate">{selectedLanguage.name}</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
+
+                {isLangPickerOpen && (
+                  <div className="absolute bottom-full right-0 mb-1 w-56 p-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl z-50 max-h-60 flex flex-col">
+                    <div className="relative mb-1.5">
+                      <Search className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search language..."
+                        value={langSearch}
+                        onChange={(e) => setLangSearch(e.target.value)}
+                        className="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-0 focus:ring-1 focus:ring-indigo-500 outline-none"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="overflow-y-auto space-y-0.5 pr-0.5">
+                      {SUPPORTED_LANGUAGES.filter((l) => {
+                        const q = langSearch.toLowerCase().trim();
+                        if (!q) return true;
+                        return (
+                          l.name.toLowerCase().includes(q) ||
+                          l.nativeName.toLowerCase().includes(q) ||
+                          l.code.toLowerCase().includes(q)
+                        );
+                      }).map((lang) => {
+                        const isSelected = lang.code === selectedLanguage.code;
+                        return (
+                          <button
+                            key={lang.code}
+                            type="button"
+                            onClick={() => {
+                              soundFx.playSelect();
+                              setSelectedLanguage(lang);
+                              setIsLangPickerOpen(false);
+                              setLangSearch('');
+                            }}
+                            className={`w-full p-2 rounded-lg flex items-center justify-between text-left text-xs transition-colors cursor-pointer ${
+                              isSelected
+                                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold'
+                                : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <span>{lang.flag}</span>
+                              <span className="truncate">{lang.name}</span>
+                            </div>
+                            {isSelected && <Check className="w-3 h-3 text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                    Choose question styles, age group, or special instructions.
-                  </p>
-                </div>
+                )}
               </div>
 
               <button
@@ -1538,16 +2059,16 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                   soundFx.playClick();
                   setShowAdvancedPrompter(!showAdvancedPrompter);
                 }}
-                className="px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs shrink-0"
+                className="px-3 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer"
               >
-                <span>{showAdvancedPrompter ? 'Hide Options' : 'Customize'}</span>
-                {showAdvancedPrompter ? (
-                  <ChevronUp className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                )}
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>{showAdvancedPrompter ? 'Hide Rules' : 'More Rules'}</span>
+                {showAdvancedPrompter ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
             </div>
+          </div>
+
+          <div>
 
             {/* Expanded Prompter & Formats Drawer */}
             {showAdvancedPrompter && (
@@ -1801,229 +2322,283 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
             </div>
           )}
 
-          {/* Primary Action Button */}
-          <div className="pt-1">
-            <button
-              type="button"
-              id="generate-quiz-btn"
-              disabled={isLoading}
-              onClick={() => handleGenerateQuiz()}
-              className={`w-full py-4 px-6 rounded-2xl text-white font-black text-base shadow-lg transition-all flex items-center justify-center gap-3 cursor-pointer group disabled:opacity-50 ${currentAccentConfig.activeBtn}`}
-            >
-              {isLoading ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
-                  <div className="text-left">
-                    <span className="block font-black text-sm">{generationStep || 'Building Your Quiz...'}</span>
-                    <span className="block text-[11px] font-normal text-white/80">Ready in just a few seconds</span>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <Sparkles className="w-5 h-5 group-hover:rotate-12 transition-transform shrink-0" />
-                  <span>Start My Quiz</span>
-                  <kbd className="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 rounded bg-white/20 text-white ml-2">
-                    ⌘ + ↵
-                  </kbd>
-                </>
-              )}
-            </button>
-          </div>
+          {/* Primary Action Button when non-text tab is active */}
+          {activeTab !== 'text' && (
+            <div className="pt-1">
+              <button
+                type="button"
+                id="generate-quiz-btn"
+                disabled={isLoading}
+                onClick={() => handleGenerateQuiz()}
+                className="arcade-btn w-full py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-500 border-2 border-emerald-700 border-b-[5px] border-b-emerald-900 text-white font-black text-base shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-between cursor-pointer group disabled:opacity-50"
+              >
+                <span>{isLoading ? generationStep || 'Building Your Quiz Game...' : '🚀 LAUNCH QUIZ GAME!'}</span>
+                <ArrowRight className="w-5 h-5 text-white group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-          {/* Right Bento Widget Column (4 Cols — Matches Gauge & Modular Cards in Reference Images) */}
-          <div className="lg:col-span-4 space-y-4">
-            {/* Bento Card 1: Revamped Challenging Level & Retention Card */}
-            <div className="rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  {lvlInfo.rank.badgeEmoji} {lvlInfo.rank.title}
-                </span>
-                <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
-                  {stats.xp.toLocaleString()} XP · {lvlInfo.rank.tierName}
-                </span>
+          {/* ZONE B: EXPLORE QUIZ WORLDS — 6 ILLUSTRATED BENTO CATEGORY PORTALS */}
+          <div className="space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+              <div>
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                  <span>🌍 Explore Interactive Quiz Worlds</span>
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Pick any themed world below to jump straight into a 24fps interactive quiz run
+                </p>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playClick();
+                  setStudioSection('tracks');
+                }}
+                className="arcade-btn px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400 text-xs font-extrabold hover:border-indigo-400 cursor-pointer self-start sm:self-center shadow-2xs"
+              >
+                Browse Saved Decks ({customQuizzes.length}) →
+              </button>
+            </div>
 
-              <div className="flex items-center gap-4">
-                <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
-                  <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r={ringRadius}
-                      className="text-slate-100 dark:text-slate-800"
-                      strokeWidth="5"
-                      stroke="currentColor"
-                      fill="transparent"
-                    />
-                    <circle
-                      cx="32"
-                      cy="32"
-                      r={ringRadius}
-                      stroke="url(#studioBentoGauge)"
-                      strokeWidth="5"
-                      strokeDasharray={ringCircumference}
-                      strokeDashoffset={ringDashoffset}
-                      strokeLinecap="round"
-                      fill="transparent"
-                    />
-                    <defs>
-                      <linearGradient id="studioBentoGauge" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#6366f1" />
-                        <stop offset="100%" stopColor="#a855f7" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xs font-black text-slate-900 dark:text-white leading-none">
-                      L{currentLevel}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                {
+                  id: 'world-space',
+                  issue: 'WORLD #01',
+                  title: 'Cosmic & Space Odyssey',
+                  subtitle: 'Black holes, exoplanets, orbital physics & NASA missions',
+                  category: 'Science & Space',
+                  xp: '+120 XP',
+                  patternClass: 'pattern-halftone',
+                  topBar: 'bg-indigo-600',
+                  borderClass: 'border-indigo-300 dark:border-indigo-800 border-b-indigo-600 dark:border-b-indigo-500',
+                  iconBg: 'bg-indigo-600 text-white border-b-3 border-indigo-900',
+                  pillClass: 'bg-indigo-100 dark:bg-indigo-950/90 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700',
+                  btnClass: 'bg-indigo-600 hover:bg-indigo-500 text-white border-b-3 border-indigo-900',
+                  prompt: 'Solar System, Black Holes, Exoplanets, and Space Exploration Trivia',
+                  emoji: '🌌',
+                },
+                {
+                  id: 'world-bio',
+                  issue: 'WORLD #02',
+                  title: 'Life Lab & Human Body',
+                  subtitle: 'DNA genetics, cellular powerhouses, brain & ecosystems',
+                  category: 'Biology & Med',
+                  xp: '+110 XP',
+                  patternClass: 'pattern-blueprint-grid',
+                  topBar: 'bg-emerald-600',
+                  borderClass: 'border-emerald-300 dark:border-emerald-800 border-b-emerald-600 dark:border-b-emerald-500',
+                  iconBg: 'bg-emerald-600 text-white border-b-3 border-emerald-900',
+                  pillClass: 'bg-emerald-100 dark:bg-emerald-950/90 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700',
+                  btnClass: 'bg-emerald-600 hover:bg-emerald-500 text-white border-b-3 border-emerald-900',
+                  prompt: 'Human Anatomy, Genetics, Cellular Biology, and Neuroscience Quiz',
+                  emoji: '🧬',
+                },
+                {
+                  id: 'world-history',
+                  issue: 'WORLD #03',
+                  title: 'Ancient Empires & History',
+                  subtitle: 'Rome, Egypt, revolutions, inventions & turning points',
+                  category: 'World History',
+                  xp: '+115 XP',
+                  patternClass: 'pattern-stripes-amber',
+                  topBar: 'bg-amber-500',
+                  borderClass: 'border-amber-300 dark:border-amber-800 border-b-amber-500 dark:border-b-amber-600',
+                  iconBg: 'bg-amber-400 text-slate-950 border-b-3 border-amber-700',
+                  pillClass: 'bg-amber-100 dark:bg-amber-950/90 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700',
+                  btnClass: 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-b-3 border-amber-700',
+                  prompt: 'Ancient Civilizations, Roman Empire, World Wonders, and Modern History',
+                  emoji: '🏛️',
+                },
+                {
+                  id: 'world-code',
+                  issue: 'WORLD #04',
+                  title: 'Code, AI & Cyber Arena',
+                  subtitle: 'Python, JavaScript, algorithms, AI models & tech history',
+                  category: 'Tech & Coding',
+                  xp: '+130 XP',
+                  patternClass: 'pattern-circuit-blue',
+                  topBar: 'bg-blue-600',
+                  borderClass: 'border-blue-300 dark:border-blue-800 border-b-blue-600 dark:border-b-blue-500',
+                  iconBg: 'bg-blue-600 text-white border-b-3 border-blue-900',
+                  pillClass: 'bg-blue-100 dark:bg-blue-950/90 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700',
+                  btnClass: 'bg-blue-600 hover:bg-blue-500 text-white border-b-3 border-blue-900',
+                  prompt: 'Python Programming, JavaScript Fundamentals, Algorithms, and Modern AI',
+                  emoji: '💻',
+                },
+                {
+                  id: 'world-pop',
+                  issue: 'WORLD #05',
+                  title: 'Pop Culture, Cinema & Gaming',
+                  subtitle: 'Blockbuster movies, gaming legends, anime & music hits',
+                  category: 'Pop & Entertainment',
+                  xp: '+100 XP',
+                  patternClass: 'pattern-polka-pop',
+                  topBar: 'bg-rose-600',
+                  borderClass: 'border-rose-300 dark:border-rose-800 border-b-rose-600 dark:border-b-rose-500',
+                  iconBg: 'bg-rose-600 text-white border-b-3 border-rose-900',
+                  pillClass: 'bg-rose-100 dark:bg-rose-950/90 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-700',
+                  btnClass: 'bg-rose-600 hover:bg-rose-500 text-white border-b-3 border-rose-900',
+                  prompt: 'Iconic Movies, Video Game History, Anime Classics, and Music Trivia',
+                  emoji: '🎮',
+                },
+                {
+                  id: 'world-logic',
+                  issue: 'WORLD #06',
+                  title: 'Brain Teasers & Logic Puzzles',
+                  subtitle: 'Lateral thinking, math riddles, paradoxes & pattern IQ',
+                  category: 'Logic & Math',
+                  xp: '+140 XP',
+                  patternClass: 'pattern-diamond-violet',
+                  topBar: 'bg-violet-600',
+                  borderClass: 'border-violet-300 dark:border-violet-800 border-b-violet-600 dark:border-b-violet-500',
+                  iconBg: 'bg-violet-600 text-white border-b-3 border-violet-900',
+                  pillClass: 'bg-violet-100 dark:bg-violet-950/90 text-violet-800 dark:text-violet-200 border-violet-300 dark:border-violet-700',
+                  btnClass: 'bg-violet-600 hover:bg-violet-500 text-white border-b-3 border-violet-900',
+                  prompt: 'Brain Teasers, Logic Paradoxes, Probability Puzzles, and Mental Math',
+                  emoji: '🧠',
+                },
+              ].map((world, idx) => (
+                <div
+                  key={world.id}
+                  onClick={() => {
+                    soundFx.playClick();
+                    setActiveTab('text');
+                    setInputText(world.prompt);
+                    setValidationWarning(null);
+                    setErrorMessage(null);
+                    handleGenerateQuiz(world.prompt);
+                  }}
+                  className={`arcade-card comic-pop-card ${world.patternClass} animate-24fps-deal delay-24fps-${(idx % 4) + 1} group relative rounded-3xl p-5 bg-white dark:bg-slate-900 border-2 border-b-[6px] ${world.borderClass} overflow-hidden cursor-pointer flex flex-col justify-between min-h-[178px]`}
+                >
+                  {/* Vibrant Top Official Color Bar */}
+                  <div className={`absolute top-0 left-0 right-0 h-2.5 ${world.topBar}`} />
+
+                  <div className="relative z-10 flex items-center justify-between gap-2 pt-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-900 dark:bg-slate-800 text-amber-300 text-[10px] font-mono font-black tracking-wider">
+                        {world.issue}
+                      </span>
+                      <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-xl border ${world.pillClass}`}>
+                        {world.category} · {world.xp}
+                      </span>
+                    </div>
+                    <span className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl shadow-xs animate-24fps-float ${world.iconBg}`}>
+                      {world.emoji}
                     </span>
-                    <span className="text-[9px] font-bold text-indigo-500">{levelProgressPct}%</span>
+                  </div>
+
+                  <div className="relative z-10 my-2.5 bg-white/90 dark:bg-slate-900/90 rounded-xl p-1.5 -mx-1.5">
+                    <h3 className="text-base sm:text-lg font-black tracking-tight leading-snug text-slate-900 dark:text-white">
+                      {world.title}
+                    </h3>
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 line-clamp-2 mt-1">
+                      {world.subtitle}
+                    </p>
+                  </div>
+
+                  <div className="relative z-10 flex items-center justify-between gap-2 pt-2.5 border-t border-slate-200/80 dark:border-slate-800">
+                    <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-300 bg-white/90 dark:bg-slate-900/90 px-2 py-0.5 rounded-lg">
+                      {questionCount} Questions · {difficulty}
+                    </span>
+                    <span className={`px-3.5 py-1.5 rounded-xl text-xs font-black shadow-2xs transition-transform group-hover:scale-105 ${world.btnClass}`}>
+                      Play World ▶
+                    </span>
                   </div>
                 </div>
-
-                <div className="flex-1 grid grid-cols-2 gap-2">
-                  <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60">
-                    <div className="text-[10px] font-bold text-slate-400">Streak Boost</div>
-                    <div className="text-sm font-black text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-0.5">
-                      <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                      <span>{stats.streak}d (+{lvlInfo.streakMultiplierPercent}%)</span>
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60">
-                    <div className="text-[10px] font-bold text-slate-400">Next Level</div>
-                    <div className="text-xs font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mt-1">
-                      <span>{lvlInfo.xpToNextLevel.toLocaleString()} XP left</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {onOpenLevelRoadmap && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playClick();
-                    onOpenLevelRoadmap();
-                  }}
-                  className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-indigo-950/50 text-xs font-extrabold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-between transition-colors cursor-pointer"
-                >
-                  <span>
-                    {!dailyCheckIn.claimedToday
-                      ? `🎁 Claim Day ${dailyCheckIn.dayIndex} Check-In Reward!`
-                      : '🏆 View Prestige Ranks & Level Chests'}
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              )}
+              ))}
             </div>
+          </div>
 
-            {/* Bento Card 2: Quick Topic Starters */}
-            <div className="rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-slate-900 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Compass className="w-3.5 h-3.5 text-indigo-500" />
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Quick Topic Ideas
+          {/* ZONE C: 3-COLUMN INTERACTIVE ARCADE LOUNGE ROW */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+            {/* Column 1 (5 Cols): Playable Daily Trivia Blitz with Comic Halftone Pattern */}
+            <div className="lg:col-span-5 comic-pop-card pattern-halftone animate-24fps-deal delay-24fps-1 rounded-3xl p-5 border-2 border-b-[6px] border-violet-300 dark:border-violet-800 border-b-violet-600 bg-white dark:bg-slate-900 flex flex-col justify-between space-y-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-2 bg-violet-600" />
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pt-1 text-xs font-extrabold">
+                  <span className="px-2.5 py-1 rounded-lg bg-violet-600 text-white font-black">
+                    🎯 Daily Trivia Blitz #{currentMiniTrivia.id}
+                  </span>
+                  <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border border-amber-600 font-black tabular-nums">
+                    {miniTriviaSolvedIds.includes(currentMiniTrivia.id)
+                      ? '✓ Claimed Today'
+                      : `⚡ POW! +15 XP (${Math.min(3, miniTriviaSolvedIds.length)}/3)`}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playClick();
-                    setStudioSection('tracks');
-                  }}
-                  className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                >
-                  See All 12 →
-                </button>
-              </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {QUICK_STARTER_TOPICS.map((topic) => (
-                  <button
-                    key={topic.label}
-                    type="button"
-                    onClick={() => {
-                      soundFx.playClick();
-                      setActiveTab('text');
-                      setInputText(topic.prompt);
-                      setValidationWarning(null);
-                      setErrorMessage(null);
-                    }}
-                    className={`flex items-center gap-2 p-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-left hover:scale-[1.02] active:scale-95 ${topic.color}`}
-                  >
-                    <span className="text-base shrink-0">{topic.icon}</span>
-                    <span className="truncate">{topic.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug bg-white/90 dark:bg-slate-900/90 p-2 rounded-xl border border-slate-200/70 dark:border-slate-800">
+                  {currentMiniTrivia.q}
+                </h3>
 
-            {/* Bento Card 3: Instant All-Ages Brain Spark Mini-Game */}
-            <div className="rounded-2xl p-4 border border-amber-200/80 dark:border-amber-900/60 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/25 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white">
-                  {currentMiniTrivia.badge}
-                </span>
-                <span className="text-[10px] font-black text-amber-600 dark:text-amber-400">
-                  +40 XP · +10 Coins
-                </span>
-              </div>
-
-              <div className="text-xs font-black text-slate-900 dark:text-white leading-snug">
-                {currentMiniTrivia.q}
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5">
-                {currentMiniTrivia.options.map((opt) => {
-                  const isPicked = miniTriviaSelected === opt;
-                  const isRight = opt === currentMiniTrivia.answer;
-                  let btnStyle =
-                    'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-amber-400';
-                  if (miniTriviaSelected) {
-                    if (isRight) {
-                      btnStyle =
-                        'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 font-black';
-                    } else if (isPicked) {
-                      btnStyle =
-                        'border-rose-400 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300';
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {currentMiniTrivia.options.map((opt, idx) => {
+                    const letter = ['A', 'B', 'C', 'D'][idx % 4];
+                    const isPicked = miniTriviaSelected === opt;
+                    const isRight = opt === currentMiniTrivia.answer;
+                    let btnStyle =
+                      'border-2 border-b-4 border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/70 text-slate-800 dark:text-slate-100 hover:border-violet-400';
+                    if (miniTriviaSelected) {
+                      if (isRight) {
+                        btnStyle =
+                          'border-2 border-b-4 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-950 dark:text-emerald-200 font-black';
+                      } else if (isPicked) {
+                        btnStyle =
+                          'border-2 border-b-4 border-rose-500 bg-rose-50 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 font-bold';
+                      } else {
+                        btnStyle = 'opacity-45 border border-slate-200 dark:border-slate-800';
+                      }
                     }
-                  }
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      disabled={!!miniTriviaSelected}
-                      onClick={() => {
-                        setMiniTriviaSelected(opt);
-                        if (opt === currentMiniTrivia.answer) {
-                          soundFx.playCorrect();
-                          if (!miniTriviaSolvedIds.includes(currentMiniTrivia.id)) {
-                            setMiniTriviaSolvedIds((prev) => [...prev, currentMiniTrivia.id]);
-                            onUpdateStats?.({
-                              xp: (stats.xp || 0) + 40,
-                              coins: (stats.coins || 0) + 10,
-                            });
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        disabled={!!miniTriviaSelected}
+                        onClick={() => {
+                          setMiniTriviaSelected(opt);
+                          if (opt === currentMiniTrivia.answer) {
+                            const check = verifyDailyTriviaBlitzXp(currentMiniTrivia.id);
+                            soundFx.playCorrect(miniTriviaSolvedIds.length + 1);
+                            if (check.allowed && check.xp > 0) {
+                              setMiniTriviaSolvedIds(getRewardedTriviaIdsToday());
+                              setMiniTriviaNotice(`🎉 +${check.xp} Verified XP & +${check.coins} Coins!`);
+                              onUpdateStats?.({
+                                xp: (stats.xp || 0) + check.xp,
+                                coins: (stats.coins || 0) + check.coins,
+                              });
+                            } else {
+                              setMiniTriviaNotice(
+                                check.reason || 'Already claimed today — 0 duplicate XP'
+                              );
+                            }
+                          } else {
+                            soundFx.playIncorrect(miniTriviaSolvedIds.length);
+                            setMiniTriviaNotice(null);
                           }
-                        } else {
-                          soundFx.playIncorrect();
-                        }
-                      }}
-                      className={`p-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer text-left truncate ${btnStyle}`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
+                        }}
+                        className={`arcade-btn p-2.5 rounded-2xl text-xs font-extrabold transition-all cursor-pointer text-left flex items-center gap-2 ${btnStyle}`}
+                      >
+                        <span className="w-6 h-6 rounded-lg text-[11px] font-mono font-black flex items-center justify-center shrink-0 bg-violet-100 dark:bg-violet-950/80 text-violet-700 dark:text-violet-300">
+                          {letter}
+                        </span>
+                        <span className="truncate">{opt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {miniTriviaSelected && (
-                <div className="p-2.5 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2 animate-in fade-in duration-150">
-                  <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-tight">
-                    <strong className="text-emerald-600 dark:text-emerald-400">
-                      {miniTriviaSelected === currentMiniTrivia.answer ? '🎉 Spot on! +40 XP! ' : `Answer: ${currentMiniTrivia.answer}. `}
+              {miniTriviaSelected ? (
+                <div className="p-3 rounded-2xl bg-indigo-50/90 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/80 flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-200 leading-relaxed">
+                    <strong className="text-indigo-700 dark:text-indigo-300">
+                      {miniTriviaSelected === currentMiniTrivia.answer
+                        ? `${miniTriviaNotice || '✓ Correct!'} — `
+                        : `💡 ${currentMiniTrivia.answer} — `}
                     </strong>
                     {currentMiniTrivia.fact}
                   </p>
@@ -2032,60 +2607,194 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
                     onClick={() => {
                       soundFx.playClick();
                       setMiniTriviaSelected(null);
+                      setMiniTriviaNotice(null);
                       setMiniTriviaIndex((prev) => prev + 1);
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black shrink-0 cursor-pointer"
+                    className="arcade-btn px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black shrink-0 cursor-pointer"
                   >
-                    Next →
+                    Next ▶
+                  </button>
+                </div>
+              ) : (
+                <div className="text-[11px] font-semibold text-slate-400 flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                  <span>Tap any option above for instant XP</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setMiniTriviaIndex((prev) => prev + 1);
+                    }}
+                    className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
+                  >
+                    Skip Question →
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Bento Card 4: Adaptive AI Recommendations Spotlight */}
-            <div className="rounded-2xl p-4 border border-indigo-200/70 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/30 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-500" />
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                    Picked For You
-                  </span>
+            {/* Column 2 (4 Cols): 1-Click Arcade Mini-Games & Modes Portal */}
+            <div className="lg:col-span-4 comic-pop-card animate-24fps-deal delay-24fps-2 rounded-3xl p-5 border-2 border-b-[6px] border-slate-300 dark:border-slate-700 border-b-indigo-600 bg-white dark:bg-slate-900 flex flex-col justify-between space-y-3.5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-2 bg-indigo-600" />
+              <div>
+                <div className="flex items-center justify-between mb-3 pt-1">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900 dark:text-white leading-tight">
+                      🕹️ Arcade Game Modes
+                    </h3>
+                    <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      Switch up how you play &amp; compete
+                    </p>
+                  </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                  {historyRecords.length} Completed
-                </span>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  {[
+                    {
+                      label: 'Word-Chain',
+                      sub: 'Link words vs AI',
+                      emoji: '🔗',
+                      tab: 'games',
+                      cardStyle: 'pattern-speed-stripes bg-violet-50/90 dark:bg-violet-950/40 border-violet-300 dark:border-violet-800 border-b-violet-600 hover:border-violet-500',
+                      badgeStyle: 'bg-violet-600 text-white border-b-2 border-violet-900',
+                    },
+                    {
+                      label: 'Math & Bee',
+                      sub: 'Speed & spelling',
+                      emoji: '🐝',
+                      tab: 'games',
+                      cardStyle: 'pattern-stripes-amber bg-amber-50/90 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 border-b-amber-500 hover:border-amber-500',
+                      badgeStyle: 'bg-amber-400 text-slate-950 border-b-2 border-amber-700',
+                    },
+                    {
+                      label: 'Live Battle',
+                      sub: 'Multiplayer PIN',
+                      emoji: '⚔️',
+                      tab: 'live',
+                      cardStyle: 'pattern-polka-pop bg-rose-50/90 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 border-b-rose-600 hover:border-rose-500',
+                      badgeStyle: 'bg-rose-600 text-white border-b-2 border-rose-900',
+                    },
+                    {
+                      label: '3D Flashcards',
+                      sub: 'Flip & memorize',
+                      emoji: '🃏',
+                      tab: 'flashcards',
+                      cardStyle: 'pattern-blueprint-grid bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 border-b-emerald-600 hover:border-emerald-500',
+                      badgeStyle: 'bg-emerald-600 text-white border-b-2 border-emerald-900',
+                    },
+                  ].map((mode) => (
+                    <button
+                      key={mode.label}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        onNavigateTab?.(mode.tab);
+                      }}
+                      className={`arcade-card p-3.5 rounded-2xl border-2 border-b-4 ${mode.cardStyle} text-left flex flex-col justify-between gap-2 cursor-pointer group transition-all`}
+                    >
+                      <span className={`w-9 h-9 rounded-xl flex items-center justify-center text-base shadow-2xs ${mode.badgeStyle}`}>
+                        {mode.emoji}
+                      </span>
+                      <div>
+                        <div className="text-xs font-black text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                          {mode.label}
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                          {mode.sub}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                {historyRecords.length > 0
-                  ? 'Practice quizzes picked based on your recent scores and topics.'
-                  : 'Finish your first quiz to get personalized topic suggestions and study tips.'}
-              </p>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    onNavigateTab?.('searcher');
+                  }}
+                  className="arcade-btn py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-700 dark:text-slate-200 text-xs font-extrabold cursor-pointer text-center"
+                >
+                  🔍 Quiz Searcher
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    onNavigateTab?.('notes');
+                  }}
+                  className="arcade-btn py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-700 dark:text-slate-200 text-xs font-extrabold cursor-pointer text-center"
+                >
+                  📄 Study &amp; Exam PDF
+                </button>
+              </div>
+            </div>
 
-              <div className="flex items-center gap-2 pt-1">
+            {/* Column 3 (3 Cols): Player Rank, Streak Journey & Daily Loot */}
+            <div className="lg:col-span-3 comic-pop-card pattern-stripes-amber animate-24fps-deal delay-24fps-3 rounded-3xl p-5 border-2 border-b-[6px] border-amber-300 dark:border-amber-800 border-b-amber-500 bg-white dark:bg-slate-900 flex flex-col justify-between space-y-3.5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-2 bg-amber-500" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 border-b-4 border-amber-700 text-slate-950 font-black text-sm flex items-center justify-center shadow-sm">
+                      Lv.{currentLevel}
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                        {lvlInfo.rank.title}
+                      </div>
+                      <div className="text-sm font-black text-slate-900 dark:text-white tabular-nums">
+                        {stats.xp.toLocaleString()} XP
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-xs font-black text-orange-600 dark:text-orange-400">
+                    <span className="animate-24fps-flame">🔥</span> {stats.streak}d
+                  </span>
+                </div>
+
+                {/* Liquid Shimmer XP Bar */}
+                <div className="space-y-1">
+                  <div className="w-full h-3 rounded-full bg-slate-200/80 dark:bg-slate-800 p-0.5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 animate-24fps-xp transition-all duration-300"
+                      style={{ width: `${Math.max(6, levelProgressPct)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 tabular-nums">
+                    <span>{lvlInfo.xpToNextLevel.toLocaleString()} XP to Lv.{currentLevel + 1}</span>
+                    <span>🎯 {accuracyPct}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-1 flex flex-col gap-2">
+                {onOpenLevelRoadmap && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      onOpenLevelRoadmap();
+                    }}
+                    className="arcade-btn w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 border-b-2 border-amber-700 text-slate-950 text-xs font-black text-center cursor-pointer shadow-2xs"
+                  >
+                    {!dailyCheckIn.claimedToday
+                      ? `🎁 Claim Day ${dailyCheckIn.dayIndex} Bonus!`
+                      : '🏆 Rank Roadmap & Loot'}
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => {
                     soundFx.playClick();
                     setStudioSection('recommended');
                   }}
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                  className="arcade-btn w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-extrabold cursor-pointer"
                 >
-                  <span>View Recommendations</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  ✨ Personalized For You
                 </button>
-                {onOpenTutor && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      soundFx.playClick();
-                      onOpenTutor();
-                    }}
-                    className="py-2.5 px-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    Ask Tutor
-                  </button>
-                )}
               </div>
             </div>
           </div>

@@ -204,7 +204,7 @@ export const StudyRecommendationsHub: React.FC<StudyRecommendationsHubProps> = (
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Top Banner: Diagnostic Performance & Mode Selector */}
-      <div className="rounded-3xl p-6 sm:p-7 border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 dark:from-slate-900 dark:via-slate-900/90 dark:to-indigo-950/30 shadow-xs">
+      <div className="comic-panel pattern-halftone rounded-3xl p-6 sm:p-7 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/40 dark:from-slate-900 dark:via-slate-900/90 dark:to-indigo-950/30">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             <MascotAvatar
@@ -213,6 +213,9 @@ export const StudyRecommendationsHub: React.FC<StudyRecommendationsHubProps> = (
             />
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 flex-wrap">
+                <span className="comic-badge px-2 py-0.5 rounded-md bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                  STUDY ENGINE
+                </span>
                 <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-black bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
                   <span>Adaptive Study Recommendation Engine</span>

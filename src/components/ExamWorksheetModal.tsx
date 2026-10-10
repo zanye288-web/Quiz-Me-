@@ -18,6 +18,7 @@ import { soundFx } from '../utils/audio';
 
 interface ExamWorksheetModalProps {
   quiz: QuizResponse;
+  isOpen?: boolean;
   onClose: () => void;
 }
 
@@ -41,7 +42,11 @@ interface OrganizedExamData {
   }>;
 }
 
-export const ExamWorksheetModal: React.FC<ExamWorksheetModalProps> = ({ quiz, onClose }) => {
+export const ExamWorksheetModal: React.FC<ExamWorksheetModalProps> = ({
+  quiz,
+  isOpen = true,
+  onClose,
+}) => {
   const [worksheetType, setWorksheetType] = useState<'student' | 'solution' | 'both'>('both');
   const [institutionName, setInstitutionName] = useState('Quiz Me! International Examination Board');
   const [timeLimitMinutes, setTimeLimitMinutes] = useState(Math.max(15, quiz.questions.length * 3));
@@ -78,8 +83,11 @@ export const ExamWorksheetModal: React.FC<ExamWorksheetModalProps> = ({ quiz, on
   };
 
   useEffect(() => {
+    if (!isOpen) return;
     runAiExamOrganizer();
-  }, [quiz.quiz_title]);
+  }, [quiz.quiz_title, isOpen]);
+
+  if (!isOpen) return null;
 
   const handlePrintPdf = () => {
     soundFx.playClick();

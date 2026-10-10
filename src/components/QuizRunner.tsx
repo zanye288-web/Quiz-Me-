@@ -46,7 +46,13 @@ import {
   PersonaType,
   UserStats,
   AssessmentConfig,
+  ExamFormatId,
 } from '../types/quiz';
+import {
+  EXAM_FORMAT_CATALOG,
+  getExamFormatSpec,
+  evaluateExamBoardGrade,
+} from '../utils/examFormats';
 import { soundFx } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
 import { usePomodoro } from '../context/PomodoroContext';
@@ -54,11 +60,37 @@ import { useTheme, FONT_CATALOG } from '../context/ThemeContext';
 import { VoiceSettingsModal } from './VoiceSettingsModal';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { ExamWorksheetModal } from './ExamWorksheetModal';
+import { FlashcardStudyDeck } from './FlashcardStudyDeck';
 import { MediaAttributionBadge } from './MediaAttributionBadge';
 import { resolveThematicVisual } from '../utils/thematicImages';
 import { MascotAvatar } from './MascotAvatar';
 import { classifyAudience, AUDIENCE_TIER_CONFIG } from '../utils/audienceClassifier';
 import { StudyToolsWidget } from './StudyToolsWidget';
+import {
+  inferQuestionDifficulty,
+  inferQuestionTopic,
+  getEncouragingFeedbackCopy,
+  getDetailedAnswerExplanation,
+  generateFollowUpQuestion,
+  recordTopicAttemptAndAdaptDifficulty,
+  interleaveQuestionsByTopic,
+  recordQuestionMiss,
+  getQuestionMissCount,
+  saveTakeawayNote,
+  recordFixedMistakeInProfile,
+  recordConsistentPracticeSession,
+  getHintUsageForQuestion,
+  recordHintUsageForQuestion,
+  generateTwoStepHintsForQuestion,
+  QuestionHintUsageRecord,
+  recordWrongAnswerChoice,
+  recordDailyPracticeMinutesAndQuestions,
+  recordDailyChallengeCompletion,
+  recordBossChallengePassed,
+  loadPersistedTextSize,
+  savePersistedTextSize,
+} from '../utils/adaptiveLearningEngine';
+import { DifficultyType } from '../types/quiz';
 
 interface QuizRunnerProps {
   quiz: QuizResponse;
@@ -77,6 +109,7 @@ interface QuizRunnerProps {
     gemsEarned: number;
     timeSpentSeconds: number;
     flaggedIds: number[];
+    fixedQuestionIds?: number[];
   }) => void;
   onQuitQuiz: () => void;
   onOpenTutor: (q: Question) => void;
@@ -117,15 +150,24 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
   const [showScratchpad, setShowScratchpad] = useState<boolean>(false);
   const [scratchpadText, setScratchpadText] = useState<string>('');
 
-  // Shortcuts & Worksheet Modals
+  // Shortcuts, Flashcards, Study Guide & Worksheet Modals
   const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
   const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState<boolean>(false);
+  const [isFlashcardModalOpen, setIsFlashcardModalOpen] = useState<boolean>(false);
+  const [showStudyGuidePanel, setShowStudyGuidePanel] = useState<boolean>(false);
 
-  // QoL: Font Size Scaling & Zen Mode
-  const [fontSizeScale, setFontSizeScale] = useState<'normal' | 'large' | 'xlarge'>('normal');
+  // QoL & Accessibility: Persisted Font Size Scaling & Zen Mode
+  const [fontSizeScale, setFontSizeScale] = useState<'normal' | 'large' | 'xlarge'>(() =>
+    loadPersistedTextSize()
+  );
   const [isZenMode, setIsZenMode] = useState<boolean>(false);
   const [showFontPopover, setShowFontPopover] = useState<boolean>(false);
   const { fontFamily, setFontFamily } = useTheme();
+
+  const updateFontSizeScale = (nextSize: 'normal' | 'large' | 'xlarge') => {
+    setFontSizeScale(nextSize);
+    savePersistedTextSize(nextSize);
+  };
 
   // QoL: Auto-Next on Correct, Option Elimination, Matrix Filter, Spoiler Shield & Image Zoom
   const [autoNextOnCorrect, setAutoNextOnCorrect] = useState<boolean>(false);
@@ -153,11 +195,96 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
   // Copied code status
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
 
-  // Hints
+  // Hints (Up to 2 Hints per Question with Slight Point Cost, Never Blocks Mastery) & AI Tutor Concept Summary States
   const [showHint, setShowHint] = useState<boolean>(false);
+  const [currentHintUsage, setCurrentHintUsage] = useState<QuestionHintUsageRecord | null>(null);
+  const [conceptSummaries, setConceptSummaries] = useState<
+    Record<
+      number,
+      {
+        conceptTitle: string;
+        simplifiedSummary: string;
+        realWorldAnalogy: string;
+        keyPrinciple: string;
+        generatedPostAnswer?: boolean;
+      }
+    >
+  >({});
+  const [isGeneratingConcept, setIsGeneratingConcept] = useState<boolean>(false);
+  const [showConceptCard, setShowConceptCard] = useState<boolean>(false);
+  const [savedConceptToNotes, setSavedConceptToNotes] = useState<Record<number, boolean>>({});
 
-  // Challenge Mode Configuration & States
-  const isChallengeMode = assessmentConfig.challengeMode ?? false;
+  // Interleaving & Adaptive Difficulty (70-80% Target) States
+  const [isInterleavedMode, setIsInterleavedMode] = useState<boolean>(
+    Boolean(assessmentConfig.interleavedMode)
+  );
+  const [activeExamFormat, setActiveExamFormat] = useState<ExamFormatId | undefined>(
+    quiz.examFormat || (assessmentConfig.mode === 'exam' ? assessmentConfig.examFormat || 'waec' : undefined)
+  );
+  const isExamModeActive = Boolean(activeExamFormat || assessmentConfig.mode === 'exam');
+  const activeExamSpec = getExamFormatSpec(activeExamFormat || 'waec');
+  const [sessionQuestions, setSessionQuestions] = useState<Question[]>(() => {
+    const tagged = (quiz.questions || []).map((q, idx) => ({
+      ...q,
+      difficulty: inferQuestionDifficulty(q, idx, quiz.difficulty),
+      topic: inferQuestionTopic(q, quiz.quiz_title),
+    }));
+    return assessmentConfig.interleavedMode ? interleaveQuestionsByTopic(tagged) : tagged;
+  });
+
+  // Sync sessionQuestions when quiz prop changes
+  useEffect(() => {
+    const tagged = (quiz.questions || []).map((q, idx) => ({
+      ...q,
+      difficulty: inferQuestionDifficulty(q, idx, quiz.difficulty),
+      topic: inferQuestionTopic(q, quiz.quiz_title),
+    }));
+    setSessionQuestions(isInterleavedMode ? interleaveQuestionsByTopic(tagged) : tagged);
+  }, [quiz]);
+
+  const handleToggleInterleavedMode = () => {
+    soundFx.playSelect();
+    const nextVal = !isInterleavedMode;
+    setIsInterleavedMode(nextVal);
+    const tagged = (quiz.questions || []).map((q, idx) => ({
+      ...q,
+      difficulty: inferQuestionDifficulty(q, idx, quiz.difficulty),
+      topic: inferQuestionTopic(q, quiz.quiz_title),
+    }));
+    setSessionQuestions(nextVal ? interleaveQuestionsByTopic(tagged) : tagged);
+  };
+
+  // Adaptive Difficulty State (Target: 70-80% Accuracy per Topic)
+  const [activeAdaptiveDifficulty, setActiveAdaptiveDifficulty] = useState<DifficultyType>(
+    quiz.difficulty || 'Intermediate'
+  );
+  const [topicAccuracyPercent, setTopicAccuracyPercent] = useState<number>(75);
+  const [adaptiveStepBanner, setAdaptiveStepBanner] = useState<string | null>(null);
+
+  // Follow-Up Question (Same Concept, Different Wording) after a Miss
+  const [activeFollowUpQuestion, setActiveFollowUpQuestion] = useState<Question | null>(null);
+  const [followUpSelectedOption, setFollowUpSelectedOption] = useState<string | null>(null);
+  const [followUpChecked, setFollowUpChecked] = useState<boolean>(false);
+  const [followUpCorrect, setFollowUpCorrect] = useState<boolean>(false);
+
+  // "Review Pile" that collects missed questions and resurfaces them later in the session
+  const [reviewPile, setReviewPile] = useState<Question[]>([]);
+  const [fixedQuestionIds, setFixedQuestionIds] = useState<number[]>([]);
+  const [isReviewingPileMode, setIsReviewingPileMode] = useState<boolean>(false);
+  const [reviewPileSelectedOption, setReviewPileSelectedOption] = useState<string | null>(null);
+  const [reviewPileChecked, setReviewPileChecked] = useState<boolean>(false);
+  const [reviewPileCorrect, setReviewPileCorrect] = useState<boolean>(false);
+
+  // Optional "Explain it in your own words" prompt for missed questions
+  const [ownWordsText, setOwnWordsText] = useState<string>('');
+  const [ownWordsSaved, setOwnWordsSaved] = useState<boolean>(false);
+  const [currentMissCount, setCurrentMissCount] = useState<number>(0);
+
+  // Separate Optional "Speed Round" Mode (Timer is strictly optional and does not affect mastery levels)
+  const [isSpeedRoundMode, setIsSpeedRoundMode] = useState<boolean>(
+    Boolean(assessmentConfig.speedRoundMode ?? assessmentConfig.challengeMode ?? false)
+  );
+  const isChallengeMode = isSpeedRoundMode;
   const questionTimeLimit = assessmentConfig.challengeTimerSeconds ?? 15;
   const [questionTimeRemaining, setQuestionTimeRemaining] = useState<number>(questionTimeLimit);
   const [lastSpeedMultiplier, setLastSpeedMultiplier] = useState<number | null>(null);
@@ -218,7 +345,9 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
     );
   }
 
-  const currentQuestion = quiz.questions[currentIndex] || quiz.questions[0];
+  const currentQuestion = sessionQuestions[currentIndex] || sessionQuestions[0] || quiz.questions[0];
+  const currentQuestionDifficulty = inferQuestionDifficulty(currentQuestion, currentIndex, quiz.difficulty);
+  const currentQuestionTopic = inferQuestionTopic(currentQuestion, quiz.quiz_title);
   const isAnswerChecked = userAnswers[currentQuestion.id]?.checked || false;
   const isCurrentCorrect = userAnswers[currentQuestion.id]?.isCorrect || false;
 
@@ -333,7 +462,9 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
   };
 
   // Sync inputs when navigating between questions
+  const questionShownAtRef = useRef<number>(Date.now());
   useEffect(() => {
+    questionShownAtRef.current = Date.now();
     const existing = userAnswers[currentQuestion.id];
     if (existing) {
       if (currentQuestion.type === 'multiple_choice') {
@@ -354,12 +485,139 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
       setFillBlankAnswer('');
       setOpenTextAnswer('');
     }
-    setShowHint(false);
+    const existingHint = getHintUsageForQuestion(currentQuestion);
+    setCurrentHintUsage(existingHint);
+    setShowHint(existingHint.hintsUsedCount > 0);
+    if (existingHint.hint2Used && currentQuestion.options && currentQuestion.options.length >= 3) {
+      const twoStep = generateTwoStepHintsForQuestion(currentQuestion);
+      if (twoStep.wrongOptionsToRemove.length > 0) {
+        setEliminatedOptions((prev) => ({
+          ...prev,
+          [currentQuestion.id]: twoStep.wrongOptionsToRemove,
+        }));
+      }
+    }
     setPeekImageClue(false);
     setVoiceTranscript('');
     setVoiceFeedbackMsg(null);
     setLastSpeedMultiplier(speedMultipliers[currentQuestion.id] || null);
+    setActiveFollowUpQuestion(null);
+    setFollowUpSelectedOption(null);
+    setFollowUpChecked(false);
+    setFollowUpCorrect(false);
+    setOwnWordsText('');
+    setOwnWordsSaved(false);
+    setCurrentMissCount(getQuestionMissCount(currentQuestion));
+    setShowConceptCard(false);
   }, [currentIndex, currentQuestion]);
+
+  // Unlock Hint #1 (-15% pts, First Letter & Concept Clue) or Hint #2 (-30% pts total, Remove 2 Wrong Options)
+  const handleUnlockHintTier = (tier: 1 | 2) => {
+    soundFx.playHint();
+    const updatedUsage = recordHintUsageForQuestion(currentQuestion, tier);
+    setCurrentHintUsage(updatedUsage);
+    setShowHint(true);
+
+    if (tier === 2) {
+      const twoStep = generateTwoStepHintsForQuestion(currentQuestion);
+      if (twoStep.wrongOptionsToRemove.length > 0) {
+        setEliminatedOptions((prev) => ({
+          ...prev,
+          [currentQuestion.id]: twoStep.wrongOptionsToRemove,
+        }));
+        if (selectedOption && twoStep.wrongOptionsToRemove.includes(selectedOption)) {
+          setSelectedOption(null);
+        }
+      }
+    }
+  };
+
+  // Calls the AI Tutor to generate a simplified 'Explain this Concept' summary specific to the active question's context
+  const handleExplainConcept = async (targetQuestion: Question = currentQuestion, forceRefresh = false) => {
+    soundFx.playSelect();
+    const qId = targetQuestion.id;
+    const isCheckedNow = Boolean(userAnswers[qId]?.checked);
+    const cached = conceptSummaries[qId];
+
+    if (showConceptCard && cached && !forceRefresh && cached.generatedPostAnswer === isCheckedNow) {
+      setShowConceptCard(false);
+      return;
+    }
+
+    setShowConceptCard(true);
+    if (cached && !forceRefresh && cached.generatedPostAnswer === isCheckedNow) {
+      return;
+    }
+
+    setIsGeneratingConcept(true);
+    const qTopic = inferQuestionTopic(targetQuestion, quiz.quiz_title);
+    const qDiff = inferQuestionDifficulty(targetQuestion, currentIndex, quiz.difficulty);
+
+    try {
+      const response = await fetch('/api/explain-concept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: targetQuestion.question,
+          topic: qTopic,
+          domain: targetQuestion.domain,
+          difficulty: qDiff,
+          quizTitle: quiz.quiz_title,
+          codeSnippet: targetQuestion.code_snippet,
+          explanation: targetQuestion.explanation,
+          correctAnswer: targetQuestion.correct_answer,
+          isAnswerChecked: isCheckedNow,
+          persona,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success && data.concept) {
+        setConceptSummaries((prev) => ({
+          ...prev,
+          [qId]: {
+            ...data.concept,
+            generatedPostAnswer: isCheckedNow,
+          },
+        }));
+      } else {
+        throw new Error(data.error || 'Fallback concept summary');
+      }
+    } catch {
+      setConceptSummaries((prev) => ({
+        ...prev,
+        [qId]: {
+          conceptTitle: `${qTopic} — Simplified Concept`,
+          simplifiedSummary: targetQuestion.explanation
+            ? `In plain terms, this question focuses on ${qTopic.toLowerCase()}. ${
+                isCheckedNow
+                  ? targetQuestion.explanation
+                  : 'Identify the primary rule connecting the scenario in the question to the core mechanism.'
+              }`
+            : `This question explores the foundational principles of ${qTopic}. Break the stem down into what is changing and what rule governs that change.`,
+          realWorldAnalogy: `Think of ${qTopic.toLowerCase()} like a blueprint: when the foundational rule is respected, the whole system works predictably.`,
+          keyPrinciple: isCheckedNow
+            ? `Key Rule: "${targetQuestion.correct_answer}" directly satisfies the core mechanism of ${qTopic}.`
+            : `Focus on the underlying cause-and-effect relationship in ${qTopic} rather than surface wording.`,
+          generatedPostAnswer: isCheckedNow,
+        },
+      }));
+    } finally {
+      setIsGeneratingConcept(false);
+    }
+  };
+
+  const handleSaveConceptToMyNotes = (targetQuestion: Question = currentQuestion) => {
+    const summary = conceptSummaries[targetQuestion.id];
+    if (!summary) return;
+    soundFx.playComplete();
+    const qTopic = inferQuestionTopic(targetQuestion, quiz.quiz_title);
+    saveTakeawayNote({
+      oneLineTakeaway: `AI Tutor (${summary.conceptTitle}): ${summary.simplifiedSummary} [Key Rule: ${summary.keyPrinciple}]`,
+      topic: qTopic,
+      quizTitle: quiz.quiz_title,
+    });
+    setSavedConceptToNotes((prev) => ({ ...prev, [targetQuestion.id]: true }));
+  };
 
   // Stop active voice recognition when switching questions or unmounting
   const stopVoiceRecognition = () => {
@@ -940,9 +1198,11 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
     return false;
   };
 
-  // Calculate speed multiplier based on remaining time in Challenge Mode
+  // Calculate speed multiplier based on remaining time in Challenge Mode (requires >=1.2s genuine reading dwell & no hint)
   const calculateSpeedMultiplier = (): number => {
-    if (!isChallengeMode) return 1.0;
+    if (!isChallengeMode || showHint) return 1.0;
+    const dwellMs = Date.now() - questionShownAtRef.current;
+    if (dwellMs < 1200) return 1.0; // Prevent instant button-mash speed farming
     const timeFraction = questionTimeRemaining / questionTimeLimit;
     if (timeFraction >= 0.7) {
       return 2.5; // Top speed (< 30% of allowed time used)
@@ -1012,10 +1272,15 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
       setStreakSavedBanner(false);
 
       // Calculate Kahoot! style arcade points (base 750-1000 + streak bonus + 2x power-up)
+      // Apply Hint Cost Multiplier (1.0x for 0 hints, 0.85x for 1 hint, 0.70x for 2 hints) — NEVER blocks mastery!
+      const hintUsageNow = getHintUsageForQuestion(currentQuestion);
+      const hintMultiplier = hintUsageNow.pointMultiplier ?? 1.0;
       const speedFactor = isChallengeMode
         ? Math.max(0.5, questionTimeRemaining / questionTimeLimit)
         : 0.88;
-      let rawArcadePts = Math.round(600 + 400 * speedFactor) + Math.min(500, (nextStreak - 1) * 100);
+      let rawArcadePts =
+        Math.round((600 + 400 * speedFactor) * hintMultiplier) +
+        Math.min(500, (nextStreak - 1) * 100);
       if (doublePointsArmed) {
         rawArcadePts *= 2;
         setDoublePointsArmed(false);
@@ -1026,6 +1291,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
 
       if (nextStreak >= 3) {
         soundFx.playKahootStreakFire();
+        soundFx.playCorrect(nextStreak);
       } else if (isChallengeMode) {
         multiplier = calculateSpeedMultiplier();
         setSpeedMultipliers((prev) => ({
@@ -1036,14 +1302,15 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
 
         if (multiplier >= 2.0) {
           soundFx.playSpeedBonus();
+          soundFx.playCorrect(nextStreak);
         } else {
-          soundFx.playCorrect();
+          soundFx.playCorrect(nextStreak);
         }
       } else {
-        soundFx.playCorrect();
+        soundFx.playCorrect(nextStreak);
       }
     } else {
-      soundFx.playIncorrect();
+      soundFx.playIncorrect(kahootStreak);
       setLastPointsEarned(0);
       if (doublePointsArmed) {
         setDoublePointsArmed(false);
@@ -1074,23 +1341,157 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
       },
     }));
 
+    // Track player's recent accuracy per topic & adjust difficulty automatically (target: 70-80%)
+    // Note: Using a hint NEVER blocks mastery credit!
+    const adaptResult = recordTopicAttemptAndAdaptDifficulty(
+      currentQuestionTopic,
+      isCorrect,
+      activeAdaptiveDifficulty,
+      isSpeedRoundMode
+    );
+    setActiveAdaptiveDifficulty(adaptResult.nextDifficulty);
+    setTopicAccuracyPercent(adaptResult.topicAccuracyPercent);
+    if (adaptResult.adjustmentReason) {
+      setAdaptiveStepBanner(adaptResult.adjustmentReason);
+    }
+
+    // Track daily practice goals (minutes & questions) + Streak Freeze progress
+    recordDailyPracticeMinutesAndQuestions(0.5, 1);
+
+    if (!isCorrect) {
+      // 0. Track Mistake Pattern Detection (which wrong answer was chosen & which concept pair is confused)
+      recordWrongAnswerChoice(currentQuestion, submitted);
+      // 1. Add missed question to the Review Pile so it resurfaces later in the session
+      setReviewPile((prev) => {
+        if (prev.some((item) => item.id === currentQuestion.id)) return prev;
+        return [...prev, currentQuestion];
+      });
+      // 2. Generate a similar follow-up question (same concept, different wording)
+      setActiveFollowUpQuestion(generateFollowUpQuestion(currentQuestion));
+      setFollowUpSelectedOption(null);
+      setFollowUpChecked(false);
+      setFollowUpCorrect(false);
+      // 3. Track repeated misses for the "Explain in your own words" reflection hook
+      const missCountNow = recordQuestionMiss(currentQuestion);
+      setCurrentMissCount(missCountNow);
+    }
+
     if (isCorrect && autoNextOnCorrect) {
       setTimeout(() => {
-        if (currentIndex + 1 < quiz.questions.length) {
+        if (currentIndex + 1 < sessionQuestions.length) {
           setCurrentIndex((prev) => prev + 1);
         }
       }, 1450);
     }
   };
 
+  // Handle checking the Follow-Up Question (Same Concept, Different Wording)
+  const handleCheckFollowUpAnswer = () => {
+    if (!activeFollowUpQuestion || !followUpSelectedOption || followUpChecked) return;
+    const isRight =
+      followUpSelectedOption.trim().toLowerCase() ===
+      activeFollowUpQuestion.correct_answer.trim().toLowerCase();
+    setFollowUpChecked(true);
+    setFollowUpCorrect(isRight);
+    if (isRight) {
+      soundFx.playCorrect();
+      recordFixedMistakeInProfile(1);
+      setFixedQuestionIds((prev) =>
+        prev.includes(currentQuestion.id) ? prev : [...prev, currentQuestion.id]
+      );
+      onUpdateStats({
+        fixedMistakesCount: (stats.fixedMistakesCount || 0) + 1,
+      });
+    } else {
+      soundFx.playClick();
+    }
+  };
+
+  // Handle checking a resurfaced question in the Review Pile
+  const handleCheckReviewPileAnswer = () => {
+    const activeReviewQ = reviewPile[0];
+    if (!activeReviewQ || !reviewPileSelectedOption || reviewPileChecked) return;
+    const isRight =
+      reviewPileSelectedOption.trim().toLowerCase() ===
+      activeReviewQ.correct_answer.trim().toLowerCase();
+    setReviewPileChecked(true);
+    setReviewPileCorrect(isRight);
+    if (isRight) {
+      soundFx.playCorrect();
+      recordFixedMistakeInProfile(1);
+      setFixedQuestionIds((prev) =>
+        prev.includes(activeReviewQ.id) ? prev : [...prev, activeReviewQ.id]
+      );
+      onUpdateStats({
+        fixedMistakesCount: (stats.fixedMistakesCount || 0) + 1,
+      });
+    } else {
+      soundFx.playClick();
+    }
+  };
+
+  const handleAdvanceReviewPile = () => {
+    soundFx.playClick();
+    if (reviewPileCorrect) {
+      const remaining = reviewPile.slice(1);
+      setReviewPile(remaining);
+      setReviewPileSelectedOption(null);
+      setReviewPileChecked(false);
+      setReviewPileCorrect(false);
+      if (remaining.length === 0) {
+        setIsReviewingPileMode(false);
+      }
+    } else {
+      // Rotate to back of Review Pile so learner gets another encouraging shot
+      const [first, ...rest] = reviewPile;
+      setReviewPile([...rest, first]);
+      setReviewPileSelectedOption(null);
+      setReviewPileChecked(false);
+      setReviewPileCorrect(false);
+    }
+  };
+
+  const handleSaveInlineOwnWords = () => {
+    if (!ownWordsText.trim()) return;
+    soundFx.playComplete();
+    saveTakeawayNote({
+      oneLineTakeaway: `My Explanation (${currentQuestionTopic}): ${ownWordsText.trim()}`,
+      topic: currentQuestionTopic,
+      quizTitle: quiz.quiz_title,
+      ownWordsExplanations: [
+        {
+          questionId: currentQuestion.id,
+          questionText: currentQuestion.question,
+          userExplanation: ownWordsText.trim(),
+          correctAnswer: currentQuestion.correct_answer,
+        },
+      ],
+    });
+    setOwnWordsSaved(true);
+  };
+
   const handleJumpToQuestion = (index: number) => {
     soundFx.playClick();
+    setIsReviewingPileMode(false);
     setCurrentIndex(index);
   };
 
   const handleNext = () => {
     soundFx.playClick();
-    if (currentIndex + 1 < quiz.questions.length) {
+    // Resurface Review Pile every 3 questions or before finishing the session!
+    if (
+      reviewPile.length > 0 &&
+      !isReviewingPileMode &&
+      (currentIndex + 1 >= sessionQuestions.length || (currentIndex + 1) % 3 === 0)
+    ) {
+      setIsReviewingPileMode(true);
+      setReviewPileSelectedOption(null);
+      setReviewPileChecked(false);
+      setReviewPileCorrect(false);
+      return;
+    }
+
+    if (currentIndex + 1 < sessionQuestions.length) {
       setCurrentIndex((prev) => prev + 1);
     } else {
       handleSubmitAssessment();
@@ -1119,27 +1520,51 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
     const totalCorrect = answersArray.filter((a) => a.isCorrect).length;
     const total = quiz.questions.length;
     
-    // Dynamic XP calculation: Apply speed multipliers if in Challenge Mode
+    // Effort-gated XP calculation: 0 correct answers = 0 XP
+    // Hints slightly reduce points (0.85x for 1 hint, 0.70x for 2 hints) while keeping 100% mastery credit intact
     let xpEarned = 0;
-    if (isChallengeMode) {
+    if (totalCorrect > 0) {
       answersArray.forEach((a) => {
         if (a.isCorrect) {
-          const mult = speedMultipliers[a.questionId] || 1.0;
-          xpEarned += Math.round(30 * mult);
+          const qObj = sessionQuestions.find((sq) => sq.id === a.questionId) || quiz.questions[0];
+          const hintMult = getHintUsageForQuestion(qObj).pointMultiplier ?? 1.0;
+          const speedMult = isChallengeMode ? speedMultipliers[a.questionId] || 1.0 : 1.0;
+          xpEarned += Math.round(20 * hintMult * speedMult);
         }
       });
-      xpEarned += 35; // Challenge mode completion bonus
-    } else {
-      xpEarned = totalCorrect * 30 + 20;
+
+      if (isInTargetTimeRange && totalCorrect / Math.max(1, total) >= 0.6) {
+        xpEarned = Math.round(xpEarned * 1.25);
+      }
     }
 
-    const gemsEarned = isChallengeMode ? totalCorrect * 8 : totalCorrect * 5;
-    if (isInTargetTimeRange) {
-      xpEarned = Math.round(xpEarned * 1.35) + 30;
+    const gemsEarned = totalCorrect > 0 ? (isChallengeMode ? totalCorrect * 3 : totalCorrect * 2) : 0;
+
+    recordConsistentPracticeSession({
+      isInterleaved: isInterleavedMode,
+      isSpeedRound: isSpeedRoundMode,
+      accuracyPercent: Math.round((totalCorrect / Math.max(1, total)) * 100),
+      fixedInSessionCount: fixedQuestionIds.length,
+    });
+
+    // Check if this session was a Daily Challenge or a Topic Boss Challenge
+    if (quiz.tags?.includes('#DailyChallenge')) {
+      recordDailyChallengeCompletion(totalCorrect, total);
+    }
+    if (quiz.tags?.includes('#BossChallenge') && totalCorrect / Math.max(1, total) >= 0.6) {
+      const bossTag = quiz.tags.find((t) => t.startsWith('#BossTopic_'));
+      const bossTopic = bossTag
+        ? bossTag.replace('#BossTopic_', '')
+        : inferQuestionTopic(sessionQuestions[0] || quiz.questions[0], quiz.quiz_title);
+      recordBossChallengePassed(bossTopic);
     }
 
     onFinishQuiz({
-      quiz,
+      quiz: {
+        ...quiz,
+        examFormat: activeExamFormat || quiz.examFormat,
+        questions: sessionQuestions,
+      },
       answers: answersArray,
       score: totalCorrect,
       total,
@@ -1147,6 +1572,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
       gemsEarned,
       timeSpentSeconds: secondsElapsed,
       flaggedIds: Array.from(flaggedIds),
+      fixedQuestionIds,
     });
   };
 
@@ -1215,7 +1641,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
     <div className={`${isFocusMode ? 'max-w-3xl' : 'max-w-6xl'} mx-auto px-4 py-6 space-y-6 transition-all duration-300`}>
       {/* Top Assessment Bar: Minimalist Focus HUD when in Focus Mode, or Full Control Bar */}
       {isFocusMode ? (
-        <div className="sticky top-4 z-40 w-full flex items-center justify-between px-5 py-3 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="comic-panel-sm sticky top-4 z-40 w-full flex items-center justify-between px-5 py-3 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center gap-3">
             <span className="px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-black text-xs border border-indigo-200/60 dark:border-indigo-800/60">
               Question {currentIndex + 1} of {quiz.questions.length}
@@ -1257,7 +1683,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-3.5 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 transition-colors">
+        <div className="comic-panel pattern-halftone bg-white dark:bg-slate-900 rounded-3xl p-3.5 sm:p-5 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 transition-colors">
         {/* Title & Quit button */}
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
           <button
@@ -1348,10 +1774,12 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
               type="button"
               onClick={() => {
                 soundFx.playClick();
-                setFontSizeScale((prev) => (prev === 'xlarge' ? 'large' : prev === 'large' ? 'normal' : 'normal'));
+                updateFontSizeScale(
+                  fontSizeScale === 'xlarge' ? 'large' : fontSizeScale === 'large' ? 'normal' : 'normal'
+                );
               }}
               className="px-2 py-1 text-[11px] font-extrabold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg cursor-pointer"
-              title="Decrease Font Size"
+              title="Decrease Font Size (Persisted)"
             >
               A-
             </button>
@@ -1362,10 +1790,12 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
               type="button"
               onClick={() => {
                 soundFx.playClick();
-                setFontSizeScale((prev) => (prev === 'normal' ? 'large' : prev === 'large' ? 'xlarge' : 'xlarge'));
+                updateFontSizeScale(
+                  fontSizeScale === 'normal' ? 'large' : fontSizeScale === 'large' ? 'xlarge' : 'xlarge'
+                );
               }}
               className="px-2 py-1 text-[11px] font-extrabold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg cursor-pointer"
-              title="Increase Font Size"
+              title="Increase Font Size (Persisted)"
             >
               A+
             </button>
@@ -1687,7 +2117,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
 
       {/* Live Quiz Time Range Progress Bar (Displays when Time Range is active) */}
       {liveTimeRangeEnabled && totalTimeLimitSecs > 0 && (
-        <div className="bg-white/95 dark:bg-slate-900/95 rounded-2xl px-4 py-2.5 border border-emerald-200/80 dark:border-emerald-900/60 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="comic-panel-sm bg-white/95 dark:bg-slate-900/95 rounded-2xl px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex items-center gap-2 text-xs">
             <span className="px-2 py-0.5 rounded-lg bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider">
               ⏱️ Time Range: {liveMinMinutes}m – {liveMaxMinutes}m
@@ -1727,12 +2157,90 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
         </div>
       )}
 
+      {/* Official Standardized Exam Mode HUD Banner (Checkpoint, WAEC, JAMB, NECO, IGCSE, SAT, AP/IB) */}
+      {!isDistractionFree && (
+        <div
+          className={`comic-panel-sm rounded-2xl px-4 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3 transition-all ${
+            isExamModeActive
+              ? 'bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border-2 border-slate-950'
+              : 'bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800'
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playSelect();
+                if (activeExamFormat) {
+                  setActiveExamFormat(undefined);
+                } else {
+                  setActiveExamFormat(assessmentConfig.examFormat || 'waec');
+                }
+              }}
+              className={`px-3 py-1 rounded-xl text-xs font-black border transition-all cursor-pointer flex items-center gap-1.5 ${
+                isExamModeActive
+                  ? 'bg-amber-300 text-slate-950 border-slate-950 shadow-2xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700'
+              }`}
+              title="Toggle Official Exam Board Mode (Checkpoint, WAEC, JAMB, IGCSE, SAT)"
+            >
+              <span>🎓</span>
+              <span>{isExamModeActive ? `Exam Mode: ${activeExamSpec.shortName}` : 'Enable Exam Mode'}</span>
+            </button>
+
+            <div className="flex flex-wrap items-center gap-1">
+              {EXAM_FORMAT_CATALOG.slice(0, 7).map((fmt) => {
+                const isSelected = activeExamFormat === fmt.id;
+                return (
+                  <button
+                    key={fmt.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playSelect();
+                      setActiveExamFormat(fmt.id);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-indigo-500 text-white border border-indigo-300 shadow-2xs font-black'
+                        : isExamModeActive
+                        ? 'bg-white/10 hover:bg-white/20 text-indigo-100'
+                        : 'bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-600 dark:text-slate-300'
+                    }`}
+                    title={`${fmt.fullName} (${fmt.gradingScaleLabel})`}
+                  >
+                    {fmt.badgeEmoji} {fmt.shortName.split(' ')[0]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {isExamModeActive && (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="px-2.5 py-1 rounded-lg bg-white/10 text-indigo-200 font-bold">
+                {activeExamSpec.paperStructure}
+              </span>
+              {(() => {
+                const correctSoFar = Object.values(userAnswers).filter((a) => a.checked && a.isCorrect).length;
+                const livePct = answeredCount > 0 ? Math.round((correctSoFar / answeredCount) * 100) : 100;
+                const boardStanding = evaluateExamBoardGrade(activeExamFormat, livePct);
+                return (
+                  <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-black tabular-nums">
+                    Standing: {boardStanding.gradeBadge}
+                  </span>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Main Assessment Layout Grid (Question Jumper Palette + Active Question Canvas) */}
       <div className={`grid ${isDistractionFree ? 'grid-cols-1 max-w-3xl mx-auto' : 'grid-cols-1 lg:grid-cols-12'} gap-4 items-start`}>
         {/* Left/Sidebar: Question Matrix & Classification Jumper (3 cols) - Hidden in Focus / Zen Mode */}
         {!isDistractionFree && (
           <div className="lg:col-span-3 space-y-3">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 transition-colors">
+            <div className="comic-panel-sm bg-white dark:bg-slate-900 rounded-2xl p-4 space-y-3 transition-colors">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Questions
@@ -1848,7 +2356,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
 
             {/* Scratchpad Card when open */}
             {showScratchpad && (
-              <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-indigo-200 dark:border-indigo-800 shadow-xs space-y-2 animate-in fade-in duration-200">
+              <div className="comic-panel bg-white dark:bg-slate-900 rounded-3xl p-4 space-y-2 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-extrabold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
                     <Edit3 className="w-3.5 h-3.5" />
@@ -1876,7 +2384,383 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
 
         {/* Right Canvas: Question Evaluation Area (9 cols or full centered width in Focus/Zen Mode) */}
         <div className={`${isDistractionFree ? 'w-full max-w-3xl mx-auto' : 'lg:col-span-9'} space-y-4`}>
-          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-xs space-y-4 transition-colors">
+          {/* Multi-Feature Study & Interactive Mode Switcher Bar */}
+          {!isDistractionFree && (
+            <div className="comic-panel-sm bg-white dark:bg-slate-900 rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playSelect();
+                    setShowStudyGuidePanel(false);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                    !showStudyGuidePanel
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Interactive Quiz ({quiz.questions.length} Qs)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playSelect();
+                    setIsFlashcardModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800 hover:bg-violet-100 transition-all cursor-pointer"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>3D Flashcards</span>
+                </button>
+
+                {quiz.study_guide && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playSelect();
+                      setShowStudyGuidePanel((prev) => !prev);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
+                      showStudyGuidePanel
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+                    }`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>{showStudyGuidePanel ? 'Hide Study Guide' : 'AI Study Guide & Vocab'}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    onOpenTutor(currentQuestion);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 transition-all cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>1-on-1 AI Tutor</span>
+                </button>
+
+                {/* Interleaving Mode Toggle (Mixes questions from different topics) */}
+                <button
+                  type="button"
+                  onClick={handleToggleInterleavedMode}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
+                    isInterleavedMode
+                      ? 'bg-teal-600 text-white border-teal-700 shadow-xs'
+                      : 'bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-100'
+                  }`}
+                  title="Mixes questions from different topics instead of grouping them by topic"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>{isInterleavedMode ? 'Interleaved Mix: ON' : 'Interleave Topics'}</span>
+                </button>
+
+                {/* Review Pile Button (Collects missed questions & resurfaces them) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playSelect();
+                    if (reviewPile.length > 0) {
+                      setIsReviewingPileMode((prev) => !prev);
+                      setReviewPileSelectedOption(null);
+                      setReviewPileChecked(false);
+                      setReviewPileCorrect(false);
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
+                    isReviewingPileMode
+                      ? 'bg-amber-400 text-slate-950 border-slate-950 shadow-xs'
+                      : reviewPile.length > 0
+                      ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-400 animate-pulse'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                  }`}
+                  title="Review Pile collects missed questions and resurfaces them later in the session"
+                >
+                  <Bookmark className="w-3.5 h-3.5" />
+                  <span>Review Pile ({reviewPile.length})</span>
+                  {fixedQuestionIds.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[10px] font-black">
+                      {fixedQuestionIds.length} Fixed
+                    </span>
+                  )}
+                </button>
+
+                {/* Optional Speed Round Mode Toggle (Separate from Mastery) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setIsSpeedRoundMode((prev) => !prev);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
+                    isSpeedRoundMode
+                      ? 'bg-orange-500 text-white border-orange-600 shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                  }`}
+                  title="Optional Speed Round timer — does not affect your topic mastery levels"
+                >
+                  <Timer className="w-3.5 h-3.5" />
+                  <span>{isSpeedRoundMode ? 'Speed Round: ON (Mastery Safe)' : 'Optional Speed Round'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Adaptive Difficulty Sweet Spot Indicator (Target: 70-80%) */}
+                <span
+                  className="px-2.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-[11px] font-black text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5"
+                  title="Adaptive Difficulty tracks recent accuracy per topic and steps up/down to keep accuracy around 70-80%"
+                >
+                  <Target className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Adaptive: {activeAdaptiveDifficulty}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 font-mono">
+                    {topicAccuracyPercent}% (70-80% Zone)
+                  </span>
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setIsWorksheetModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 transition-all cursor-pointer"
+                  title="Open Printable Exam Paper & Mark Scheme"
+                >
+                  <Printer className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Exam Paper / PDF</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Adaptive Difficulty Step-Up / Step-Down Notification Banner */}
+          {adaptiveStepBanner && (
+            <div className="comic-panel-sm rounded-2xl p-3.5 bg-gradient-to-r from-indigo-50 via-emerald-50 to-amber-50 dark:from-indigo-950/50 dark:via-emerald-950/30 dark:to-slate-900 flex items-center justify-between gap-3 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2.5 text-xs font-black text-slate-900 dark:text-white">
+                <span className="px-2 py-0.5 rounded bg-amber-300 text-slate-950 border border-slate-950 text-[10px] uppercase">
+                  70–80% Sweet Spot
+                </span>
+                <span>{adaptiveStepBanner}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdaptiveStepBanner(null)}
+                className="text-xs font-bold text-slate-400 hover:text-slate-600 cursor-pointer shrink-0"
+              >
+                Dismiss ✕
+              </button>
+            </div>
+          )}
+
+          {/* Resurfaced Review Pile Stage (Collects missed questions & resurfaces them later in the session) */}
+          {isReviewingPileMode && reviewPile.length > 0 && (
+            <div className="comic-panel pattern-halftone rounded-3xl bg-gradient-to-br from-amber-50/95 via-white to-indigo-50/80 dark:from-slate-900 dark:via-indigo-950/40 dark:to-amber-950/20 p-5 sm:p-6 space-y-4 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b-2 border-slate-900 dark:border-slate-700">
+                <div className="flex items-center gap-2.5">
+                  <span className="comic-badge px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                    🔄 REVIEW PILE RESURFACED ({reviewPile.length} LEFT)
+                  </span>
+                  <span className="text-xs font-black text-indigo-900 dark:text-indigo-200">
+                    Second-Chance Mastery • Fixing a Missed Concept!
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsReviewingPileMode(false)}
+                  className="text-xs font-extrabold text-slate-500 hover:text-slate-800 dark:hover:text-white cursor-pointer"
+                >
+                  Return to Main Flow →
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2.5 py-0.5 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-200 text-[11px] font-black">
+                    Topic: {inferQuestionTopic(reviewPile[0], quiz.quiz_title)}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 text-[11px] font-black">
+                    Difficulty: {inferQuestionDifficulty(reviewPile[0], 0, quiz.difficulty)}
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <h4 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-snug flex-1">
+                    {reviewPile[0].question}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => handleExplainConcept(reviewPile[0])}
+                    disabled={isGeneratingConcept}
+                    className="comic-panel-sm shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-slate-950 border-2 border-slate-950 text-xs font-black transition-all cursor-pointer"
+                    title="Ask AI Tutor to generate a simplified 'Explain this Concept' summary for this question"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span>Explain this Concept</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {(
+                    reviewPile[0].options || [
+                      reviewPile[0].correct_answer,
+                      'Alternative concept distractor',
+                      'Secondary edge case',
+                      'None of the above',
+                    ]
+                  ).map((opt, idx) => {
+                    const isPicked = reviewPileSelectedOption === opt;
+                    const isRightOpt =
+                      opt.trim().toLowerCase() ===
+                      reviewPile[0].correct_answer.trim().toLowerCase();
+                    let style =
+                      'bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white';
+                    if (reviewPileChecked) {
+                      if (isRightOpt) {
+                        style =
+                          'bg-emerald-100 dark:bg-emerald-950/80 border-2 border-emerald-600 text-emerald-950 dark:text-emerald-100 font-black';
+                      } else if (isPicked) {
+                        style =
+                          'bg-amber-100 dark:bg-amber-950/60 border-2 border-amber-500 text-amber-950 dark:text-amber-100';
+                      }
+                    } else if (isPicked) {
+                      style =
+                        'bg-indigo-50 dark:bg-indigo-950/80 border-2 border-indigo-600 text-indigo-950 dark:text-white font-black';
+                    }
+
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        disabled={reviewPileChecked}
+                        onClick={() => {
+                          soundFx.playClick();
+                          setReviewPileSelectedOption(opt);
+                        }}
+                        className={`p-3.5 rounded-2xl text-left text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-2.5 ${style}`}
+                      >
+                        <span className="w-6 h-6 rounded-lg bg-slate-900 text-white text-xs font-mono font-black flex items-center justify-center shrink-0">
+                          {['A', 'B', 'C', 'D'][idx] || idx + 1}
+                        </span>
+                        <span className="flex-1">{opt}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {reviewPileChecked && (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs space-y-1">
+                    <div className="font-black text-emerald-900 dark:text-emerald-200">
+                      {reviewPileCorrect
+                        ? '🎉 Mistake Fixed! You mastered this resurfaced question and removed it from your Review Pile!'
+                        : `🌱 Almost there! The target answer is "${reviewPile[0].correct_answer}". We'll keep it in your Review Pile for one more look!`}
+                    </div>
+                    <p className="text-slate-700 dark:text-slate-300">{reviewPile[0].explanation}</p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2.5 pt-1">
+                  {!reviewPileChecked ? (
+                    <button
+                      type="button"
+                      disabled={!reviewPileSelectedOption}
+                      onClick={handleCheckReviewPileAnswer}
+                      className="comic-panel-sm px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-black cursor-pointer"
+                    >
+                      Check Resurfaced Question
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleAdvanceReviewPile}
+                      className="comic-panel-sm px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black cursor-pointer"
+                    >
+                      {reviewPileCorrect && reviewPile.length === 1
+                        ? 'Review Pile Cleared! Continue Session →'
+                        : 'Next in Review Pile →'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Collapsible AI Study Guide & Core Vocabulary Panel */}
+          {showStudyGuidePanel && quiz.study_guide && (
+            <div className="comic-panel-sm bg-white dark:bg-slate-900 rounded-2xl p-5 space-y-4 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-emerald-500" />
+                  <h4 className="font-black text-sm text-slate-900 dark:text-white">
+                    AI Study Guide & Core Vocabulary — {quiz.quiz_title}
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStudyGuidePanel(false)}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  Close ✕
+                </button>
+              </div>
+
+              {quiz.study_guide.key_takeaways && quiz.study_guide.key_takeaways.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                    Key Takeaways
+                  </span>
+                  <ul className="space-y-1.5">
+                    {quiz.study_guide.key_takeaways.map((kt, idx) => (
+                      <li key={idx} className="text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                        <span>{kt}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {quiz.study_guide.core_vocabulary && quiz.study_guide.core_vocabulary.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+                    Essential Vocabulary
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {quiz.study_guide.core_vocabulary.map((v, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700 text-xs"
+                      >
+                        <span className="font-black text-indigo-600 dark:text-indigo-400 block">{v.term}</span>
+                        <span className="text-slate-600 dark:text-slate-300">{v.definition}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="comic-panel comic-pop-card bg-white dark:bg-slate-900 rounded-3xl p-5 sm:p-7 space-y-4 transition-colors relative overflow-hidden">
+            {/* Neo-Comic Top Accent Pattern Ribbon */}
+            <div className="pattern-speed-stripes -mx-5 sm:-mx-7 -mt-5 sm:-mt-7 mb-4 px-5 sm:px-7 py-2.5 bg-indigo-50/80 dark:bg-indigo-950/40 border-b-2 border-slate-900 dark:border-slate-800 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="comic-badge comic-badge-tilt-left px-2.5 py-0.5 rounded-md bg-amber-300 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                  PANEL #{currentIndex + 1}
+                </span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-indigo-950 dark:text-indigo-200">
+                  Interactive Comic Challenge Stage
+                </span>
+              </div>
+              <span className="text-[10px] font-mono font-black uppercase tracking-widest px-2 py-0.5 rounded bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700">
+                {currentQuestion.type.replace('_', ' ')}
+              </span>
+            </div>
+
             {/* Challenge Mode Question Countdown Bar */}
             {isChallengeMode && (
               <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 dark:from-amber-950/30 dark:via-orange-950/20 dark:to-slate-900 border border-amber-300/80 dark:border-amber-700/80 space-y-2.5 animate-in fade-in duration-200">
@@ -1940,8 +2824,27 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                     currentQuestion.domain
                   )}`}
                 >
-                  {currentQuestion.domain || 'Core Knowledge'}
+                  {currentQuestionTopic}
                 </span>
+
+                {/* Explicit Question Difficulty Level Tag */}
+                <span
+                  className={`text-xs font-black px-2.5 py-1 rounded-lg border ${
+                    currentQuestionDifficulty === 'Master'
+                      ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                      : currentQuestionDifficulty === 'Intermediate'
+                      ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                  }`}
+                >
+                  Difficulty: {currentQuestionDifficulty}
+                </span>
+
+                {isSpeedRoundMode && (
+                  <span className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 border border-orange-300 dark:border-orange-800">
+                    ⚡ Speed Round (Does Not Affect Mastery)
+                  </span>
+                )}
 
                 {/* Bloom's Level */}
                 {currentQuestion.bloom_level && (
@@ -1950,9 +2853,12 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                   </span>
                 )}
 
-                {/* Points */}
+                {/* Points (Reflects Hint Cost Multiplier if Hints Used) */}
                 <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                  {currentQuestion.points || 20} pts
+                  {Math.round((currentQuestion.points || 20) * (currentHintUsage?.pointMultiplier ?? 1.0))} pts
+                  {currentHintUsage && currentHintUsage.hintsUsedCount > 0
+                    ? ` (${currentHintUsage.hintsUsedCount}/2 Hints • Mastery Safe)`
+                    : ''}
                 </span>
 
                 {/* Score & Answer Streak Pill */}
@@ -2060,19 +2966,189 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
               </div>
             </div>
 
-            {/* Question Text */}
+            {/* Question Text + Next-to-Question 'Explain this Concept' AI Tutor Button */}
             <div className="space-y-3">
-              <h3
-                className={`font-black text-slate-900 dark:text-white leading-relaxed tracking-tight ${
-                  fontSizeScale === 'xlarge'
-                    ? 'text-2xl sm:text-3xl'
-                    : fontSizeScale === 'large'
-                    ? 'text-xl sm:text-2xl'
-                    : 'text-lg sm:text-xl'
-                }`}
-              >
-                {currentQuestion.question}
-              </h3>
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <h3
+                  className={`font-black text-slate-900 dark:text-white leading-snug tracking-tight flex-1 ${
+                    fontSizeScale === 'xlarge'
+                      ? 'text-2xl sm:text-3xl'
+                      : fontSizeScale === 'large'
+                      ? 'text-xl sm:text-2xl'
+                      : 'text-lg sm:text-xl'
+                  }`}
+                >
+                  {currentQuestion.question}
+                </h3>
+
+                <button
+                  type="button"
+                  onClick={() => handleExplainConcept(currentQuestion)}
+                  disabled={isGeneratingConcept}
+                  className={`comic-panel-sm shrink-0 self-start inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                    showConceptCard
+                      ? 'bg-amber-300 text-slate-950 border-2 border-slate-950'
+                      : 'bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 hover:from-indigo-500 hover:to-violet-500 text-white border-2 border-slate-950'
+                  }`}
+                  title="Call the AI Tutor to generate a simplified 'Explain this Concept' summary specific to this question"
+                >
+                  {isGeneratingConcept ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                      <span>Explaining Concept...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                      <span>{showConceptCard ? 'Hide Concept Summary' : 'Explain this Concept'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* AI Tutor 'Explain this Concept' Simplified Summary Panel */}
+              {showConceptCard && (
+                <div className="comic-panel-sm pattern-halftone rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-indigo-50/95 via-white to-amber-50/85 dark:from-indigo-950/75 dark:via-slate-900 dark:to-violet-950/50 border-2 border-slate-900 dark:border-indigo-400 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-start justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800 pb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <MascotAvatar
+                        mood={persona === 'Teacher' ? 'teacher' : 'happy'}
+                        size="sm"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center flex-wrap gap-1.5">
+                          <span className="comic-badge px-2 py-0.5 rounded bg-amber-300 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                            🦉 AI TUTOR • EXPLAIN THIS CONCEPT
+                          </span>
+                          <span className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300">
+                            {currentQuestionTopic} ({currentQuestionDifficulty})
+                          </span>
+                        </div>
+                        <h4 className="font-black text-sm sm:text-base text-slate-900 dark:text-white truncate mt-0.5">
+                          {isGeneratingConcept
+                            ? 'Synthesizing simplified concept breakdown...'
+                            : conceptSummaries[currentQuestion.id]?.conceptTitle ||
+                              `${currentQuestionTopic} — Simplified Summary`}
+                        </h4>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {!isGeneratingConcept && conceptSummaries[currentQuestion.id] && (
+                        <button
+                          type="button"
+                          onClick={() => handleExplainConcept(currentQuestion, true)}
+                          className="p-1.5 rounded-lg bg-white/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer"
+                          title="Regenerate simplified summary"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowConceptCard(false)}
+                        className="p-1.5 rounded-lg bg-white/80 dark:bg-slate-800 text-slate-500 hover:text-rose-600 border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer"
+                        title="Close concept summary"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {isGeneratingConcept ? (
+                    <div className="py-4 flex items-center gap-3 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                      <RefreshCw className="w-4 h-4 animate-spin text-indigo-600 shrink-0" />
+                      <span>
+                        AI Tutor is breaking down this question’s core concept into simple, everyday language...
+                      </span>
+                    </div>
+                  ) : (
+                    conceptSummaries[currentQuestion.id] && (
+                      <div className="space-y-3 text-xs sm:text-sm">
+                        <div className="p-3.5 rounded-xl bg-white/95 dark:bg-slate-900/90 border border-indigo-200/80 dark:border-indigo-800/80 space-y-1">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                            💡 Simplified Concept Summary
+                          </span>
+                          <p className="text-slate-800 dark:text-slate-100 font-semibold leading-relaxed">
+                            {conceptSummaries[currentQuestion.id].simplifiedSummary}
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          <div className="p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-300/80 dark:border-amber-800/80 space-y-1">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-300 block">
+                              🧩 Real-World Analogy
+                            </span>
+                            <p className="text-xs text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
+                              {conceptSummaries[currentQuestion.id].realWorldAnalogy}
+                            </p>
+                          </div>
+
+                          <div className="p-3 rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-300/80 dark:border-emerald-800/80 space-y-1">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 block">
+                              🎯 Core Rule to Remember
+                            </span>
+                            <p className="text-xs text-slate-800 dark:text-slate-200 font-bold leading-relaxed">
+                              {conceptSummaries[currentQuestion.id].keyPrinciple}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                          <div className="flex items-center flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveConceptToMyNotes(currentQuestion)}
+                              disabled={Boolean(savedConceptToNotes[currentQuestion.id])}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                savedConceptToNotes[currentQuestion.id]
+                                  ? 'bg-emerald-600 text-white border-emerald-700'
+                                  : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:border-indigo-500'
+                              }`}
+                            >
+                              <Bookmark className="w-3.5 h-3.5" />
+                              <span>
+                                {savedConceptToNotes[currentQuestion.id]
+                                  ? '✓ Saved to My Notes'
+                                  : 'Save Summary to My Notes'}
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                soundFx.playClick();
+                                const c = conceptSummaries[currentQuestion.id];
+                                if (!c) return;
+                                speechEngine.speak(
+                                  `${c.conceptTitle}. ${c.simplifiedSummary} Analogy: ${c.realWorldAnalogy}. Core rule: ${c.keyPrinciple}`,
+                                  { id: `concept_${currentQuestion.id}`, lang: quiz.language }
+                                );
+                              }}
+                              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:border-indigo-500 transition-all cursor-pointer flex items-center gap-1.5"
+                            >
+                              <Volume2 className="w-3.5 h-3.5 text-indigo-500" />
+                              <span>Read Summary Aloud</span>
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundFx.playClick();
+                              onOpenTutor(currentQuestion);
+                            }}
+                            className="px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>Ask Follow-Up in AI Tutor Chat →</span>
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
 
               {/* Question Contextual Image (with Spoiler Shield before answering & Zoom Lightbox) */}
               {currentQuestion.image_url && (
@@ -2307,26 +3383,37 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
               </div>
             )}
 
-            {/* QUESTION INPUT FORMAT: MULTIPLE CHOICE */}
+            {/* QUESTION INPUT FORMAT: MULTIPLE CHOICE — VIBRANT OFFICIAL & FUN TACTILE TILES */}
             {currentQuestion.type === 'multiple_choice' && currentQuestion.options && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
                 {currentQuestion.options.map((option, idx) => {
                   const letter = ['A', 'B', 'C', 'D'][idx] || `${idx + 1}`;
-                  const badgeAccent = [
-                    'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
-                    'bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800',
-                    'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-                    'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-                  ][idx % 4];
                   const isSelected = selectedOption === option;
                   const isEliminated = (eliminatedOptions[currentQuestion.id] || []).includes(option);
 
-                  let optionStyle = 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-indigo-400 text-slate-900 dark:text-slate-100';
+                  const badgeColors = [
+                    'bg-blue-600 text-white border-blue-800',
+                    'bg-emerald-600 text-white border-emerald-800',
+                    'bg-amber-400 text-slate-950 border-amber-600',
+                    'bg-rose-600 text-white border-rose-800',
+                  ];
+                  const hoverBorders = [
+                    'hover:border-blue-500 dark:hover:border-blue-400',
+                    'hover:border-emerald-500 dark:hover:border-emerald-400',
+                    'hover:border-amber-500 dark:hover:border-amber-400',
+                    'hover:border-rose-500 dark:hover:border-rose-400',
+                  ];
+
+                  let optionStyle = `border-2 border-b-[5px] border-slate-200 dark:border-slate-700 border-b-slate-300 dark:border-b-slate-800 bg-white dark:bg-slate-800/95 ${
+                    hoverBorders[idx % 4]
+                  } text-slate-900 dark:text-white shadow-xs`;
 
                   if (isEliminated && !isAnswerChecked) {
-                    optionStyle = 'opacity-45 border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/40 text-slate-400 line-through';
+                    optionStyle =
+                      'opacity-45 border-2 border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/40 text-slate-400 line-through';
                   } else if (isSelected) {
-                    optionStyle = 'border-indigo-500 dark:border-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/30 text-indigo-900 dark:text-indigo-200 ring-2 ring-indigo-500/20 font-bold';
+                    optionStyle =
+                      'border-2 border-b-[5px] border-indigo-600 dark:border-indigo-400 border-b-indigo-800 dark:border-b-indigo-600 bg-indigo-50/95 dark:bg-indigo-950/70 text-slate-950 dark:text-white ring-2 ring-indigo-500/30 font-extrabold -translate-y-0.5 shadow-md';
                   }
 
                   if (isAnswerChecked) {
@@ -2334,11 +3421,14 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                       option.trim().toLowerCase() ===
                       currentQuestion.correct_answer.trim().toLowerCase()
                     ) {
-                      optionStyle = 'border-emerald-600 dark:border-emerald-500 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 font-extrabold ring-2 ring-emerald-600';
+                      optionStyle =
+                        'border-2 border-b-[5px] border-emerald-600 dark:border-emerald-500 border-b-emerald-800 bg-emerald-50 dark:bg-emerald-950/80 text-emerald-950 dark:text-emerald-100 font-black ring-2 ring-emerald-500 shadow-md';
                     } else if (isSelected && !isCurrentCorrect) {
-                      optionStyle = 'border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-200 font-bold';
+                      optionStyle =
+                        'border-2 border-b-[5px] border-rose-500 border-b-rose-700 bg-rose-50 dark:bg-rose-950/60 text-rose-950 dark:text-rose-100 font-bold';
                     } else {
-                      optionStyle = 'opacity-40 border-slate-200 dark:border-slate-800 text-slate-400';
+                      optionStyle =
+                        'opacity-45 border-2 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400';
                     }
                   }
 
@@ -2351,7 +3441,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
 
                   return (
                     <div
-                      key={idx}
+                      key={`${currentQuestion.id}-${idx}`}
                       onClick={() => {
                         if (isAnswerChecked || isEliminated) return;
                         soundFx.playClick();
@@ -2364,36 +3454,36 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                         handleVoiceDirectCheck(option);
                       }}
                       title="Click to select, or Double-Tap / Double-Click to lock in as your answer"
-                      className={`p-3.5 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${optionStyle}`}
+                      className={`arcade-btn animate-24fps-deal delay-24fps-${(idx % 4) + 1} p-4 rounded-2xl text-left transition-all flex items-center gap-3.5 cursor-pointer ${optionStyle}`}
                     >
                       <span
-                        className={`w-8 h-8 rounded-xl font-black text-xs flex items-center justify-center shrink-0 border shadow-2xs ${
+                        className={`w-10 h-10 rounded-xl font-mono font-black text-sm flex items-center justify-center shrink-0 border-b-3 shadow-xs transition-transform ${
                           isSelected
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : badgeAccent
+                            ? 'bg-indigo-600 text-white border-indigo-900 scale-105'
+                            : badgeColors[idx % 4]
                         }`}
                       >
                         {letter}
                       </span>
-                      <span className={`${optSizeClass} font-semibold flex-1 leading-snug`}>
+                      <span className={`${optSizeClass} font-bold flex-1 leading-snug`}>
                         {option}
                       </span>
                       {!isAnswerChecked && (
                         <button
                           type="button"
                           onClick={(e) => toggleEliminateOption(option, e)}
-                          className={`p-1 rounded-lg border text-[10px] font-bold transition-colors cursor-pointer shrink-0 ${
+                          className={`p-1.5 rounded-xl border text-[10px] font-bold transition-colors cursor-pointer shrink-0 ${
                             isEliminated
                               ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-800'
-                              : 'bg-white/80 dark:bg-slate-800/80 text-slate-400 hover:text-rose-500 border-slate-200/60 dark:border-slate-700/60'
+                              : 'bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 border-slate-200/80 dark:border-slate-700/80'
                           }`}
                           title={isEliminated ? 'Restore option' : 'Cross out / Eliminate distractor'}
                         >
                           <Scissors className="w-3 h-3" />
                         </button>
                       )}
-                      <span className="hidden sm:inline-block text-[10px] font-mono font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-slate-700/60">
-                        [{idx + 1}]
+                      <span className="hidden sm:inline-block text-[10px] font-mono font-black text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-lg border border-slate-200/80 dark:border-slate-600">
+                        {idx + 1}
                       </span>
                     </div>
                   );
@@ -2563,79 +3653,294 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
               </div>
             )}
 
-            {/* Hint Accordion */}
-            {showHint && currentQuestion.gamified_feedback?.hint && (
-              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-3 animate-in fade-in duration-200">
-                <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-extrabold uppercase tracking-wider text-[10px] text-amber-700 dark:text-amber-300 mb-0.5">
-                    Hint
-                  </p>
-                  <p className="font-semibold leading-relaxed">
-                    {currentQuestion.gamified_feedback.hint}
-                  </p>
-                </div>
-              </div>
-            )}
+            {/* 2-Step Hints with a Cost Accordion (Up to 2 Hints/Question, Slight Point Reduction, Never Blocks Mastery) */}
+            {showHint && (() => {
+              const twoStep = generateTwoStepHintsForQuestion(currentQuestion);
+              const usage = currentHintUsage || getHintUsageForQuestion(currentQuestion);
+              return (
+                <div className="comic-panel-sm p-4 rounded-2xl bg-amber-50/95 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-700 text-amber-950 dark:text-amber-100 text-xs space-y-3 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-amber-200/80 dark:border-amber-800/80 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span className="font-black uppercase tracking-wider text-[11px] text-amber-900 dark:text-amber-200">
+                        💡 Hints With a Cost ({usage.hintsUsedCount}/2 Used on This Question)
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-[10px] font-black">
+                      🛡️ Never Blocks Mastery Credit • {Math.round(usage.pointMultiplier * 100)}% Point Value
+                    </span>
+                  </div>
 
-            {/* Checked Rationale Box with Quizzie Mascot Support */}
-            {isAnswerChecked && (
-              <div
-                className={`p-5 rounded-3xl border animate-in fade-in duration-200 space-y-3 ${
-                  isCurrentCorrect
-                    ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200'
-                    : 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-950 dark:text-rose-200'
-                }`}
-              >
-                <div className="flex items-start gap-3.5">
-                  <MascotAvatar
-                    mood={isCurrentCorrect ? (stats.streak > 2 ? 'streak' : 'happy') : 'comforting'}
-                    size="sm"
-                  />
-                  <div className="flex-1 space-y-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-2">
-                      {isCurrentCorrect ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Hint #1 Card: First Letter & Concept Clue */}
+                    <div className="p-3 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-amber-300 dark:border-amber-800 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                          Hint #1: First Letter & Clue
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-slate-500">
+                          -15% pts
+                        </span>
+                      </div>
+                      {usage.hint1Used ? (
+                        <p className="font-semibold text-slate-800 dark:text-slate-100 leading-relaxed">
+                          {twoStep.hint1Text}
+                        </p>
                       ) : (
-                        <XCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
-                      )}
-                      <h4 className="font-extrabold text-sm sm:text-base tracking-tight">
-                        {isCurrentCorrect
-                          ? currentQuestion.gamified_feedback?.success_quote || 'Spark on! Correct! Nicely done.'
-                          : `Keep going! Correct Answer: ${currentQuestion.correct_answer}`}
-                      </h4>
-                      {isCurrentCorrect && lastPointsEarned > 0 && (
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-black bg-emerald-600 text-white shadow-2xs">
-                          +{lastPointsEarned.toLocaleString()} pts
-                        </span>
-                      )}
-                      {streakSavedBanner && (
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500 text-slate-950">
-                          🛡️ Streak Shield Saved Your {kahootStreak}x Streak!
-                        </span>
+                        <button
+                          type="button"
+                          disabled={isAnswerChecked}
+                          onClick={() => handleUnlockHintTier(1)}
+                          className="w-full py-1.5 px-3 rounded-lg bg-amber-300 hover:bg-amber-400 text-slate-950 font-black text-xs border border-slate-950 transition-all cursor-pointer disabled:opacity-40"
+                        >
+                          Unlock Hint #1 (First Letter Clue)
+                        </button>
                       )}
                     </div>
 
-                    <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed pt-1">
-                      {currentQuestion.explanation}
-                    </p>
-
-                    {!isCurrentCorrect && (
-                      <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1.5 pt-1">
-                        <span>🌱</span>
-                        <span>Tip: Every mistake helps you learn the concept even better!</span>
-                      </p>
-                    )}
+                    {/* Hint #2 Card: Remove 2 Wrong Options / Structural Pattern */}
+                    <div className="p-3 rounded-xl bg-white/90 dark:bg-slate-900/90 border border-amber-300 dark:border-amber-800 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-300">
+                          Hint #2: Remove 2 Wrong Options
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-slate-500">
+                          -30% pts total
+                        </span>
+                      </div>
+                      {usage.hint2Used ? (
+                        <p className="font-semibold text-slate-800 dark:text-slate-100 leading-relaxed">
+                          {twoStep.hint2Text}
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={isAnswerChecked}
+                          onClick={() => handleUnlockHintTier(2)}
+                          className="w-full py-1.5 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-black text-xs border border-slate-950 transition-all cursor-pointer disabled:opacity-40"
+                        >
+                          Unlock Hint #2 (Eliminate 2 Options)
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
+              );
+            })()}
 
-                {currentQuestion.pedagogy_note && (
-                  <p className="text-[11px] font-semibold text-indigo-900 dark:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40 p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800">
-                    <span className="font-extrabold">Study Tip:</span> {currentQuestion.pedagogy_note}
-                  </p>
-                )}
-              </div>
-            )}
+            {/* Checked Rationale Box with Encouraging Learning Moments, Distractor Breakdown & Follow-Up Question */}
+            {isAnswerChecked && (() => {
+              const submittedAns = userAnswers[currentQuestion.id]?.userAnswer || '';
+              const detailedExp = getDetailedAnswerExplanation(
+                currentQuestion,
+                submittedAns,
+                isCurrentCorrect
+              );
+              const encouragingCopy = getEncouragingFeedbackCopy(currentQuestion.id);
+
+              return (
+                <div
+                  className={`comic-panel-sm p-5 rounded-3xl animate-in fade-in duration-200 space-y-4 ${
+                    isCurrentCorrect
+                      ? 'bg-emerald-50/85 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-100'
+                      : 'bg-amber-50/90 dark:bg-indigo-950/40 border-amber-300 dark:border-indigo-800 text-slate-900 dark:text-slate-100'
+                  }`}
+                >
+                  <div className="flex items-start gap-3.5">
+                    <MascotAvatar
+                      mood={isCurrentCorrect ? (stats.streak > 2 ? 'streak' : 'happy') : 'encourage'}
+                      size="sm"
+                    />
+                    <div className="flex-1 space-y-2 min-w-0">
+                      <div className="flex items-center flex-wrap gap-2">
+                        {isCurrentCorrect ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        ) : (
+                          <Sparkles className="w-5 h-5 text-amber-500 shrink-0 animate-bounce" />
+                        )}
+                        <h4 className="font-black text-sm sm:text-base tracking-tight">
+                          {isCurrentCorrect
+                            ? currentQuestion.gamified_feedback?.success_quote ||
+                              'Spark on! Correct! Nicely done.'
+                            : encouragingCopy.headline}
+                        </h4>
+                        {isCurrentCorrect && lastPointsEarned > 0 && (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-black bg-emerald-600 text-white shadow-2xs">
+                            +{lastPointsEarned.toLocaleString()} pts
+                          </span>
+                        )}
+                        {!isCurrentCorrect && (
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-300 text-slate-950 border border-slate-950">
+                            📚 Added to Review Pile
+                          </span>
+                        )}
+                        {streakSavedBanner && (
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500 text-slate-950">
+                            🛡️ Streak Shield Saved Your {kahootStreak}x Streak!
+                          </span>
+                        )}
+                      </div>
+
+                      {!isCurrentCorrect && (
+                        <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                          {encouragingCopy.subtext}
+                        </p>
+                      )}
+
+                      {/* 1. Why the Chosen Option Was Incorrect (Shown on Wrong Answers) */}
+                      {!isCurrentCorrect && detailedExp.whyChosenWasIncorrect && (
+                        <div className="p-3 rounded-2xl bg-white/90 dark:bg-slate-900/80 border-2 border-amber-300 dark:border-amber-700/80 text-xs space-y-1">
+                          <span className="font-black uppercase tracking-wider text-[10px] text-amber-700 dark:text-amber-300 block">
+                            🔍 Why Your Choice (“{submittedAns}”) Didn’t Fit:
+                          </span>
+                          <p className="text-slate-700 dark:text-slate-200 font-semibold leading-relaxed">
+                            {detailedExp.whyChosenWasIncorrect}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* 2. Why the Correct Answer Is Right (Shown After Every Answer) */}
+                      <div className="p-3 rounded-2xl bg-white/90 dark:bg-slate-900/80 border-2 border-emerald-300 dark:border-emerald-700/80 text-xs space-y-1">
+                        <span className="font-black uppercase tracking-wider text-[10px] text-emerald-700 dark:text-emerald-300 block">
+                          ✓ Why “{currentQuestion.correct_answer}” Is Right:
+                        </span>
+                        <p className="text-slate-700 dark:text-slate-200 font-semibold leading-relaxed">
+                          {detailedExp.whyCorrectIsRight}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {currentQuestion.pedagogy_note && (
+                    <p className="text-[11px] font-semibold text-indigo-900 dark:text-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40 p-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                      <span className="font-extrabold">Study Tip:</span> {currentQuestion.pedagogy_note}
+                    </p>
+                  )}
+
+                  {/* 3. Similar Follow-Up Question (Same Concept, Different Wording) After a Miss */}
+                  {!isCurrentCorrect && activeFollowUpQuestion && (
+                    <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-900 dark:border-slate-700 space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="comic-badge px-2 py-0.5 rounded bg-indigo-600 text-white text-[10px] font-black uppercase">
+                            FOLLOW-UP PRACTICE
+                          </span>
+                          <span className="text-xs font-black text-slate-900 dark:text-white">
+                            Try a Similar Question (Same Concept, Fresh Wording)
+                          </span>
+                        </div>
+                        {followUpChecked && followUpCorrect && (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[11px] font-black">
+                            🌟 Concept Redeemed! (+1 Fixed Mistake)
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white leading-snug">
+                        {activeFollowUpQuestion.question}
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {(activeFollowUpQuestion.options || []).map((opt, idx) => {
+                          const isPicked = followUpSelectedOption === opt;
+                          const isRight =
+                            opt.trim().toLowerCase() ===
+                            activeFollowUpQuestion.correct_answer.trim().toLowerCase();
+                          let btnCls =
+                            'bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200';
+                          if (followUpChecked) {
+                            if (isRight) {
+                              btnCls =
+                                'bg-emerald-100 dark:bg-emerald-950/70 border-2 border-emerald-600 text-emerald-950 dark:text-emerald-100 font-black';
+                            } else if (isPicked) {
+                              btnCls =
+                                'bg-amber-100 dark:bg-amber-950/60 border-2 border-amber-500 text-amber-950 dark:text-amber-100';
+                            }
+                          } else if (isPicked) {
+                            btnCls =
+                              'bg-indigo-50 dark:bg-indigo-950/70 border-2 border-indigo-600 text-indigo-950 dark:text-white font-black';
+                          }
+
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              disabled={followUpChecked}
+                              onClick={() => {
+                                soundFx.playClick();
+                                setFollowUpSelectedOption(opt);
+                              }}
+                              className={`p-3 rounded-xl text-left text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${btnCls}`}
+                            >
+                              <span className="w-5 h-5 rounded bg-slate-900 text-white text-[10px] font-mono font-black flex items-center justify-center shrink-0">
+                                {['A', 'B', 'C', 'D'][idx] || idx + 1}
+                              </span>
+                              <span className="flex-1">{opt}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {!followUpChecked ? (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            disabled={!followUpSelectedOption}
+                            onClick={handleCheckFollowUpAnswer}
+                            className="comic-panel-sm px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-black cursor-pointer"
+                          >
+                            Check Follow-Up Answer
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                          {followUpCorrect
+                            ? activeFollowUpQuestion.explanation
+                            : `Good effort! The target concept is "${activeFollowUpQuestion.correct_answer}". You'll get another friendly look in your Review Pile!`}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 4. Optional "Explain It In Your Own Words" Prompt for Missed / Repeatedly Missed Questions */}
+                  {!isCurrentCorrect && (
+                    <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-slate-900/90 border border-indigo-200 dark:border-indigo-800 space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <span className="text-xs font-black text-indigo-900 dark:text-indigo-200">
+                          🧠 Optional Reflection: Explain It In Your Own Words
+                          {currentMissCount > 1 ? ` (Missed ${currentMissCount}x)` : ''}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500">
+                          Saves directly to your “My Notes” screen
+                        </span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={ownWordsText}
+                          disabled={ownWordsSaved}
+                          onChange={(e) => setOwnWordsText(e.target.value)}
+                          placeholder="In one sentence, how would you explain why the right answer works?"
+                          className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          disabled={!ownWordsText.trim() || ownWordsSaved}
+                          onClick={handleSaveInlineOwnWords}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black cursor-pointer disabled:opacity-40 shrink-0 ${
+                            ownWordsSaved
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                          }`}
+                        >
+                          {ownWordsSaved ? '✓ Saved to My Notes' : 'Save Reflection'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Bottom Assessment Control Deck */}
@@ -2645,13 +3950,23 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  soundFx.playHint();
-                  setShowHint(!showHint);
+                  if (!showHint && (!currentHintUsage || currentHintUsage.hintsUsedCount === 0)) {
+                    handleUnlockHintTier(1);
+                  } else {
+                    soundFx.playHint();
+                    setShowHint(!showHint);
+                  }
                 }}
                 className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-xs font-extrabold hover:bg-amber-100 transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Lightbulb className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span>{showHint ? 'Hide Hint' : 'View Hint'}</span>
+                <span>
+                  {showHint
+                    ? `Hints (${currentHintUsage?.hintsUsedCount || 0}/2 Used)`
+                    : currentHintUsage && currentHintUsage.hintsUsedCount > 0
+                    ? `Show Hints (${currentHintUsage.hintsUsedCount}/2)`
+                    : 'Use Hint (Max 2)'}
+                </span>
               </button>
 
               <button
@@ -2733,11 +4048,21 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
       />
 
       {/* Printable Exam Worksheet & Solution Key Modal */}
-      <ExamWorksheetModal
-        quiz={quiz}
-        isOpen={isWorksheetModalOpen}
-        onClose={() => setIsWorksheetModalOpen(false)}
-      />
+      {isWorksheetModalOpen && (
+        <ExamWorksheetModal
+          quiz={quiz}
+          isOpen={isWorksheetModalOpen}
+          onClose={() => setIsWorksheetModalOpen(false)}
+        />
+      )}
+
+      {/* 3D Interactive Flashcard Study Deck Modal */}
+      {isFlashcardModalOpen && (
+        <FlashcardStudyDeck
+          quiz={quiz}
+          onClose={() => setIsFlashcardModalOpen(false)}
+        />
+      )}
 
       {/* Voice & Narration Settings Modal */}
       <VoiceSettingsModal
