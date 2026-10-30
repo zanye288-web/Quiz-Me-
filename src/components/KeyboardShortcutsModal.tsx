@@ -38,6 +38,24 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
       ],
     },
     {
+      title: 'Candidate Superpowers & Examination Tools',
+      icon: '⚡',
+      shortcuts: [
+        { keys: ['Alt', 'C'], description: 'Open Scientific & Graphing Calculator' },
+        { keys: ['Alt', 'F'], description: 'Open Formula Booklet & Physical Constants' },
+        { keys: ['Alt', 'S'], description: 'Open Working Scratchpad Canvas' },
+        { keys: ['Alt', 'H'], description: 'Open Diagnostic Topic Mastery Heatmap' },
+        { keys: ['Alt', 'P'], description: 'Open 3-Min Audio Revision Podcast Player' },
+        { keys: ['Alt', 'O'], description: 'Open 20-Item OMR Bubble Sheet Simulator' },
+        { keys: ['Alt', 'L'], description: 'Open Science & STEM Laboratory (Periodic Table/pH/Optics)' },
+        { keys: ['Alt', 'E'], description: 'Open Humanities & Literature Suite (PEEL/Literary Devices)' },
+        { keys: ['Alt', 'M'], description: 'Open Mathematical Analysis Sandbox (Quadratic/Stats/Venn)' },
+        { keys: ['Alt', 'J'], description: 'Open JAMB 8-Key CBT Simulator & Seat Pass' },
+        { keys: ['Alt', 'W'], description: 'Open Candidate Wellness & Box Breathing Coach' },
+        { keys: ['Alt', 'V'], description: 'Open Mnemonics & SM-2 Memory Vault' },
+      ],
+    },
+    {
       title: 'Quiz & Exam Runner',
       icon: '⚡',
       shortcuts: [

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BookOpen,
   FileText,
@@ -33,15 +33,21 @@ import {
   EXAM_FORMAT_CATALOG,
   getExamFormatSpec,
   buildPrebuiltExamByFormat,
+  evaluateExamBoardGrade,
 } from '../utils/examFormats';
 import {
   PAST_PAPER_ACADEMY_SUBJECTS,
   TOPICAL_PAST_PAPER_PACKS,
   buildExpandedPastPaperAcademyResources,
+  buildResourceForSessionPaper,
+  getWrittenExamPaperHeaderMeta,
+  getDocumentProvenanceMeta,
+  EXAM_BOARD_INCEPTION_YEARS,
   SubjectFolderSpec,
   TopicalPastPaperPack,
 } from '../data/pastPaperAcademyCatalog';
 import { soundFx } from '../utils/audio';
+import { OpenAccessHubView } from './open-access/OpenAccessHubView';
 
 export type ResourceKind = 'past_paper' | 'textbook' | 'marking_scheme' | 'syllabus';
 
@@ -693,6 +699,27 @@ export const ACADEMIC_RESOURCES_CATALOG: AcademicResourceItem[] = [
   },
 ];
 
+const WORLD_REGION_SLOTS: Array<{ id: string; label: string; emoji: string }> = [
+  { id: 'All Regions', label: 'All Countries & Regions', emoji: '🌍' },
+  { id: 'West & East Africa', label: 'Africa (WAEC, JAMB, NECO, KCSE, Matric)', emoji: '🇳🇬' },
+  { id: 'United Kingdom & Europe', label: 'UK & Europe (GCSE, A-Level, Abitur, Bac)', emoji: '🇬🇧' },
+  { id: 'North & South America', label: 'Americas (Digital SAT, ACT, AP, ENEM)', emoji: '🇺🇸' },
+  { id: 'Asia & Oceania', label: 'Asia & Oceania (JEE/NEET, Gaokao, ATAR)', emoji: '🇮🇳' },
+  { id: 'Global / International', label: 'International (IGCSE, Checkpoint, IB, IELTS)', emoji: '🌐' },
+];
+
+const SUBJECT_CATEGORY_SLOTS: Array<{
+  id: 'all' | SubjectFolderSpec['category'];
+  label: string;
+  emoji: string;
+}> = [
+  { id: 'all', label: 'All Subject Slots', emoji: '🗂️' },
+  { id: 'Mathematics & Computing', label: 'Mathematics & Computing', emoji: '📐' },
+  { id: 'Sciences', label: 'Sciences (Physics, Chem, Bio)', emoji: '🔬' },
+  { id: 'Languages & Literature', label: 'English, Languages & Literature', emoji: '📖' },
+  { id: 'Humanities & Business', label: 'Economics, Business & Humanities', emoji: '📈' },
+];
+
 export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
   persona,
   selectedExamFormat = 'waec',
@@ -700,20 +727,27 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
   onOpenNotesGenerator,
   onOpenWorksheet,
 }) => {
-  // PastPaperAcademy View Mode: 'directory' | 'topical' | 'textbooks' | 'grid'
-  const [hubViewMode, setHubViewMode] = useState<'directory' | 'topical' | 'textbooks' | 'grid'>('directory');
+  // PastPapersAcademy View Mode: 'directory' | 'topical' | 'open_access' | 'textbooks' | 'grid' | 'registry_analytics'
+  const [hubViewMode, setHubViewMode] = useState<
+    'directory' | 'topical' | 'open_access' | 'textbooks' | 'grid' | 'registry_analytics'
+  >('directory');
+  const [activeRegionSlot, setActiveRegionSlot] = useState<string>('All Regions');
   const [activeBoardFilter, setActiveBoardFilter] = useState<ExamFormatId | 'all'>('all');
+  const [activeCheckpointTier, setActiveCheckpointTier] = useState<'all' | 'Lower Secondary' | 'Primary'>('all');
+  const [activeCategorySlot, setActiveCategorySlot] = useState<'all' | SubjectFolderSpec['category']>('all');
+  const [activeDecadeFilter, setActiveDecadeFilter] = useState<
+    'all' | '2020-2026' | '2010-2019' | '2000-2009' | '1990-1999' | '1980-1989' | 'earlier'
+  >('all');
+  const [activeSessionSlot, setActiveSessionSlot] = useState<string>('all');
+  const [activePaperTypeSlot, setActivePaperTypeSlot] = useState<'all' | 'QP' | 'MS' | 'ER' | 'GT' | 'TEXTBOOK'>('all');
   const [activeKindFilter, setActiveKindFilter] = useState<'all' | 'past_paper' | 'textbook' | 'marking_scheme'>('all');
+  const [showAiBuilderDrawer, setShowAiBuilderDrawer] = useState<boolean>(false);
+  const [showIngestParserDrawer, setShowIngestParserDrawer] = useState<boolean>(false);
+
   const [selectedSubjectFolderId, setSelectedSubjectFolderId] = useState<string>(
     PAST_PAPER_ACADEMY_SUBJECTS[0]?.id || 'waec-402-math'
   );
-  const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({
-    '2025 Specimen': true,
-    '2024 May/June (School)': true,
-    '2024 UTME CBT': true,
-    '2024 May/June (s24)': true,
-    '2024 October Series': true,
-  });
+  const [expandedSessions, setExpandedSessions] = useState<Record<string, boolean>>({});
   const [activeExaminerModal, setActiveExaminerModal] = useState<{
     folder: SubjectFolderSpec;
     session: string;
@@ -722,6 +756,33 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [previewResource, setPreviewResource] = useState<AcademicResourceItem | null>(null);
   const [showMarkingSchemeInPreview, setShowMarkingSchemeInPreview] = useState<boolean>(true);
+  const [paperStudyMode, setPaperStudyMode] = useState<'written_paper' | 'split_qp_ms' | 'mark_scheme_table'>('split_qp_ms');
+  const [candidateName, setCandidateName] = useState<string>('Candidate Student');
+  const [candidateCentreNo, setCandidateCentreNo] = useState<string>('NG001 / GB402');
+  const [studentWrittenWorking, setStudentWrittenWorking] = useState<Record<string, string>>({});
+  const [studentFinalAnswers, setStudentFinalAnswers] = useState<Record<string, string>>({});
+  const [studentSelfMarks, setStudentSelfMarks] = useState<Record<string, number>>({});
+  const [studyTimerSeconds, setStudyTimerSeconds] = useState<number>(3600);
+  const [isStudyTimerRunning, setIsStudyTimerRunning] = useState<boolean>(false);
+
+  const [completedSessions, setCompletedSessions] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('quizme_completed_past_sessions_v1');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [flaggedQuestionKeys, setFlaggedQuestionKeys] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('quizme_flagged_past_questions_v1');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [savedIds, setSavedIds] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem(SAVED_RESOURCES_KEY);
@@ -734,11 +795,255 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
   // Custom AI Past Paper & Textbook Generator state
   const [customExamBoard, setCustomExamBoard] = useState<ExamFormatId>(selectedExamFormat);
   const [customSubject, setCustomSubject] = useState<string>('Mathematics');
-  const [customYear, setCustomYear] = useState<string>('2024');
+  const [customYear, setCustomYear] = useState<string>('2026');
   const [customResourceKind, setCustomResourceKind] = useState<'past_paper' | 'textbook'>('past_paper');
   const [customResources, setCustomResources] = useState<AcademicResourceItem[]>([]);
   const [isSynthesizingCustom, setIsSynthesizingCustom] = useState<boolean>(false);
   const [downloadToast, setDownloadToast] = useState<string | null>(null);
+
+  // Past Paper Document Ingestion & Parser state
+  const [rawPaperImportText, setRawPaperImportText] = useState<string>('');
+  const [importPaperBoard, setImportPaperBoard] = useState<ExamFormatId>(selectedExamFormat);
+  const [importPaperSubject, setImportPaperSubject] = useState<string>('Mathematics');
+  const [importPaperYear, setImportPaperYear] = useState<string>('2025 May/June');
+  const [isParsingImportedPaper, setIsParsingImportedPaper] = useState<boolean>(false);
+
+  // Per-question AI Examiner Marking & AI Personal Tutor state
+  const [aiQuestionFeedback, setAiQuestionFeedback] = useState<Record<string, string>>({});
+  const [markingQuestionKey, setMarkingQuestionKey] = useState<string | null>(null);
+  const [aiTutorExplanation, setAiTutorExplanation] = useState<Record<string, string>>({});
+  const [explainingQuestionKey, setExplainingQuestionKey] = useState<string | null>(null);
+
+  // AI Examiner Marking for written working + final answer
+  const handleAiMarkQuestionWorking = async (
+    qKey: string,
+    q: PastPaperQuestionItem,
+    paperTitle: string
+  ) => {
+    soundFx.playSelect();
+    setMarkingQuestionKey(qKey);
+    const working = studentWrittenWorking[qKey] || '';
+    const finalAns = studentFinalAnswers[qKey] || '';
+    const combinedResponse = `Working Steps: ${working || '(None shown)'} | Final Answer: ${finalAns || '(None written)'}`;
+
+    try {
+      const res = await fetch('/api/evaluate-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: `[${paperTitle} · Q${q.number} (${q.marks} Marks)] ${q.question}`,
+          correctAnswer: q.answer,
+          userAnswer: combinedResponse,
+          explanation: q.markingSchemeNotes,
+          persona: 'Teacher',
+          rubric: [q.markingSchemeNotes, `Official Answer: ${q.answer}`],
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const isCorrect = Boolean(data.isCorrect);
+        const partialRatio = isCorrect
+          ? 1
+          : working.trim().length > 12
+          ? 0.5
+          : 0;
+        const awardedMarks = Math.round(q.marks * partialRatio);
+        setStudentSelfMarks((prev) => ({ ...prev, [qKey]: awardedMarks }));
+        setAiQuestionFeedback((prev) => ({
+          ...prev,
+          [qKey]: `[AI Examiner Awarded ${awardedMarks}/${q.marks} Marks] ${
+            data.feedback || q.markingSchemeNotes
+          }`,
+        }));
+        setShowMarkingSchemeInPreview(true);
+      } else {
+        throw new Error('Fallback mark evaluation');
+      }
+    } catch {
+      const cleanUser = (finalAns + ' ' + working).trim().toLowerCase();
+      const cleanOfficial = q.answer.trim().toLowerCase();
+      const fullMatch = cleanUser.includes(cleanOfficial) && cleanOfficial.length > 0;
+      const hasMethod = working.trim().length > 10;
+      const awardedMarks = fullMatch ? q.marks : hasMethod ? Math.max(1, Math.floor(q.marks / 2)) : 0;
+      setStudentSelfMarks((prev) => ({ ...prev, [qKey]: awardedMarks }));
+      setAiQuestionFeedback((prev) => ({
+        ...prev,
+        [qKey]: `[Examiner Rubric Check: ${awardedMarks}/${q.marks} Marks] ${
+          fullMatch
+            ? 'Full Method [M1] and Accuracy [A1] marks awarded.'
+            : hasMethod
+            ? 'Partial Method [M1] credit awarded for working steps; verify final accuracy [A1] against the Official Mark Scheme.'
+            : 'Please show intermediate working steps [M1] and final answer [A1].'
+        }`,
+      }));
+      setShowMarkingSchemeInPreview(true);
+    } finally {
+      setMarkingQuestionKey(null);
+    }
+  };
+
+  // AI Personal Tutor step-by-step worked solution for any past-paper question
+  const handleAskAiTutorForQuestion = async (
+    qKey: string,
+    q: PastPaperQuestionItem,
+    paperTitle: string
+  ) => {
+    soundFx.playSelect();
+    setExplainingQuestionKey(qKey);
+    try {
+      const res = await fetch('/api/ask-tutor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: `[${paperTitle} · Q${q.number}] ${q.question}`,
+          correctAnswer: q.answer,
+          explanation: q.markingSchemeNotes,
+          userQuery:
+            'Provide a clear, step-by-step worked solution showing how to earn every M1 (Method) and A1 (Accuracy) mark, the underlying syllabus concept, and one common examiner trap to avoid.',
+          persona: 'Student',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiTutorExplanation((prev) => ({
+          ...prev,
+          [qKey]: data.reply || data.explanation || q.markingSchemeNotes,
+        }));
+      } else {
+        throw new Error('Fallback tutor explanation');
+      }
+    } catch {
+      setAiTutorExplanation((prev) => ({
+        ...prev,
+        [qKey]: `Step-by-Step Tutor Walkthrough: 1) Identify the command word and given values in Q${q.number}. 2) Apply the official method: ${q.markingSchemeNotes}. 3) Confirm your final answer matches "${q.answer}" with appropriate units.`,
+      }));
+    } finally {
+      setExplainingQuestionKey(null);
+    }
+  };
+
+  // Parse pasted/uploaded raw past paper text into a structured Written Exam Paper + Mark Scheme
+  const handleParseImportedPastPaper = async () => {
+    if (!rawPaperImportText.trim()) return;
+    soundFx.playClick();
+    setIsParsingImportedPaper(true);
+    const spec = getExamFormatSpec(importPaperBoard);
+    const cleanSubj = importPaperSubject.trim() || 'Mathematics';
+
+    try {
+      const lines = rawPaperImportText
+        .split(/\n+/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 8);
+      const seedQuestions = lines.slice(0, 12).map((line, idx) => ({
+        id: idx + 1,
+        type: 'open_explanation',
+        question: line,
+        correct_answer: 'See Official Mark Scheme',
+        explanation: `Method [M1] and Accuracy [A1] rubric for ${spec.shortName} ${cleanSubj}`,
+      }));
+
+      const res = await fetch('/api/organize-exam', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quizTitle: `${spec.shortName} ${importPaperYear} ${cleanSubj} Imported Past Paper`,
+          difficulty: 'Intermediate',
+          questions: seedQuestions,
+        }),
+      });
+
+      let parsedQuestions: PastPaperQuestionItem[] = [];
+      if (res.ok) {
+        const data = await res.json();
+        const items = data.organizedExam?.items || [];
+        if (Array.isArray(items) && items.length > 0) {
+          parsedQuestions = items.map((it: any, idx: number) => ({
+            number: idx + 1,
+            section: it.sectionTitle || `${spec.shortName} ${importPaperYear} · Section A`,
+            marks: Number(it.marks) || 4,
+            question: it.formattedQuestion || seedQuestions[idx]?.question || `Question ${idx + 1}`,
+            answer: it.acceptableAnswers || 'Verified in Mark Scheme',
+            markingSchemeNotes:
+              it.markingGuidance ||
+              `Award [M1] for valid method and [A1] for accurate conclusion.`,
+          }));
+        }
+      }
+
+      if (parsedQuestions.length === 0) {
+        parsedQuestions = seedQuestions.map((sq, idx) => ({
+          number: idx + 1,
+          section: `${spec.shortName} ${importPaperYear} · Structured Paper`,
+          marks: 4,
+          question: sq.question,
+          answer: 'Refer to step-by-step derivation',
+          markingSchemeNotes: `[Imported Paper Rubric · Q${idx + 1}] Award [M1] for correct formula/principle and [A1] for accurate final evaluation.`,
+        }));
+      }
+
+      const totalMarks = parsedQuestions.reduce((acc, q) => acc + q.marks, 0);
+      const importedResource: AcademicResourceItem = {
+        id: `custom-import-${importPaperBoard}-${Date.now()}`,
+        title: `${spec.shortName} ${cleanSubj} (${importPaperYear}) — Imported Past Paper & Mark Scheme`,
+        examFormat: importPaperBoard,
+        kind: 'past_paper',
+        subject: cleanSubj,
+        yearOrEdition: importPaperYear,
+        paperCode: `${spec.shortName.toUpperCase().slice(0, 4)}-IMP-${new Date().getFullYear()}`,
+        durationMinutes: 90,
+        totalMarks,
+        pagesCount: Math.max(4, parsedQuestions.length * 2),
+        fileSizeLabel: '1.1 MB',
+        authorOrBody: `${spec.governingBody} (User-Imported & Structured)`,
+        description: `Structured examination paper and separated M1/A1 Mark Scheme parsed from uploaded document text (${parsedQuestions.length} questions).`,
+        tags: [spec.shortName, cleanSubj, importPaperYear, 'Imported Past Paper', 'QP + MS'],
+        questions: parsedQuestions,
+      };
+
+      setCustomResources((prev) => [importedResource, ...prev]);
+      setShowIngestParserDrawer(false);
+      setRawPaperImportText('');
+      setPreviewResource(importedResource);
+      soundFx.playComplete();
+    } finally {
+      setIsParsingImportedPaper(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isStudyTimerRunning) return;
+    const interval = setInterval(() => {
+      setStudyTimerSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isStudyTimerRunning]);
+
+  const toggleCompleteSession = (sessionKey: string) => {
+    soundFx.playSelect();
+    setCompletedSessions((prev) => {
+      const next = prev.includes(sessionKey) ? prev.filter((k) => k !== sessionKey) : [...prev, sessionKey];
+      try {
+        localStorage.setItem('quizme_completed_past_sessions_v1', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  const toggleFlagQuestion = (qKey: string) => {
+    soundFx.playSelect();
+    setFlaggedQuestionKeys((prev) => {
+      const next = prev.includes(qKey) ? prev.filter((k) => k !== qKey) : [...prev, qKey];
+      try {
+        localStorage.setItem('quizme_flagged_past_questions_v1', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   const toggleSaveResource = (id: string) => {
     soundFx.playSelect();
@@ -763,21 +1068,53 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
     [customResources, expandedCatalog]
   );
 
+  // Filter Exam Boards by chosen World Region Slot
+  const visibleExamBoards = useMemo(() => {
+    return EXAM_FORMAT_CATALOG.filter((spec) => {
+      if (spec.id === 'standard_exam') return false;
+      if (activeRegionSlot === 'All Regions') return true;
+      return spec.worldRegion === activeRegionSlot;
+    });
+  }, [activeRegionSlot]);
+
+  // Count resources per exam board for quick slot badges
+  const boardCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const r of allResources) {
+      map[r.examFormat] = (map[r.examFormat] || 0) + 1;
+    }
+    return map;
+  }, [allResources]);
+
   const filteredSubjectFolders = useMemo(() => {
     return PAST_PAPER_ACADEMY_SUBJECTS.filter((f) => {
+      const spec = getExamFormatSpec(f.examFormat);
+      if (activeRegionSlot !== 'All Regions' && spec.worldRegion !== activeRegionSlot) return false;
       if (activeBoardFilter !== 'all' && f.examFormat !== activeBoardFilter) return false;
+      if (activeCheckpointTier !== 'all' && f.examFormat === 'checkpoint') {
+        if (activeCheckpointTier === 'Lower Secondary' && !f.checkpointTier?.startsWith('Lower Secondary')) {
+          return false;
+        }
+        if (activeCheckpointTier === 'Primary' && !f.checkpointTier?.startsWith('Primary')) {
+          return false;
+        }
+      }
+      if (activeCategorySlot !== 'all' && f.category !== activeCategorySlot) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
           f.subjectName.toLowerCase().includes(q) ||
           f.syllabusCode.toLowerCase().includes(q) ||
           f.category.toLowerCase().includes(q) ||
-          f.textbookTitle.toLowerCase().includes(q)
+          f.textbookTitle.toLowerCase().includes(q) ||
+          (f.checkpointTier || '').toLowerCase().includes(q) ||
+          (spec.countryName || '').toLowerCase().includes(q) ||
+          spec.shortName.toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [activeBoardFilter, searchQuery]);
+  }, [activeRegionSlot, activeBoardFilter, activeCheckpointTier, activeCategorySlot, searchQuery]);
 
   const activeSubjectFolder: SubjectFolderSpec = useMemo(() => {
     return (
@@ -789,23 +1126,36 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
 
   const filteredTopicalPacks = useMemo(() => {
     return TOPICAL_PAST_PAPER_PACKS.filter((p) => {
+      const spec = getExamFormatSpec(p.examFormat);
+      if (activeRegionSlot !== 'All Regions' && spec.worldRegion !== activeRegionSlot) return false;
       if (activeBoardFilter !== 'all' && p.examFormat !== activeBoardFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
           p.topicName.toLowerCase().includes(q) ||
           p.subject.toLowerCase().includes(q) ||
-          p.keySubtopics.some((s) => s.toLowerCase().includes(q))
+          p.keySubtopics.some((s) => s.toLowerCase().includes(q)) ||
+          spec.shortName.toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [activeBoardFilter, searchQuery]);
+  }, [activeRegionSlot, activeBoardFilter, searchQuery]);
 
   const filteredResources = useMemo(() => {
     return allResources.filter((item) => {
+      const spec = getExamFormatSpec(item.examFormat);
+      if (activeRegionSlot !== 'All Regions' && spec.worldRegion !== activeRegionSlot) {
+        return false;
+      }
       if (activeBoardFilter !== 'all' && item.examFormat !== activeBoardFilter) {
         return false;
+      }
+      if (activeCheckpointTier !== 'all' && item.examFormat === 'checkpoint') {
+        const hasPrimary = item.tags.some((t) => t.toLowerCase().includes('primary'));
+        const hasLowerSec = item.tags.some((t) => t.toLowerCase().includes('lower secondary'));
+        if (activeCheckpointTier === 'Primary' && !hasPrimary) return false;
+        if (activeCheckpointTier === 'Lower Secondary' && !hasLowerSec) return false;
       }
       if (activeKindFilter !== 'all' && item.kind !== activeKindFilter) {
         return false;
@@ -815,14 +1165,16 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
         const matchTitle = item.title.toLowerCase().includes(q);
         const matchSubj = item.subject.toLowerCase().includes(q);
         const matchCode = item.paperCode.toLowerCase().includes(q);
+        const matchYr = item.yearOrEdition.toLowerCase().includes(q);
+        const matchCountry = (spec.countryName || '').toLowerCase().includes(q);
         const matchTags = item.tags.some((t) => t.toLowerCase().includes(q));
-        return matchTitle || matchSubj || matchCode || matchTags;
+        return matchTitle || matchSubj || matchCode || matchYr || matchCountry || matchTags;
       }
       return true;
     });
-  }, [allResources, activeBoardFilter, activeKindFilter, searchQuery]);
+  }, [allResources, activeRegionSlot, activeBoardFilter, activeCheckpointTier, activeKindFilter, searchQuery]);
 
-  // Trigger a real browser file download (HTML Printable Booklet or Markdown/Text) without window.open
+  // Trigger a real browser file download formatted in official written exam layout or official Mark Scheme table
   const handleDownloadResourceFile = (
     item: AcademicResourceItem,
     format: 'html_booklet' | 'markdown' | 'marking_scheme'
@@ -846,7 +1198,7 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
       ];
 
       if (item.questions && item.questions.length > 0) {
-        lines.push('## Official Past Paper Questions & Marking Scheme', '');
+        lines.push('## Official Written Examination Questions & Mark Scheme', '');
         item.questions.forEach((q) => {
           lines.push(`### Question ${q.number} (${q.section}) — [${q.marks} Marks]`);
           lines.push(q.question, '');
@@ -856,8 +1208,10 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
             });
             lines.push('');
           }
-          lines.push(`**Correct Answer:** ${q.answer}`);
-          lines.push(`**Examiner Marking Scheme:** ${q.markingSchemeNotes}`, '');
+          lines.push('**Working Space:** `........................................................................`');
+          lines.push(`**Answer Line:** \`.................................................... [${q.marks}]\``);
+          lines.push(`**Official Mark Scheme Answer:** ${q.answer}`);
+          lines.push(`**Examiner M1/A1 Marking Guidance:** ${q.markingSchemeNotes}`, '');
         });
       }
 
@@ -888,93 +1242,104 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
       return;
     }
 
-    // Printable HTML Exam Booklet / Textbook PDF-ready document
-    const includeScheme = format === 'marking_scheme' || true;
+    const isMarkSchemeOnly = format === 'marking_scheme' || item.kind === 'marking_scheme';
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>${item.title} — ${spec.shortName}</title>
   <style>
-    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #0f172a; max-width: 860px; margin: 32px auto; padding: 0 24px; line-height: 1.6; }
-    .cover-box { border: 3px solid #0f172a; border-radius: 16px; padding: 24px; background: #f8fafc; margin-bottom: 28px; }
-    .badge { display: inline-block; background: #4f46e5; color: #fff; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
-    h1 { font-size: 24px; margin: 10px 0 6px; color: #0f172a; }
-    .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 2px dashed #cbd5e1; font-size: 13px; }
-    .q-card { border: 2px solid #e2e8f0; border-radius: 12px; padding: 18px; margin-bottom: 18px; page-break-inside: avoid; }
-    .q-header { display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; color: #4f46e5; margin-bottom: 8px; }
-    .options { list-style: none; padding-left: 0; margin: 12px 0; }
-    .options li { padding: 6px 10px; margin-bottom: 6px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
-    .scheme { margin-top: 12px; padding: 12px; border-radius: 8px; background: #ecfdf5; border-left: 4px solid #10b981; font-size: 13px; }
-    .formula-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px; border-radius: 8px; font-family: monospace; margin: 10px 0; }
-    @media print { .no-print { display: none; } body { margin: 0; } }
+    body { font-family: 'Times New Roman', Georgia, serif; color: #0f172a; max-width: 860px; margin: 28px auto; padding: 0 24px; line-height: 1.55; }
+    .cover-box { border: 3px solid #0f172a; padding: 22px; background: #ffffff; margin-bottom: 24px; }
+    .board-title { font-family: system-ui, sans-serif; font-weight: 900; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 10px; }
+    h1 { font-size: 22px; margin: 8px 0 4px; color: #0f172a; }
+    .candidate-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-top: 14px; border: 2px solid #0f172a; padding: 10px; font-family: system-ui, sans-serif; font-size: 12px; }
+    .candidate-cell { border-bottom: 1px dotted #475569; padding-bottom: 4px; }
+    .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 2px solid #0f172a; font-family: system-ui, sans-serif; font-size: 12px; }
+    .instructions { margin-top: 12px; padding: 10px 14px; background: #f8fafc; border: 1px solid #94a3b8; font-family: system-ui, sans-serif; font-size: 12px; }
+    .q-card { border: 1.5px solid #0f172a; padding: 18px; margin-bottom: 18px; page-break-inside: avoid; }
+    .q-header { display: flex; justify-content: space-between; font-family: system-ui, sans-serif; font-weight: 800; font-size: 13px; color: #0f172a; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 10px; }
+    .working-lines { margin-top: 14px; border-top: 1px dotted #64748b; border-bottom: 1px dotted #64748b; height: 56px; position: relative; }
+    .answer-line { text-align: right; font-family: system-ui, sans-serif; font-weight: 700; font-size: 13px; margin-top: 12px; }
+    .scheme { margin-top: 12px; padding: 12px; background: #ecfdf5; border-left: 4px solid #059669; font-family: system-ui, sans-serif; font-size: 12.5px; }
+    table.ms-table { width: 100%; border-collapse: collapse; font-family: system-ui, sans-serif; font-size: 13px; margin-top: 16px; }
+    table.ms-table th, table.ms-table td { border: 1.5px solid #0f172a; padding: 10px; text-align: left; vertical-align: top; }
+    table.ms-table th { background: #f1f5f9; font-weight: 800; }
+    @media print { body { margin: 0; } }
   </style>
 </head>
 <body>
   <div class="cover-box">
-    <span class="badge">${spec.badgeEmoji} ${spec.fullName} · ${item.kind === 'textbook' ? 'OFFICIAL TEXTBOOK COMPENDIUM' : 'OFFICIAL PAST PAPER & MARKING SCHEME'}</span>
+    <div class="board-title">${spec.badgeEmoji} ${spec.governingBody} — ${spec.fullName}</div>
     <h1>${item.title}</h1>
-    <p style="margin:4px 0;color:#475569;font-size:14px;">${item.description}</p>
+    <p style="margin:4px 0;color:#334155;font-size:13px;">${item.description}</p>
+    <div class="candidate-grid">
+      <div class="candidate-cell"><strong>CANDIDATE NAME:</strong> ................................................................</div>
+      <div class="candidate-cell"><strong>CENTRE NUMBER:</strong> ........................</div>
+      <div class="candidate-cell"><strong>CANDIDATE NUMBER:</strong> ........................</div>
+    </div>
     <div class="meta-grid">
-      <div><strong>Paper Code:</strong><br/>${item.paperCode}</div>
-      <div><strong>Series / Edition:</strong><br/>${item.yearOrEdition}</div>
-      <div><strong>Duration:</strong><br/>${item.durationMinutes} Minutes</div>
-      <div><strong>Total Marks:</strong><br/>${item.totalMarks} Marks</div>
+      <div><strong>Syllabus / Paper:</strong><br/>${item.paperCode}</div>
+      <div><strong>Examination Series:</strong><br/>${item.yearOrEdition}</div>
+      <div><strong>Time Allowed:</strong><br/>${item.durationMinutes} Minutes</div>
+      <div><strong>Maximum Marks:</strong><br/>${item.totalMarks} Marks</div>
+    </div>
+    <div class="instructions">
+      <strong>INSTRUCTIONS TO CANDIDATES:</strong> Write in dark blue or black pen. Answer ALL questions in the spaces provided. Show all your working clearly; Method Marks [M1] and Accuracy Marks [A1] are awarded according to the Official Mark Scheme.
     </div>
   </div>
   ${
     item.questions && item.questions.length > 0
-      ? `<h2>Examination Questions${includeScheme ? ' & Marking Scheme' : ''}</h2>` +
-        item.questions
-          .map(
-            (q) => `
+      ? isMarkSchemeOnly
+        ? `<h2>OFFICIAL EXAMINER MARK SCHEME (MS) RUBRIC TABLE</h2>
+           <table class="ms-table">
+             <thead>
+               <tr>
+                 <th style="width:8%">Q#</th>
+                 <th style="width:28%">Acceptable Official Answer</th>
+                 <th style="width:10%">Marks</th>
+                 <th>Examiner M1 / A1 / B1 Marking Guidance & Working</th>
+               </tr>
+             </thead>
+             <tbody>
+               ${item.questions
+                 .map(
+                   (q) => `<tr>
+                     <td><strong>${q.number}</strong></td>
+                     <td><strong>${q.answer}</strong></td>
+                     <td><strong>[${q.marks}]</strong></td>
+                     <td>${q.markingSchemeNotes}</td>
+                   </tr>`
+                 )
+                 .join('')}
+             </tbody>
+           </table>`
+        : `<h2>OFFICIAL WRITTEN EXAMINATION PAPER & MARK SCHEME</h2>` +
+          item.questions
+            .map(
+              (q) => `
       <div class="q-card">
         <div class="q-header">
-          <span>Question ${q.number} · ${q.section}</span>
+          <span><strong>${q.number}</strong> &nbsp; ${q.section}</span>
           <span>[${q.marks} Marks]</span>
         </div>
-        <div style="font-weight:700;font-size:15px;">${q.question}</div>
+        <div style="font-size:15.5px;font-weight:600;">${q.question}</div>
         ${
           q.options
-            ? `<ul class="options">${q.options
-                .map((opt, idx) => `<li><strong>${String.fromCharCode(65 + idx)}.</strong> ${opt}</li>`)
-                .join('')}</ul>`
+            ? `<div style="margin:10px 0;font-family:system-ui,sans-serif;font-size:13.5px;">${q.options
+                .map((opt, idx) => `<div style="margin:4px 0;">[ &nbsp; ] <strong>${String.fromCharCode(65 + idx)}.</strong> ${opt}</div>`)
+                .join('')}</div>`
             : ''
         }
-        ${
-          includeScheme
-            ? `<div class="scheme"><strong>Official Answer:</strong> ${q.answer}<br/><strong>Marking Scheme & Working:</strong> ${q.markingSchemeNotes}</div>`
-            : ''
-        }
-      </div>`
-          )
-          .join('')
-      : ''
-  }
-  ${
-    item.chapters && item.chapters.length > 0
-      ? `<h2>Textbook Chapters, Formulas & Worked Examples</h2>` +
-        item.chapters
-          .map(
-            (ch) => `
-      <div class="q-card">
-        <div class="q-header">
-          <span>Chapter ${ch.chapterNumber}</span>
-          <span>${item.subject}</span>
-        </div>
-        <h3 style="margin:4px 0 8px;">${ch.title}</h3>
-        <p>${ch.summary}</p>
-        <div class="formula-box">
-          <strong>Key Formulas & Principles:</strong><br/>
-          ${ch.keyFormulasOrRules.map((f) => `• ${f}`).join('<br/>')}
-        </div>
+        <div class="working-lines"></div>
+        <div class="answer-line">........................................................................ [${q.marks}]</div>
         <div class="scheme">
-          <strong>Worked Example:</strong> ${ch.workedExample.problem}<br/>
-          <strong>Step-by-Step Solution:</strong> ${ch.workedExample.solution}
+          <strong>✓ Official Mark Scheme Answer:</strong> ${q.answer}<br/>
+          <strong>Examiner M1/A1 Guidance:</strong> ${q.markingSchemeNotes}
         </div>
       </div>`
-          )
-          .join('')
+            )
+            .join('')
       : ''
   }
 </body>
@@ -984,20 +1349,20 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${safeFilename}-${format === 'marking_scheme' ? 'marking-scheme' : 'booklet'}.html`;
+    a.download = `${safeFilename}-${format === 'marking_scheme' ? 'official-mark-scheme' : 'written-exam-paper'}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setDownloadToast(
-      `Downloaded "${item.title}" (${format === 'marking_scheme' ? 'Marking Scheme' : 'Printable Exam/Textbook Booklet'})`
+      `Downloaded "${item.title}" (${format === 'marking_scheme' ? 'Official Mark Scheme Table' : 'Written Exam Paper Booklet'})`
     );
     setTimeout(() => setDownloadToast(null), 4000);
   };
 
   // Convert any Past Paper or Textbook into a live interactive QuizResponse and launch in QuizRunner
   const handlePracticePastPaperInteractive = (item: AcademicResourceItem) => {
-    soundFx.playStart();
+    soundFx.playSelect();
     if (item.questions && item.questions.length > 0) {
       const convertedQuestions: Question[] = item.questions.map((q, idx) => ({
         id: idx + 1,
@@ -1014,10 +1379,13 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
               ],
         correct_answer: q.answer,
         explanation: q.markingSchemeNotes,
-        pedagogical_topic: item.subject,
-        pedagogical_subtopic: q.section,
+        topic: item.subject,
         bloom_level: 'Apply',
-        cognitive_domain: 'Quantitative & Analytical',
+        domain: 'Applied Logic',
+        gamified_feedback: {
+          success_quote: 'Official Past Paper Mark Awarded!',
+          hint: 'Review the syllabus formula and marking scheme conventions.',
+        },
       }));
 
       const prebuiltExtra = buildPrebuiltExamByFormat(item.examFormat, persona);
@@ -1081,7 +1449,7 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
           section: `${spec.shortName} ${customYear} · Section A`,
           marks: 3,
           question: q.question,
-          options: q.options,
+          options: q.options || undefined,
           answer: q.correct_answer,
           markingSchemeNotes: q.explanation,
         }));
@@ -1094,7 +1462,7 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
           section: `${spec.shortName} ${customYear} · Core Paper`,
           marks: 3,
           question: q.question,
-          options: q.options,
+          options: q.options || undefined,
           answer: q.correct_answer,
           markingSchemeNotes: q.explanation,
         }));
@@ -1104,22 +1472,22 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
         id: `custom-${customExamBoard}-${Date.now()}`,
         title:
           customResourceKind === 'past_paper'
-            ? `${spec.shortName} ${customYear} ${cleanSubj} Past Paper & Marking Scheme`
-            : `${spec.shortName} ${cleanSubj} Complete Revision Textbook (${customYear} Edition)`,
+            ? `[AI Practice Paper] ${spec.shortName} ${customYear} ${cleanSubj} Practice Paper & Marking Guide`
+            : `[AI Study Guide] ${spec.shortName} ${cleanSubj} Revision Compendium (${customYear} Edition)`,
         examFormat: customExamBoard,
         kind: customResourceKind,
         subject: cleanSubj,
-        yearOrEdition: `${customYear} Series`,
-        paperCode: `${spec.shortName.toUpperCase().slice(0, 4)}-${customYear}-${Math.floor(100 + Math.random() * 899)}`,
+        yearOrEdition: `${customYear} Practice Series`,
+        paperCode: `${spec.shortName.toUpperCase().slice(0, 4)}-AI-${customYear}-${Math.floor(100 + Math.random() * 899)}`,
         durationMinutes: spec.defaultTimeMinutes || 90,
         totalMarks: 100,
         pagesCount: 16,
         fileSizeLabel: '1.3 MB',
-        authorOrBody: `${spec.governingBody} AI Synthesis`,
-        description: `Custom generated ${spec.fullName} ${
-          customResourceKind === 'past_paper' ? 'past paper with full M1/A1 marking scheme' : 'textbook chapters, formulas, and worked examples'
-        } for ${cleanSubj}.`,
-        tags: [spec.shortName, cleanSubj, customYear, customResourceKind === 'past_paper' ? 'Past Paper' : 'Textbook'],
+        authorOrBody: `Quiz Me! AI Assessment Engine (${spec.shortName} Syllabus-Aligned Practice)`,
+        description: `AI-synthesized practice ${
+          customResourceKind === 'past_paper' ? 'paper with M1/A1 marking rubric (Non-Official Practice Material)' : 'study guide chapters, formulas, and worked examples'
+        } aligned to ${spec.fullName} ${cleanSubj}.`,
+        tags: [spec.shortName, cleanSubj, customYear, 'AI Practice Synthesis (Non-Official)'],
         questions: synthesizedQuestions,
         chapters:
           customResourceKind === 'textbook'
@@ -1129,7 +1497,7 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
                 summary: sq.markingSchemeNotes,
                 keyFormulasOrRules: [
                   `Master ${spec.shortName} syllabus objective ${idx + 1} for ${cleanSubj}`,
-                  `Apply official ${spec.governingBody} marking scheme conventions`,
+                  `Apply ${spec.governingBody} M1/A1 marking conventions`,
                 ],
                 workedExample: {
                   problem: sq.question,
@@ -1150,145 +1518,300 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
     }
   };
 
+  // Sessions inside the active subject folder filtered by activeDecadeFilter and activeSessionSlot
+  const visibleSessionsInFolder = useMemo(() => {
+    if (!activeSubjectFolder) return [];
+    return activeSubjectFolder.sessions.filter((s) => {
+      if (activeSessionSlot !== 'all' && s !== activeSessionSlot) {
+        return false;
+      }
+      if (activeDecadeFilter !== 'all') {
+        const yearMatch = s.match(/\b(19\d{2}|20\d{2})\b/);
+        const yr = yearMatch ? parseInt(yearMatch[1], 10) : 2026;
+        if (activeDecadeFilter === '2020-2026' && (yr < 2020 || yr > 2026)) return false;
+        if (activeDecadeFilter === '2010-2019' && (yr < 2010 || yr > 2019)) return false;
+        if (activeDecadeFilter === '2000-2009' && (yr < 2000 || yr > 2009)) return false;
+        if (activeDecadeFilter === '1990-1999' && (yr < 1990 || yr > 1999)) return false;
+        if (activeDecadeFilter === '1980-1989' && (yr < 1980 || yr > 1989)) return false;
+        if (activeDecadeFilter === 'earlier' && yr >= 1980) return false;
+      }
+      return true;
+    });
+  }, [activeSubjectFolder, activeSessionSlot, activeDecadeFilter]);
+
+  const formatTimer = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const rem = secs % 60;
+    return `${String(mins).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
+  };
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
-      {/* Download Notification Banner */}
+    <div className="w-full max-w-[1380px] mx-auto px-4 sm:px-6 py-5 space-y-6 pb-14 animate-in fade-in duration-300">
+      {/* Download Notification Toast */}
       {downloadToast && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl bg-emerald-600 text-white border-2 border-slate-950 shadow-xl flex items-center gap-2.5 text-xs font-black animate-in slide-in-from-bottom-4">
-          <CheckCircle2 className="w-4 h-4 text-amber-300 shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-slate-900 text-white border border-slate-700 shadow-lg flex items-center gap-2.5 text-xs font-semibold animate-in slide-in-from-bottom-4">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{downloadToast}</span>
         </div>
       )}
 
-      {/* Hero Header Banner */}
-      <div className="comic-tab-hero rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden">
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-3 max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="comic-badge px-3 py-1 rounded-xl bg-amber-300 text-slate-950 border-2 border-slate-950 text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
-                <FolderDown className="w-3.5 h-3.5" />
-                <span>OFFICIAL PAST PAPERS &amp; TEXTBOOKS HUB</span>
-              </span>
-              <span className="px-3 py-1 rounded-xl bg-slate-950/60 border border-white/25 text-xs font-extrabold text-cyan-200">
-                WAEC · JAMB · Checkpoint · NECO · IGCSE · SAT · AP/IB
-              </span>
+      {/* ==================== FRIENDLY, CLEAN HEADER ==================== */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-2xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+              <span>{EXAM_FORMAT_CATALOG.length - 1} Global Examination Systems</span>
+              <span aria-hidden="true">·</span>
+              <span>All Years Up to 2026</span>
+              <span aria-hidden="true">·</span>
+              <span>Verified Question Papers, Mark Schemes &amp; AI Examiner</span>
             </div>
-
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight">
-              Download Past Papers, Marking Schemes &amp;{' '}
-              <span className="inline-block px-3 py-0.5 rounded-xl bg-amber-300 text-slate-950 border-b-3 border-amber-600">
-                Exam Textbooks
-              </span>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Global Past Paper Library &amp; Exam Engine
             </h1>
-            <p className="text-xs sm:text-sm text-indigo-100 font-semibold leading-relaxed max-w-2xl">
-              Browse and download printable past question booklets, step-by-step Chief Examiner marking schemes, and subject revision textbooks — or practice any paper live in timed CBT mode.
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              Browse authentic examination papers, official M1/A1 marking schemes, examiner reports, and AI-marked practice across 25+ examination boards worldwide.
             </p>
           </div>
 
-          {/* Quick Stats Pill Card */}
-          <div className="grid grid-cols-3 gap-2.5 bg-slate-950/55 p-3.5 rounded-2xl border-2 border-slate-950 self-start lg:self-center shrink-0">
-            <div className="text-center px-2">
-              <div className="text-xl font-black text-amber-300">{allResources.length}</div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
-                Papers &amp; Books
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <div className="flex items-center gap-4 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-800 text-xs">
+              <div>
+                <span className="text-slate-500 dark:text-slate-400 block">Available Papers</span>
+                <span className="font-bold text-sm text-slate-900 dark:text-white tabular-nums">
+                  {allResources.length}
+                </span>
+              </div>
+              <div className="h-7 w-px bg-slate-200 dark:bg-slate-700" />
+              <div>
+                <span className="text-slate-500 dark:text-slate-400 block">Years Completed</span>
+                <span className="font-bold text-sm text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {completedSessions.length}
+                </span>
+              </div>
+              <div className="h-7 w-px bg-slate-200 dark:bg-slate-700" />
+              <div>
+                <span className="text-slate-500 dark:text-slate-400 block">Flagged Qs</span>
+                <span className="font-bold text-sm text-amber-600 dark:text-amber-400 tabular-nums">
+                  {flaggedQuestionKeys.length}
+                </span>
               </div>
             </div>
-            <div className="text-center px-2 border-x border-white/15">
-              <div className="text-xl font-black text-emerald-400">8</div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
-                Exam Boards
-              </div>
-            </div>
-            <div className="text-center px-2">
-              <div className="text-xl font-black text-cyan-300">{savedIds.length}</div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-200">
-                Bookmarked
-              </div>
-            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                setShowIngestParserDrawer((prev) => !prev);
+                setShowAiBuilderDrawer(false);
+              }}
+              className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-400 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <FolderDown className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span>{showIngestParserDrawer ? 'Close Parser' : 'Import / Parse Paper'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                setShowAiBuilderDrawer((prev) => !prev);
+                setShowIngestParserDrawer(false);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer shadow-2xs"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>{showAiBuilderDrawer ? 'Close Custom Builder' : 'Create Custom Paper'}</span>
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Custom On-Demand Past Paper & Textbook Synthesizer Bar */}
-      <div className="p-5 rounded-3xl border-2 border-b-4 border-indigo-200 dark:border-indigo-900/70 bg-gradient-to-r from-indigo-50/70 via-white to-amber-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/30 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block">
-              ✨ On-Demand AI Past Paper &amp; Textbook Builder
-            </span>
-            <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
-              Need a specific exam year, subject paper, or textbook chapter? Generate &amp; download it instantly:
-            </h2>
+        {/* Collapsible Past Paper Document Ingestion & Parser Drawer */}
+        {showIngestParserDrawer && (
+          <div className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Document Ingestion &amp; Past-Paper Parser
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Paste raw questions or examination text below to automatically segment questions, preserve numbering, and generate a separated M1/A1 Mark Scheme.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowIngestParserDrawer(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <select
+                value={importPaperBoard}
+                onChange={(e) => setImportPaperBoard(e.target.value as ExamFormatId)}
+                aria-label="Imported Paper Exam Board"
+                className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white"
+              >
+                {EXAM_FORMAT_CATALOG.map((spec) => (
+                  <option key={spec.id} value={spec.id}>
+                    {spec.badgeEmoji} {spec.shortName} ({spec.governingBody})
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="text"
+                value={importPaperSubject}
+                onChange={(e) => setImportPaperSubject(e.target.value)}
+                placeholder="Subject (e.g., Physics, Chemistry, Mathematics)"
+                className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white"
+              />
+
+              <input
+                type="text"
+                value={importPaperYear}
+                onChange={(e) => setImportPaperYear(e.target.value)}
+                placeholder="Year / Series (e.g., 2024 May/June Paper 2)"
+                className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <textarea
+              rows={3}
+              value={rawPaperImportText}
+              onChange={(e) => setRawPaperImportText(e.target.value)}
+              placeholder="Paste raw past-paper questions here (one question per line or paragraph)..."
+              className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+            />
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={isParsingImportedPaper || !rawPaperImportText.trim()}
+                onClick={handleParseImportedPastPaper}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>
+                  {isParsingImportedPaper
+                    ? 'Parsing Paper & Mark Scheme...'
+                    : 'Parse & Add to Past Paper Library'}
+                </span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-          <select
-            value={customExamBoard}
-            onChange={(e) => setCustomExamBoard(e.target.value as ExamFormatId)}
-            aria-label="Select Exam Board"
-            className="px-3.5 py-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-extrabold text-slate-900 dark:text-white"
-          >
-            {EXAM_FORMAT_CATALOG.map((spec) => (
-              <option key={spec.id} value={spec.id}>
-                {spec.badgeEmoji} {spec.shortName}
-              </option>
-            ))}
-          </select>
+        {/* Collapsible Custom Paper Generator */}
+        {showAiBuilderDrawer && (
+          <div className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800 space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Generate a Custom Practice Paper or Study Guide
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Pick any exam board, subject, and year to build a printable written paper with a mark scheme.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAiBuilderDrawer(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-          <select
-            value={customResourceKind}
-            onChange={(e) => setCustomResourceKind(e.target.value as 'past_paper' | 'textbook')}
-            aria-label="Select Resource Type"
-            className="px-3.5 py-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-extrabold text-slate-900 dark:text-white"
-          >
-            <option value="past_paper">📄 Past Paper + Marking Scheme</option>
-            <option value="textbook">📚 Revision Textbook + Worked Examples</option>
-          </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+              <select
+                value={customExamBoard}
+                onChange={(e) => setCustomExamBoard(e.target.value as ExamFormatId)}
+                aria-label="Select Exam Board"
+                className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white"
+              >
+                {EXAM_FORMAT_CATALOG.map((spec) => (
+                  <option key={spec.id} value={spec.id}>
+                    {spec.badgeEmoji} {spec.shortName} ({spec.countryName || spec.regionTag})
+                  </option>
+                ))}
+              </select>
 
-          <input
-            type="text"
-            value={customSubject}
-            onChange={(e) => setCustomSubject(e.target.value)}
-            placeholder="Subject (e.g., Chemistry, Economics, Biology)"
-            className="px-3.5 py-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white"
-          />
+              <select
+                value={customResourceKind}
+                onChange={(e) => setCustomResourceKind(e.target.value as 'past_paper' | 'textbook')}
+                aria-label="Select Resource Type"
+                className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white"
+              >
+                <option value="past_paper">Written Past Paper + Mark Scheme</option>
+                <option value="textbook">Revision Textbook + Worked Examples</option>
+              </select>
 
-          <select
-            value={customYear}
-            onChange={(e) => setCustomYear(e.target.value)}
-            aria-label="Select Exam Series Year"
-            className="px-3.5 py-2.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-extrabold text-slate-900 dark:text-white"
-          >
-            {['2025 Specimen', '2024', '2023', '2022', '2021', '2020'].map((yr) => (
-              <option key={yr} value={yr}>
-                📅 {yr} Series
-              </option>
-            ))}
-          </select>
+              <input
+                type="text"
+                value={customSubject}
+                onChange={(e) => setCustomSubject(e.target.value)}
+                placeholder="Subject (e.g., Further Maths, Chemistry)"
+                className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white"
+              />
 
-          <button
-            type="button"
-            disabled={isSynthesizingCustom}
-            onClick={handleSynthesizeCustomResource}
-            className="arcade-btn px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 disabled:opacity-50 text-white text-xs font-black border-2 border-slate-950 shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-          >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>{isSynthesizingCustom ? 'Building Booklet...' : 'Generate & Open'}</span>
-          </button>
-        </div>
+              <select
+                value={customYear}
+                onChange={(e) => setCustomYear(e.target.value)}
+                aria-label="Select Exam Series Year"
+                className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white"
+              >
+                {[
+                  '2026 May/June',
+                  '2026 Specimen',
+                  '2025 Oct/Nov',
+                  '2025 May/June',
+                  '2024',
+                  '2023',
+                  '2022',
+                  '2021',
+                  '2020',
+                  '2015',
+                  '2010',
+                  '2005',
+                  '2000',
+                  '1995',
+                  '1990',
+                ].map((yr) => (
+                  <option key={yr} value={yr}>
+                    {yr} Series
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                disabled={isSynthesizingCustom}
+                onClick={handleSynthesizeCustomResource}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{isSynthesizingCustom ? 'Generating...' : 'Build Paper'}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Filter & Search Controls + PastPaperAcademy View Mode Tabs */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 space-y-4 shadow-xs">
-        {/* Top Row: PastPaperAcademy Organization Tabs */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex flex-wrap items-center gap-1.5">
+      {/* ==================== SIMPLE, EASY-TO-USE NAVIGATION & FILTER BAR ==================== */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 space-y-4 shadow-2xs">
+        {/* Top Row: 4 Clear View Tabs + Search Input */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/90 rounded-xl">
             {[
-              { id: 'directory', emoji: '📁', label: 'Subject & Year Folders (PastPaperAcademy)' },
-              { id: 'topical', emoji: '🎯', label: `Topical Past Papers (${TOPICAL_PAST_PAPER_PACKS.length})` },
-              { id: 'textbooks', emoji: '📚', label: 'Textbooks & Syllabus Books' },
-              { id: 'grid', emoji: '🗂️', label: `All Papers Archive (${allResources.length})` },
+              { id: 'directory', label: `Browse by Subject (${PAST_PAPER_ACADEMY_SUBJECTS.length})` },
+              { id: 'topical', label: `Practice by Topic (${TOPICAL_PAST_PAPER_PACKS.length})` },
+              { id: 'open_access', label: 'Open Educational Resources & Curricula (9 Repositories)' },
+              { id: 'textbooks', label: 'Subject Textbooks' },
+              { id: 'grid', label: 'All Papers List' },
+              { id: 'registry_analytics', label: `Exam Systems Registry (${EXAM_FORMAT_CATALOG.length - 1})` },
             ].map((mode) => {
               const isPicked = hubViewMode === mode.id;
               return (
@@ -1297,137 +1820,260 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
                   type="button"
                   onClick={() => {
                     soundFx.playSelect();
-                    setHubViewMode(mode.id as 'directory' | 'topical' | 'textbooks' | 'grid');
+                    setHubViewMode(
+                      mode.id as
+                        | 'directory'
+                        | 'topical'
+                        | 'open_access'
+                        | 'textbooks'
+                        | 'grid'
+                        | 'registry_analytics'
+                    );
                     if (mode.id === 'textbooks') {
                       setActiveKindFilter('textbook');
                     } else if (mode.id === 'grid') {
                       setActiveKindFilter('all');
                     }
                   }}
-                  className={`arcade-btn px-3.5 py-2 rounded-2xl text-xs font-black border-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     isPicked
-                      ? 'bg-indigo-600 text-white border-slate-950 shadow-xs'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <span>{mode.emoji}</span>
-                  <span>{mode.label}</span>
+                  {mode.label}
                 </button>
               );
             })}
           </div>
 
-          <span className="text-[11px] font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-xl border border-emerald-200 dark:border-emerald-800">
-            QP = Question Paper · MS = Mark Scheme · ER = Examiner Report · GT = Grade Threshold
-          </span>
+          {/* Clean Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search subject, code (0580, 0862, 0096), board, or year..."
+              className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Exam Board Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playSelect();
-                setActiveBoardFilter('all');
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer whitespace-nowrap ${
-                activeBoardFilter === 'all'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950 border-slate-900'
-                  : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-              }`}
-            >
-              🌍 All Exams ({allResources.length})
-            </button>
-            {EXAM_FORMAT_CATALOG.filter((f) => f.id !== 'general').map((spec) => {
-              const isSelected = activeBoardFilter === spec.id;
-              return (
-                <button
-                  key={spec.id}
-                  type="button"
-                  onClick={() => {
-                    soundFx.playSelect();
-                    setActiveBoardFilter(spec.id);
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
-                  }`}
-                >
-                  <span>{spec.badgeEmoji}</span>
-                  <span>{spec.shortName}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Resource Type Switcher */}
-          {hubViewMode === 'grid' && (
-            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-              {[
-                { id: 'all', label: `All (${allResources.length})` },
-                { id: 'past_paper', label: '📄 Past Papers' },
-                { id: 'textbook', label: '📚 Textbooks' },
-                { id: 'marking_scheme', label: '✅ Syllabuses & ER' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    soundFx.playSelect();
-                    setActiveKindFilter(tab.id as 'all' | 'past_paper' | 'textbook' | 'marking_scheme');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
-                    activeKindFilter === tab.id
-                      ? 'bg-amber-300 text-slate-950 border-slate-950'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+        {/* Filter Row 1: Region & Subject Department Dropdowns + Exam Board Pills */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+          <div className="md:col-span-4 flex flex-col sm:flex-row gap-2">
+            <div className="flex-1">
+              <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                Region / Country
+              </label>
+              <select
+                value={activeRegionSlot}
+                onChange={(e) => {
+                  soundFx.playSelect();
+                  setActiveRegionSlot(e.target.value);
+                  setActiveBoardFilter('all');
+                }}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                {WORLD_REGION_SLOTS.map((region) => (
+                  <option key={region.id} value={region.id}>
+                    {region.emoji} {region.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+
+            <div className="flex-1">
+              <label className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                Subject Area
+              </label>
+              <select
+                value={activeCategorySlot}
+                onChange={(e) => {
+                  soundFx.playSelect();
+                  setActiveCategorySlot(e.target.value as 'all' | SubjectFolderSpec['category']);
+                }}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                {SUBJECT_CATEGORY_SLOTS.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.emoji} {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Exam Board Selector */}
+          <div className="md:col-span-8">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                Exam Board ({visibleExamBoards.length} Available)
+              </label>
+              {(activeRegionSlot !== 'All Regions' ||
+                activeBoardFilter !== 'all' ||
+                activeCheckpointTier !== 'all' ||
+                activeCategorySlot !== 'all' ||
+                activeDecadeFilter !== 'all' ||
+                activeSessionSlot !== 'all' ||
+                activePaperTypeSlot !== 'all' ||
+                searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    setActiveRegionSlot('All Regions');
+                    setActiveBoardFilter('all');
+                    setActiveCheckpointTier('all');
+                    setActiveCategorySlot('all');
+                    setActiveDecadeFilter('all');
+                    setActiveSessionSlot('all');
+                    setActivePaperTypeSlot('all');
+                    setSearchQuery('');
+                  }}
+                  className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                >
+                  Reset Filters
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  soundFx.playSelect();
+                  setActiveBoardFilter('all');
+                  setActiveCheckpointTier('all');
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border shrink-0 transition-colors cursor-pointer ${
+                  activeBoardFilter === 'all'
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                }`}
+              >
+                All Boards
+              </button>
+
+              {visibleExamBoards.map((spec) => {
+                const isSelected = activeBoardFilter === spec.id;
+                return (
+                  <button
+                    key={spec.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playSelect();
+                      setActiveBoardFilter(spec.id);
+                      const firstMatchingFolder = PAST_PAPER_ACADEMY_SUBJECTS.find(
+                        (f) => f.examFormat === spec.id
+                      );
+                      if (firstMatchingFolder) {
+                        setSelectedSubjectFolderId(firstMatchingFolder.id);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border shrink-0 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                    }`}
+                  >
+                    <span>{spec.badgeEmoji}</span>
+                    <span>{spec.shortName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by syllabus code (0580, 0625, WAEC 402, UTME-ENG), subject, year, or textbook title..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/70 text-xs sm:text-sm font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        {/* Clean Cambridge Checkpoint Level Switcher (Primary vs Lower Secondary) */}
+        {(activeBoardFilter === 'all' || activeBoardFilter === 'checkpoint') && (
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="text-xs text-slate-600 dark:text-slate-300">
+              <span className="font-semibold text-slate-900 dark:text-white">
+                Cambridge Checkpoint Level:
+              </span>{' '}
+              Choose between Primary (Stages 4–6) and Lower Secondary (Stages 7–9)
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { id: 'all', label: 'All Checkpoint Levels' },
+                {
+                  id: 'Primary',
+                  label: 'Primary Checkpoint (Stages 4–6 · Ages 8–11)',
+                },
+                {
+                  id: 'Lower Secondary',
+                  label: 'Lower Secondary Checkpoint (Stages 7–9 · Ages 11–14)',
+                },
+              ].map((tier) => {
+                const isPicked =
+                  activeBoardFilter === 'checkpoint' && activeCheckpointTier === tier.id;
+                return (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playSelect();
+                      setActiveBoardFilter('checkpoint');
+                      setActiveCheckpointTier(tier.id as 'all' | 'Lower Secondary' | 'Primary');
+                      const matchingFolder = PAST_PAPER_ACADEMY_SUBJECTS.find((f) => {
+                        if (f.examFormat !== 'checkpoint') return false;
+                        if (tier.id === 'Primary') return f.checkpointTier?.startsWith('Primary');
+                        if (tier.id === 'Lower Secondary')
+                          return f.checkpointTier?.startsWith('Lower Secondary');
+                        return true;
+                      });
+                      if (matchingFolder) {
+                        setSelectedSubjectFolderId(matchingFolder.id);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                      isPicked
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-500'
+                    }`}
+                  >
+                    {tier.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ==================== VIEW 1: PASTPAPERACADEMY SUBJECT & YEAR DIRECTORY ==================== */}
+      {/* ==================== VIEW 1: CLEAN TWO-COLUMN SUBJECT & YEAR BROWSER ==================== */}
       {hubViewMode === 'directory' && activeSubjectFolder && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {/* Left Column: Qualification & Subject Folders Sidebar */}
-          <div className="lg:col-span-4 space-y-2.5">
-            <div className="px-3 py-2 rounded-2xl bg-slate-900 text-white flex items-center justify-between text-xs font-black">
-              <span>📂 Subject Folders ({filteredSubjectFolders.length})</span>
-              <span className="text-amber-300">Syllabus Code</span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column: Clean Subject List */}
+          <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
+            <div className="px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                Subjects ({filteredSubjectFolders.length})
+              </h2>
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Select a subject
+              </span>
             </div>
 
-            <div className="space-y-2 max-h-[680px] overflow-y-auto pr-1">
+            <div className="p-2.5 space-y-1.5 max-h-[calc(100vh-240px)] min-h-[480px] overflow-y-auto">
               {filteredSubjectFolders.map((folder) => {
                 const isSelected = folder.id === activeSubjectFolder.id;
                 const boardSpec = getExamFormatSpec(folder.examFormat);
-                const totalPaperFiles = folder.sessions.length * folder.papersOffered.length;
+                const startYear =
+                  folder.inceptionYear || EXAM_BOARD_INCEPTION_YEARS[folder.examFormat] || 1990;
 
                 return (
                   <button
@@ -1436,344 +2082,432 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
                     onClick={() => {
                       soundFx.playSelect();
                       setSelectedSubjectFolderId(folder.id);
+                      setActiveSessionSlot('all');
                     }}
-                    className={`w-full p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start justify-between gap-2.5 ${
+                    className={`w-full p-3 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
                       isSelected
-                        ? 'border-indigo-600 dark:border-amber-400 bg-indigo-50/90 dark:bg-indigo-950/70 shadow-sm'
-                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-400'
+                        ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/50 dark:border-indigo-500'
+                        : 'border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'
                     }`}
                   >
-                    <div className="flex items-start gap-2.5 min-w-0">
-                      <span className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-lg shrink-0 border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <span className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-base shrink-0 mt-0.5">
                         {folder.iconEmoji}
                       </span>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="px-2 py-0.5 rounded-md bg-slate-900 text-amber-300 font-mono text-[10px] font-black">
-                            {folder.syllabusCode}
-                          </span>
-                          <span className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400">
-                            {boardSpec.shortName}
-                          </span>
-                        </div>
-                        <div className="font-black text-xs sm:text-sm text-slate-900 dark:text-white mt-1 truncate">
+                        <div className="font-semibold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
                           {folder.subjectName}
                         </div>
-                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
-                          {folder.sessions.length} Sessions · {totalPaperFiles} Papers + Textbook
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                            {folder.syllabusCode}
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span>{boardSpec.shortName}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>{startYear}–2026</span>
                         </div>
+                        {folder.checkpointTier && (
+                          <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 mt-0.5">
+                            {folder.checkpointTier}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <ChevronRight
-                      className={`w-4 h-4 shrink-0 mt-2 transition-transform ${
+                      className={`w-4 h-4 shrink-0 transition-transform ${
                         isSelected ? 'text-indigo-600 translate-x-0.5' : 'text-slate-400'
                       }`}
                     />
                   </button>
                 );
               })}
+
+              {filteredSubjectFolders.length === 0 && (
+                <div className="p-8 text-center space-y-3">
+                  <p className="text-xs text-slate-500">
+                    No subjects match your current filters.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveRegionSlot('All Regions');
+                      setActiveBoardFilter('all');
+                      setActiveCheckpointTier('all');
+                      setActiveCategorySlot('all');
+                      setSearchQuery('');
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold cursor-pointer"
+                  >
+                    Show All Subjects
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Right Column: Active Subject Folder -> Textbook Banner + Year/Session Accordions + QP/MS/ER/GT Table */}
+          {/* Right Column: Selected Subject Overview + Clean Year & Paper List */}
           <div className="lg:col-span-8 space-y-4">
-            {/* Subject Folder Header & Grade Threshold Strip */}
-            <div className="p-5 rounded-3xl border-2 border-slate-900 dark:border-slate-700 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="px-2.5 py-0.5 rounded-lg bg-amber-300 text-slate-950 font-mono text-xs font-black">
-                      {activeSubjectFolder.syllabusCode}
-                    </span>
-                    <span className="text-xs font-extrabold text-cyan-300">
+            {/* Subject Header Card */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                      {getExamFormatSpec(activeSubjectFolder.examFormat).badgeEmoji}{' '}
                       {getExamFormatSpec(activeSubjectFolder.examFormat).fullName}
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-bold text-indigo-200">
-                      {activeSubjectFolder.category}
+                    <span aria-hidden="true">·</span>
+                    <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                      Syllabus {activeSubjectFolder.syllabusCode}
                     </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
+                      Years{' '}
+                      {activeSubjectFolder.inceptionYear ||
+                        EXAM_BOARD_INCEPTION_YEARS[activeSubjectFolder.examFormat] ||
+                        1990}
+                      –2026
+                    </span>
+                    {activeSubjectFolder.checkpointTier && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {activeSubjectFolder.checkpointTier}
+                        </span>
+                      </>
+                    )}
                   </div>
-                  <h2 className="text-lg sm:text-xl font-black text-white">
-                    {activeSubjectFolder.iconEmoji} {activeSubjectFolder.subjectName} — Past Papers, Schemes &amp; Textbook
+
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                    {activeSubjectFolder.iconEmoji} {activeSubjectFolder.subjectName}
                   </h2>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    {activeSubjectFolder.sessions.length} Exam Series Available · Includes Written Question Papers &amp; Official Mark Schemes
+                  </p>
                 </div>
 
-                {onOpenNotesGenerator && (
+                {/* Clean Subject Actions (Textbook, Examiner Tips, AI Notes) */}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {(() => {
+                    const subjectBook: AcademicResourceItem = {
+                      id: `ppa-book-${activeSubjectFolder.id}`,
+                      title: activeSubjectFolder.textbookTitle,
+                      examFormat: activeSubjectFolder.examFormat,
+                      kind: 'textbook',
+                      subject: activeSubjectFolder.subjectName,
+                      yearOrEdition: 'Complete Curriculum Edition (Up to 2026 Syllabus)',
+                      paperCode: `${activeSubjectFolder.syllabusCode}-BOOK`,
+                      durationMinutes: 180,
+                      totalMarks: 100,
+                      pagesCount: 68,
+                      fileSizeLabel: '3.4 MB',
+                      authorOrBody: activeSubjectFolder.textbookAuthor,
+                      description: `Complete textbook & worked examples for ${activeSubjectFolder.syllabusCode} ${activeSubjectFolder.subjectName}.`,
+                      tags: ['Textbook', activeSubjectFolder.syllabusCode, activeSubjectFolder.subjectName],
+                      chapters: activeSubjectFolder.textbookChapters,
+                      questions: activeSubjectFolder.coreQuestions,
+                    };
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewResource(subjectBook)}
+                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-indigo-400 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Read Textbook</span>
+                      </button>
+                    );
+                  })()}
+
                   <button
                     type="button"
-                    onClick={() =>
-                      onOpenNotesGenerator(
-                        `${activeSubjectFolder.syllabusCode} ${activeSubjectFolder.subjectName}`,
-                        activeSubjectFolder.examFormat
-                      )
-                    }
-                    className="arcade-btn px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-2 border-slate-950 text-xs font-black cursor-pointer flex items-center gap-1.5 self-start shrink-0"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setActiveExaminerModal({
+                        folder: activeSubjectFolder,
+                        session: activeSubjectFolder.sessions[0] || '2026 Series',
+                        mode: 'ER',
+                      });
+                    }}
+                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-indigo-400 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>AI Syllabus Notes</span>
+                    Grade Boundaries &amp; Tips
                   </button>
-                )}
+
+                  {onOpenNotesGenerator && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onOpenNotesGenerator(
+                          `${activeSubjectFolder.syllabusCode} ${activeSubjectFolder.subjectName}`,
+                          activeSubjectFolder.examFormat
+                        )
+                      }
+                      className="px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Study Notes</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Official Grade Thresholds Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-white/15 text-xs">
-                <div className="p-2.5 rounded-xl bg-white/10">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 block">
-                    🏆 Distinction Threshold
-                  </span>
-                  <span className="font-bold text-white">{activeSubjectFolder.gradeThresholds.distinction}</span>
+              {/* Clean Year Filter Bar: Decade Tabs + Single Jump-to-Year Dropdown */}
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[
+                    { id: 'all', label: 'All Years' },
+                    { id: '2020-2026', label: '2020–2026' },
+                    { id: '2010-2019', label: '2010–2019' },
+                    { id: '2000-2009', label: '2000–2009' },
+                    { id: '1990-1999', label: '1990–1999' },
+                    { id: '1980-1989', label: '1980–1989' },
+                    { id: 'earlier', label: 'Pre-1980' },
+                  ].map((era) => (
+                    <button
+                      key={era.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playSelect();
+                        setActiveDecadeFilter(
+                          era.id as
+                            | 'all'
+                            | '2020-2026'
+                            | '2010-2019'
+                            | '2000-2009'
+                            | '1990-1999'
+                            | '1980-1989'
+                            | 'earlier'
+                        );
+                        setActiveSessionSlot('all');
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                        activeDecadeFilter === era.id
+                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {era.label}
+                    </button>
+                  ))}
                 </div>
-                <div className="p-2.5 rounded-xl bg-white/10">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 block">
-                    ⭐ Credit Threshold
-                  </span>
-                  <span className="font-bold text-white">{activeSubjectFolder.gradeThresholds.credit}</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-white/10">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300 block">
-                    ✓ Pass Threshold
-                  </span>
-                  <span className="font-bold text-white">{activeSubjectFolder.gradeThresholds.pass}</span>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={activeSessionSlot}
+                    onChange={(e) => {
+                      soundFx.playSelect();
+                      const val = e.target.value;
+                      setActiveSessionSlot(val);
+                      if (val !== 'all') {
+                        setExpandedSessions((prev) => ({ ...prev, [val]: true }));
+                      }
+                    }}
+                    aria-label="Filter by Exam Year Series"
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="all">
+                      Jump to Year / Series ({visibleSessionsInFolder.length})
+                    </option>
+                    {visibleSessionsInFolder.map((sess) => (
+                      <option key={sess} value={sess}>
+                        {sess}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      const next: Record<string, boolean> = {};
+                      visibleSessionsInFolder.forEach((s) => {
+                        next[s] = true;
+                      });
+                      setExpandedSessions(next);
+                    }}
+                    className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer shrink-0"
+                  >
+                    Expand All
+                  </button>
+                  <span className="text-slate-300 dark:text-slate-700">|</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      const next: Record<string, boolean> = {};
+                      visibleSessionsInFolder.forEach((s) => {
+                        next[s] = false;
+                      });
+                      setExpandedSessions(next);
+                    }}
+                    className="text-xs font-semibold text-slate-500 hover:underline cursor-pointer shrink-0"
+                  >
+                    Collapse
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Official Recommended Subject Textbook Card */}
-            {(() => {
-              const subjectBook: AcademicResourceItem = {
-                id: `ppa-book-${activeSubjectFolder.id}`,
-                title: activeSubjectFolder.textbookTitle,
-                examFormat: activeSubjectFolder.examFormat,
-                kind: 'textbook',
-                subject: activeSubjectFolder.subjectName,
-                yearOrEdition: 'Complete Curriculum Edition',
-                paperCode: `${activeSubjectFolder.syllabusCode}-BOOK`,
-                durationMinutes: 180,
-                totalMarks: 100,
-                pagesCount: 68,
-                fileSizeLabel: '3.4 MB',
-                authorOrBody: activeSubjectFolder.textbookAuthor,
-                description: `Complete textbook & worked examples for ${activeSubjectFolder.syllabusCode} ${activeSubjectFolder.subjectName}.`,
-                tags: ['Textbook', activeSubjectFolder.syllabusCode, activeSubjectFolder.subjectName],
-                chapters: activeSubjectFolder.textbookChapters,
-                questions: activeSubjectFolder.coreQuestions,
-              };
-              return (
-                <div className="p-4 rounded-2xl border-2 border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black uppercase">
-                        📚 Recommended Syllabus Textbook
-                      </span>
-                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                        By {activeSubjectFolder.textbookAuthor}
-                      </span>
-                    </div>
-                    <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                      {activeSubjectFolder.textbookTitle}
-                    </h3>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setPreviewResource(subjectBook)}
-                      className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-emerald-400 text-xs font-black text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 cursor-pointer flex items-center gap-1"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>Read Chapters</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadResourceFile(subjectBook, 'html_booklet')}
-                      className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black cursor-pointer flex items-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5 text-amber-300" />
-                      <span>Download Textbook</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Year & Session Folders Accordion (PastPaperAcademy Style — All Sessions Included!) */}
-            <div className="flex items-center justify-between px-1 pt-1">
-              <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                📅 All Exam Years &amp; Series ({activeSubjectFolder.sessions.length} Sessions · {activeSubjectFolder.sessions.length * activeSubjectFolder.papersOffered.length} Papers)
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playClick();
-                    const next: Record<string, boolean> = {};
-                    activeSubjectFolder.sessions.forEach((s) => {
-                      next[s] = true;
-                    });
-                    setExpandedSessions(next);
-                  }}
-                  className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                >
-                  Expand All Years
-                </button>
-                <span className="text-slate-300">|</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playClick();
-                    setHubViewMode('grid');
-                    setActiveKindFilter('all');
-                  }}
-                  className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
-                >
-                  View All {allResources.length} Papers →
-                </button>
-              </div>
-            </div>
-
+            {/* Clean Accordion List of Exam Years & Papers */}
             <div className="space-y-3">
-              {activeSubjectFolder.sessions.map((session) => {
-                const isExpanded = expandedSessions[session] ?? true;
+              {visibleSessionsInFolder.map((session, sessionIdx) => {
+                const isExpanded = expandedSessions[session] ?? sessionIdx < 3;
+                const sessionCompletionKey = `${activeSubjectFolder.id}::${session}`;
+                const isSessionCompleted = completedSessions.includes(sessionCompletionKey);
+
                 return (
                   <div
                     key={session}
-                    className="rounded-2xl border-2 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-2xs"
+                    className={`rounded-2xl border overflow-hidden transition-colors ${
+                      isSessionCompleted
+                        ? 'border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-900'
+                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
+                    }`}
                   >
-                    {/* Session Folder Header */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        soundFx.playClick();
-                        setExpandedSessions((prev) => ({ ...prev, [session]: !isExpanded }));
-                      }}
-                      className="w-full px-4 py-3.5 bg-slate-50 dark:bg-slate-800/80 hover:bg-indigo-50/50 dark:hover:bg-slate-800 flex items-center justify-between gap-2 text-left cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-base">{isExpanded ? '📂' : '📁'}</span>
-                        <span className="text-sm font-black text-slate-900 dark:text-white">
+                    {/* Year / Session Header */}
+                    <div className="w-full px-4 py-3 bg-slate-50/70 dark:bg-slate-800/50 flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundFx.playClick();
+                          setExpandedSessions((prev) => ({ ...prev, [session]: !isExpanded }));
+                        }}
+                        className="flex items-center gap-2.5 text-left cursor-pointer flex-1 min-w-0"
+                      >
+                        <ChevronRight
+                          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${
+                            isExpanded ? 'rotate-90 text-indigo-600' : ''
+                          }`}
+                        />
+                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
                           {session}
                         </span>
-                        <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[10px] font-black">
-                          {activeSubjectFolder.papersOffered.length} Papers (QP + MS + ER + GT)
+                        <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline">
+                          · {activeSubjectFolder.papersOffered.length} Papers &amp; Mark Schemes
                         </span>
-                      </div>
-                      <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
-                        {isExpanded ? 'Hide Papers ▲' : 'View Papers ▼'}
-                      </span>
-                    </button>
+                      </button>
 
-                    {/* Paired Paper Rows inside the Session */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            soundFx.playClick();
+                            setActiveExaminerModal({
+                              folder: activeSubjectFolder,
+                              session,
+                              mode: 'ER',
+                            });
+                          }}
+                          className="text-xs font-medium text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 cursor-pointer hidden sm:inline"
+                        >
+                          Examiner Report
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleCompleteSession(sessionCompletionKey)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
+                            isSessionCompleted
+                              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                              : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
+                          }`}
+                        >
+                          {isSessionCompleted ? '✓ Completed' : 'Mark Done'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Papers inside this Year / Session */}
                     {isExpanded && (
                       <div className="divide-y divide-slate-100 dark:divide-slate-800">
                         {activeSubjectFolder.papersOffered.map((paper) => {
-                          const paperResource: AcademicResourceItem = {
-                            id: `ppa-${activeSubjectFolder.id}-${session}-${paper.paperNumber}`,
-                            title: `${activeSubjectFolder.syllabusCode} ${activeSubjectFolder.subjectName} — ${paper.paperNumber}: ${paper.paperTitle}`,
-                            examFormat: activeSubjectFolder.examFormat,
-                            kind: 'past_paper',
-                            subject: activeSubjectFolder.subjectName,
-                            yearOrEdition: session,
-                            paperCode: `${activeSubjectFolder.syllabusCode} / ${paper.paperNumber}`,
-                            durationMinutes: paper.durationMinutes,
-                            totalMarks: paper.totalMarks,
-                            pagesCount: 16,
-                            fileSizeLabel: '1.4 MB',
-                            authorOrBody: `${activeSubjectFolder.syllabusCode} Official Board`,
-                            description: `${session} ${activeSubjectFolder.subjectName} (${paper.paperTitle}) with full questions and marking scheme.`,
-                            tags: [activeSubjectFolder.syllabusCode, session, paper.paperNumber],
-                            questions: activeSubjectFolder.coreQuestions.map((q, idx) => ({
-                              ...q,
-                              number: idx + 1,
-                              section: `${session} · ${paper.paperNumber}`,
-                            })),
-                          };
+                          const paperResource = buildResourceForSessionPaper(
+                            activeSubjectFolder,
+                            session,
+                            paper,
+                            'QP'
+                          );
+                          const msResource = buildResourceForSessionPaper(
+                            activeSubjectFolder,
+                            session,
+                            paper,
+                            'MS'
+                          );
 
                           return (
                             <div
                               key={paper.paperNumber}
-                              className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                              className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
                             >
-                              <div className="space-y-0.5">
+                              <div className="min-w-0 space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-slate-900 text-white dark:bg-slate-700">
+                                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
                                     {paper.paperNumber}
                                   </span>
-                                  <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                                  <span className="text-sm font-semibold text-slate-900 dark:text-white">
                                     {paper.paperTitle}
                                   </span>
                                 </div>
-                                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-3">
-                                  <span>⏱️ {paper.durationMinutes} mins</span>
-                                  <span>🏆 {paper.totalMarks} Marks</span>
-                                  <span>📄 {session}</span>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-2">
+                                  <span>{paper.durationMinutes} mins</span>
+                                  <span aria-hidden="true">·</span>
+                                  <span>{paper.totalMarks} Marks</span>
+                                  <span aria-hidden="true">·</span>
+                                  <span>Written Paper + Step-by-Step Mark Scheme</span>
                                 </div>
                               </div>
 
-                              {/* PastPaperAcademy Paired Quick Action Badges: QP | MS | ER | GT | CBT */}
-                              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDownloadResourceFile(paperResource, 'html_booklet')}
-                                  className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-black cursor-pointer flex items-center gap-1 shadow-2xs"
-                                  title="Download Question Paper Booklet (QP)"
-                                >
-                                  <Download className="w-3 h-3 text-amber-300" />
-                                  <span>QP</span>
-                                </button>
-
+                              {/* Clear, Human-Friendly Action Buttons */}
+                              <div className="flex flex-wrap items-center gap-2 shrink-0">
                                 <button
                                   type="button"
                                   onClick={() => {
                                     soundFx.playClick();
+                                    setPaperStudyMode('split_qp_ms');
                                     setShowMarkingSchemeInPreview(true);
+                                    setStudyTimerSeconds((paper.durationMinutes || 60) * 60);
+                                    setIsStudyTimerRunning(false);
                                     setPreviewResource(paperResource);
                                   }}
-                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black cursor-pointer flex items-center gap-1 shadow-2xs"
-                                  title="View & Download Official Marking Scheme (MS)"
+                                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs"
                                 >
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>MS</span>
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>Open Paper &amp; Mark Scheme</span>
                                 </button>
 
                                 <button
                                   type="button"
                                   onClick={() => {
                                     soundFx.playClick();
-                                    setActiveExaminerModal({
-                                      folder: activeSubjectFolder,
-                                      session,
-                                      mode: 'ER',
-                                    });
+                                    setPaperStudyMode('mark_scheme_table');
+                                    setShowMarkingSchemeInPreview(true);
+                                    setPreviewResource(msResource);
                                   }}
-                                  className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-black cursor-pointer"
-                                  title="View Chief Examiner Report (ER)"
+                                  className="px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50/70 dark:bg-emerald-950/40 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 text-xs font-semibold cursor-pointer flex items-center gap-1"
                                 >
-                                  ER
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    soundFx.playClick();
-                                    setActiveExaminerModal({
-                                      folder: activeSubjectFolder,
-                                      session,
-                                      mode: 'GT',
-                                    });
-                                  }}
-                                  className="px-2.5 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-[11px] font-black cursor-pointer"
-                                  title="View Session Grade Thresholds (GT)"
-                                >
-                                  GT
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Mark Scheme</span>
                                 </button>
 
                                 <button
                                   type="button"
                                   onClick={() => handlePracticePastPaperInteractive(paperResource)}
-                                  className="px-3 py-1.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-slate-950 border border-slate-950 text-[11px] font-black cursor-pointer flex items-center gap-1"
-                                  title="Practice this paper in Timed CBT Mode"
+                                  className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-400 text-slate-700 dark:text-slate-200 text-xs font-semibold cursor-pointer flex items-center gap-1"
                                 >
-                                  <Play className="w-3 h-3 fill-slate-950" />
-                                  <span>CBT</span>
+                                  <Play className="w-3 h-3" />
+                                  <span>Timed Quiz</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadResourceFile(paperResource, 'html_booklet')}
+                                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-indigo-400 text-slate-600 dark:text-slate-300 text-xs font-semibold cursor-pointer flex items-center gap-1"
+                                  title="Download Printable Question Paper & Mark Scheme Booklet"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Download</span>
                                 </button>
                               </div>
                             </div>
@@ -1791,7 +2525,7 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
 
       {/* ==================== VIEW 2: TOPICAL PAST PAPERS (BY SYLLABUS TOPIC) ==================== */}
       {hubViewMode === 'topical' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredTopicalPacks.map((pack: TopicalPastPaperPack) => {
             const spec = getExamFormatSpec(pack.examFormat);
             const topicalResource: AcademicResourceItem = {
@@ -1815,59 +2549,62 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
             return (
               <div
                 key={pack.id}
-                className="rounded-3xl border-2 border-b-4 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-col justify-between gap-4 hover:border-indigo-400 transition-all"
+                className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-col justify-between gap-4 hover:border-indigo-400 transition-all shadow-2xs"
               >
                 <div className="space-y-2.5">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="px-2.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-xs font-black">
+                  <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold text-indigo-600 dark:text-indigo-400">
                       {spec.badgeEmoji} {spec.shortName} · {pack.subject}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-lg bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-300 text-[11px] font-black">
-                      {pack.difficulty} · {pack.questionCount} Qs ({pack.yearsCovered})
+                    <span>
+                      {pack.difficulty} · {pack.questionCount} Questions
                     </span>
                   </div>
 
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">
-                    🎯 {pack.topicName}
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
+                    {pack.topicName}
                   </h3>
 
-                  <div className="flex flex-wrap gap-1.5">
-                    {pack.keySubtopics.map((sub) => (
-                      <span
-                        key={sub}
-                        className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300"
-                      >
-                        • {sub}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Subtopics: {pack.keySubtopics.join(' · ')}
+                  </p>
 
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1">
-                    <div className="font-black text-indigo-600 dark:text-indigo-400">
-                      Sample Past Question ({pack.sampleQuestion.marks} Marks):
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1">
+                    <div className="font-semibold text-slate-500 dark:text-slate-400">
+                      Sample Question ({pack.sampleQuestion.marks} Marks):
                     </div>
-                    <div className="font-bold text-slate-800 dark:text-slate-200">
+                    <div className="font-medium text-slate-800 dark:text-slate-200 line-clamp-2">
                       {pack.sampleQuestion.question}
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2">
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleDownloadResourceFile(topicalResource, 'html_booklet')}
-                    className="arcade-btn flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer"
+                    onClick={() => {
+                      setPaperStudyMode('split_qp_ms');
+                      setPreviewResource(topicalResource);
+                    }}
+                    className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer text-center"
                   >
-                    <Download className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Download Topical Pack (QP+MS)</span>
+                    Open Paper &amp; Mark Scheme
                   </button>
                   <button
                     type="button"
                     onClick={() => handlePracticePastPaperInteractive(topicalResource)}
-                    className="py-2 px-3.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-slate-950 border border-slate-950 text-xs font-black flex items-center gap-1.5 cursor-pointer"
+                    className="py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-400 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1 cursor-pointer"
                   >
-                    <Play className="w-3.5 h-3.5 fill-slate-950" />
-                    <span>Practice Topic CBT</span>
+                    <Play className="w-3 h-3" />
+                    <span>Quiz</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadResourceFile(topicalResource, 'html_booklet')}
+                    className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-400 cursor-pointer"
+                    title="Download Topic Pack"
+                  >
+                    <Download className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -1876,193 +2613,364 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
         </div>
       )}
 
-      {/* ==================== VIEW 3 & 4: TEXTBOOKS LIBRARY / ALL PAPERS GRID ==================== */}
-      {(hubViewMode === 'grid' || hubViewMode === 'textbooks') && (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredResources.map((item) => {
-          const spec = getExamFormatSpec(item.examFormat);
-          const isSaved = savedIds.includes(item.id);
-          const isTextbook = item.kind === 'textbook';
-
-          return (
-            <div
-              key={item.id}
-              className="rounded-3xl border-2 border-b-[5px] border-slate-200 dark:border-slate-800 border-b-slate-300 dark:border-b-slate-700 bg-white dark:bg-slate-900 p-5 flex flex-col justify-between gap-4 hover:border-indigo-400 transition-all shadow-xs"
-            >
-              <div className="space-y-3">
-                {/* Top Badges */}
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-2.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-black">
-                      {spec.badgeEmoji} {spec.shortName}
-                    </span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${
-                        isTextbook
-                          ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                          : 'bg-amber-100 dark:bg-amber-950/70 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                      }`}
-                    >
-                      {isTextbook ? '📚 Official Textbook' : '📄 Past Paper + Scheme'}
-                    </span>
-                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                      {item.yearOrEdition}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleSaveResource(item.id)}
-                    className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 cursor-pointer"
-                    title={isSaved ? 'Remove from saved' : 'Bookmark Past Paper / Textbook'}
-                  >
-                    {isSaved ? (
-                      <BookmarkCheck className="w-4 h-4 text-indigo-600 fill-indigo-600" />
-                    ) : (
-                      <Bookmark className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-
-                {/* Title & Author */}
-                <div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug">
-                    {item.title}
-                  </h3>
-                  <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mt-0.5">
-                    {item.authorOrBody} · Code: <span className="font-mono text-indigo-600 dark:text-indigo-400">{item.paperCode}</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  {item.description}
-                </p>
-
-                {/* Metadata Strip */}
-                <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                    {item.durationMinutes} mins
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Award className="w-3.5 h-3.5 text-amber-500" />
-                    {item.totalMarks} Marks
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5 text-emerald-500" />
-                    {item.pagesCount} pages ({item.fileSizeLabel})
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDownloadResourceFile(item, 'html_booklet')}
-                  className="arcade-btn flex-1 min-w-[140px] py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Download Booklet</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDownloadResourceFile(item, 'markdown')}
-                  className="py-2.5 px-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-indigo-400 text-xs font-extrabold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1 cursor-pointer"
-                  title="Download Markdown / Text Revision Pack"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>.MD</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundFx.playClick();
-                    setPreviewResource(item);
-                  }}
-                  className="py-2.5 px-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-400 text-xs font-extrabold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Eye className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>Read / Scheme</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handlePracticePastPaperInteractive(item)}
-                  className="py-2.5 px-3.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-slate-950 border-2 border-slate-950 text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer"
-                  title="Practice this past paper interactively in timed Exam Mode"
-                >
-                  <Play className="w-3.5 h-3.5 fill-slate-950" />
-                  <span>Practice CBT</span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/* ==================== VIEW: OPEN EDUCATIONAL RESOURCES & CURRICULA (9 REPOSITORIES) ==================== */}
+      {hubViewMode === 'open_access' && (
+        <OpenAccessHubView
+          persona={persona}
+          selectedExamFormat={activeBoardFilter !== 'all' ? activeBoardFilter : selectedExamFormat}
+          onStartQuiz={onStartQuiz}
+          onOpenNotesGenerator={onOpenNotesGenerator}
+          onOpenWorksheet={onOpenWorksheet}
+        />
       )}
 
-      {/* Examiner Report (ER) & Grade Thresholds (GT) Modal */}
-      {activeExaminerModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-900 dark:border-slate-700 shadow-2xl overflow-hidden">
-            <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-900 text-white flex items-center justify-between gap-3">
+      {/* ==================== VIEW 3 & 4: TEXTBOOKS LIBRARY / ALL PAPERS LIST ==================== */}
+      {(hubViewMode === 'grid' || hubViewMode === 'textbooks') && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Showing {Math.min(filteredResources.length, 180)} of {filteredResources.length} resources
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { id: 'all', label: `All (${allResources.length})` },
+                { id: 'past_paper', label: 'Question Papers' },
+                { id: 'marking_scheme', label: 'Mark Schemes' },
+                { id: 'textbook', label: 'Textbooks' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    soundFx.playSelect();
+                    setActiveKindFilter(tab.id as 'all' | 'past_paper' | 'textbook' | 'marking_scheme');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                    activeKindFilter === tab.id
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900'
+                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filteredResources.slice(0, 180).map((item) => {
+              const spec = getExamFormatSpec(item.examFormat);
+              const isSaved = savedIds.includes(item.id);
+              const isTextbook = item.kind === 'textbook';
+              const isMarkScheme = item.kind === 'marking_scheme';
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 flex flex-col justify-between gap-4 hover:border-indigo-400 transition-all shadow-2xs"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                          {spec.badgeEmoji} {spec.shortName}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {isTextbook ? 'Textbook' : isMarkScheme ? 'Mark Scheme' : 'Question Paper'}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>{item.yearOrEdition}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleSaveResource(item.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 cursor-pointer"
+                        title={isSaved ? 'Remove bookmark' : 'Bookmark resource'}
+                      >
+                        {isSaved ? (
+                          <BookmarkCheck className="w-4 h-4 text-indigo-600 fill-indigo-600" />
+                        ) : (
+                          <Bookmark className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
+                        {item.title}
+                      </h3>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                        {item.authorOrBody} · <span className="font-mono">{item.paperCode}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
+                      {item.description}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400 pt-1">
+                      <span>{item.durationMinutes} mins</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{item.totalMarks} Marks</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{item.pagesCount} pages</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundFx.playClick();
+                        setPaperStudyMode(isMarkScheme ? 'mark_scheme_table' : 'split_qp_ms');
+                        setPreviewResource(item);
+                      }}
+                      className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>{isTextbook ? 'Read Book' : 'Open Paper & MS'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handlePracticePastPaperInteractive(item)}
+                      className="py-2 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-400 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Play className="w-3 h-3" />
+                      <span>Quiz</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDownloadResourceFile(
+                          item,
+                          isMarkScheme ? 'marking_scheme' : 'html_booklet'
+                        )
+                      }
+                      className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-indigo-400 text-slate-600 dark:text-slate-300 cursor-pointer"
+                      title="Download Booklet"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== VIEW 5: GLOBAL EXAMINATION SYSTEMS REGISTRY, PROVENANCE & READINESS ANALYTICS ==================== */}
+      {hubViewMode === 'registry_analytics' && (
+        <div className="space-y-6">
+          {/* Personal Exam Readiness & Self/AI-Marking Analytics Summary */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-4 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <span className="px-2.5 py-0.5 rounded-md bg-amber-300 text-slate-950 text-[10px] font-black uppercase tracking-wider">
-                  {activeExaminerModal.mode === 'ER' ? 'CHIEF EXAMINER REPORT (ER)' : 'OFFICIAL GRADE THRESHOLDS (GT)'}
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  Personal Examination Readiness &amp; Marking Analytics
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Tracks your self-marked and AI-marked written paper responses, completed examination series, and bookmarked papers.
+                </p>
+              </div>
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                Provenance Policy: Authentic Syllabus &amp; Specimen Papers Clearly Separated from AI Practice Synthesis
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                  Supported Exam Systems
                 </span>
-                <h3 className="text-base sm:text-lg font-black mt-1">
+                <span className="text-xl font-bold text-slate-900 dark:text-white tabular-nums mt-0.5 block">
+                  {EXAM_FORMAT_CATALOG.length - 1} Systems
+                </span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                  Questions Self / AI-Marked
+                </span>
+                <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400 tabular-nums mt-0.5 block">
+                  {Object.keys(studentSelfMarks).length} Questions
+                </span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                  Completed Exam Series
+                </span>
+                <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-0.5 block">
+                  {completedSessions.length} Series
+                </span>
+              </div>
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                  Bookmarked Papers
+                </span>
+                <span className="text-xl font-bold text-amber-600 dark:text-amber-400 tabular-nums mt-0.5 block">
+                  {savedIds.length} Saved
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Complete 25+ Global Examination Systems Registry Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  Global Examination Systems Registry &amp; Verification Matrix ({EXAM_FORMAT_CATALOG.length - 1} Boards)
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Click any examination system to filter subjects, historical sessions, question papers, and official marking schemes.
+                </p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200">
+                    <th className="p-3.5">Examination System</th>
+                    <th className="p-3.5">Governing Authority &amp; Region</th>
+                    <th className="p-3.5">Archive Span</th>
+                    <th className="p-3.5">Paper Structure &amp; Scale</th>
+                    <th className="p-3.5">Verification &amp; Rights</th>
+                    <th className="p-3.5 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                  {EXAM_FORMAT_CATALOG.filter((s) => s.id !== 'standard_exam').map((spec) => {
+                    const startYr = EXAM_BOARD_INCEPTION_YEARS[spec.id] || 1990;
+                    const count = boardCounts[spec.id] || 0;
+                    return (
+                      <tr
+                        key={spec.id}
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                      >
+                        <td className="p-3.5 font-bold text-slate-900 dark:text-white">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{spec.badgeEmoji}</span>
+                            <div>
+                              <div>{spec.shortName}</div>
+                              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                                { count } Indexed Papers &amp; Mark Schemes
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-slate-700 dark:text-slate-300">
+                          <div className="font-semibold">{spec.governingBody}</div>
+                          <div className="text-[11px] text-slate-500">{spec.regionTag}</div>
+                        </td>
+                        <td className="p-3.5 font-mono font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
+                          {startYr}–2026
+                        </td>
+                        <td className="p-3.5 text-slate-600 dark:text-slate-300">
+                          <div>{spec.paperStructure}</div>
+                          <div className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+                            {spec.gradingScaleLabel}
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-slate-600 dark:text-slate-300">
+                          <div className="font-semibold text-emerald-700 dark:text-emerald-400">
+                            Verified Syllabus &amp; Mark Scheme Structure
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            Authorized Educational Practice Reference
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              soundFx.playSelect();
+                              setActiveRegionSlot('All Regions');
+                              setActiveBoardFilter(spec.id);
+                              const folder = PAST_PAPER_ACADEMY_SUBJECTS.find(
+                                (f) => f.examFormat === spec.id
+                              );
+                              if (folder) setSelectedSubjectFolderId(folder.id);
+                              setHubViewMode('directory');
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold cursor-pointer"
+                          >
+                            Open Papers
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Examiner Report & Grade Boundaries Modal */}
+      {activeExaminerModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                  Examiner Guidance &amp; Grade Boundaries
+                </div>
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-0.5">
                   {activeExaminerModal.folder.syllabusCode} {activeExaminerModal.folder.subjectName} ({activeExaminerModal.session})
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setActiveExaminerModal(null)}
-                className="p-1.5 rounded-xl bg-white/10 hover:bg-rose-500 text-white cursor-pointer"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
-                  <div className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-300">
-                    Distinction
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+                  <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    Distinction / Top Grade
                   </div>
-                  <div className="text-xs font-black text-slate-900 dark:text-white mt-0.5">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white mt-1">
                     {activeExaminerModal.folder.gradeThresholds.distinction}
                   </div>
                 </div>
-                <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
-                  <div className="text-[10px] font-black uppercase text-amber-800 dark:text-amber-300">
-                    Credit
+                <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
+                  <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                    Credit / Strong Pass
                   </div>
-                  <div className="text-xs font-black text-slate-900 dark:text-white mt-0.5">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white mt-1">
                     {activeExaminerModal.folder.gradeThresholds.credit}
                   </div>
                 </div>
-                <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800">
-                  <div className="text-[10px] font-black uppercase text-indigo-700 dark:text-indigo-300">
-                    Pass
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+                  <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    Minimum Pass Threshold
                   </div>
-                  <div className="text-xs font-black text-slate-900 dark:text-white mt-0.5">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white mt-1">
                     {activeExaminerModal.folder.gradeThresholds.pass}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Chief Examiner Observations &amp; Candidate Pitfalls to Avoid:
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Key Examiner Tips &amp; Common Mistakes to Avoid
                 </h4>
                 <ul className="space-y-2">
                   {activeExaminerModal.folder.examinerInsights.map((insight, i) => (
                     <li
                       key={i}
-                      className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border-l-4 border-purple-500 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                      className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-200 leading-relaxed"
                     >
                       {insight}
                     </li>
@@ -2070,13 +2978,13 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
                 </ul>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end pt-2">
                 <button
                   type="button"
                   onClick={() => setActiveExaminerModal(null)}
-                  className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-black cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold cursor-pointer"
                 >
-                  Close Report
+                  Done
                 </button>
               </div>
             </div>
@@ -2084,208 +2992,653 @@ export const PastPapersHubView: React.FC<PastPapersHubViewProps> = ({
         </div>
       )}
 
-      {/* Interactive Reader & Marking Scheme Modal */}
-      {previewResource && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-900 dark:border-slate-700 shadow-2xl overflow-hidden my-8 max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="p-5 sm:p-6 border-b-2 border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="px-2.5 py-0.5 rounded-lg bg-indigo-600 text-white text-[10px] font-black uppercase tracking-wider">
-                    {getExamFormatSpec(previewResource.examFormat).fullName}
-                  </span>
-                  <span className="text-xs font-mono font-bold text-slate-500">
-                    {previewResource.paperCode} · {previewResource.yearOrEdition}
-                  </span>
-                </div>
-                <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
-                  {previewResource.title}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPreviewResource(null)}
-                className="p-2 rounded-xl bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-rose-500 hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* ==================== AUTHENTIC WRITTEN EXAM PAPER & ACTIVE STUDY WORKBENCH MODAL ==================== */}
+      {previewResource && (() => {
+        const matchedFolder =
+          PAST_PAPER_ACADEMY_SUBJECTS.find(
+            (f) =>
+              f.examFormat === previewResource.examFormat &&
+              (previewResource.subject.includes(f.subjectName) ||
+                previewResource.paperCode.includes(f.syllabusCode))
+          ) || activeSubjectFolder;
+        const paperMeta = getWrittenExamPaperHeaderMeta(
+          matchedFolder,
+          previewResource.yearOrEdition,
+          previewResource.paperCode
+        );
+        const candidateHeaderBoxes = [
+          'Candidate Full Name',
+          'Centre / School Number',
+          'Candidate / Index Number',
+        ];
+        const questions = previewResource.questions || [];
+        const totalPossibleMarks =
+          questions.reduce((acc, q) => acc + (q.marks || 0), 0) || previewResource.totalMarks || 100;
+        const awardedMarksTotal = questions.reduce((acc, q) => {
+          const qKey = `${previewResource.id}::q${q.number}`;
+          return acc + (studentSelfMarks[qKey] || 0);
+        }, 0);
+        const percentageScore =
+          totalPossibleMarks > 0 ? Math.round((awardedMarksTotal / totalPossibleMarks) * 100) : 0;
+        const gradeEval = evaluateExamBoardGrade(previewResource.examFormat, percentageScore);
 
-            {/* Modal Toolbar */}
-            <div className="px-6 py-3 bg-indigo-50/60 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                {previewResource.questions && previewResource.questions.length > 0 && (
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+            <div className="w-full max-w-6xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-4 max-h-[94vh] flex flex-col">
+              {/* Top Bar: Title + Timer + Self-Marked Score */}
+              <div className="p-4 sm:px-6 border-b border-slate-200 dark:border-slate-800 bg-slate-900 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap text-xs text-slate-300 mb-0.5">
+                    <span className="font-semibold text-amber-300">
+                      {paperMeta.governingHeader}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="font-mono">
+                      {previewResource.paperCode} ({previewResource.yearOrEdition})
+                    </span>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-bold text-white truncate">
+                    {previewResource.title}
+                  </h2>
+                </div>
+
+                {/* Live Study Timer + Self-Marking Grade Calculator */}
+                <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                  {questions.length > 0 && (
+                    <>
+                      <div className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 flex items-center gap-2 text-xs">
+                        <Clock className="w-3.5 h-3.5 text-amber-300" />
+                        <span className="font-mono font-bold text-white tabular-nums">
+                          {formatTimer(studyTimerSeconds)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsStudyTimerRunning((p) => !p)}
+                          className="px-2 py-0.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-semibold cursor-pointer"
+                        >
+                          {isStudyTimerRunning ? 'Pause' : 'Start Timer'}
+                        </button>
+                      </div>
+
+                      <div className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 flex items-center gap-2 text-xs">
+                        <Award className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="font-semibold text-white tabular-nums">
+                          Score: {awardedMarksTotal} / {totalPossibleMarks} ({percentageScore}%)
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[11px] font-bold">
+                          {gradeEval.gradeBadge}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
                   <button
                     type="button"
-                    onClick={() => setShowMarkingSchemeInPreview((prev) => !prev)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black border cursor-pointer transition-all ${
-                      showMarkingSchemeInPreview
-                        ? 'bg-emerald-600 text-white border-emerald-700'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
-                    }`}
+                    onClick={() => setPreviewResource(null)}
+                    className="p-2 rounded-xl bg-white/10 hover:bg-rose-500 text-white transition-colors cursor-pointer"
                   >
-                    {showMarkingSchemeInPreview ? '✓ Marking Scheme Visible' : 'Show Marking Scheme'}
+                    <X className="w-5 h-5" />
                   </button>
+                </div>
+              </div>
+
+              {/* Study Mode Switcher & Download Toolbar */}
+              <div className="px-4 sm:px-6 py-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+                {questions.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-200/70 dark:bg-slate-800 rounded-xl">
+                    {[
+                      {
+                        id: 'split_qp_ms',
+                        label: 'Split View (Paper + Mark Scheme)',
+                      },
+                      {
+                        id: 'written_paper',
+                        label: 'Written Exam Paper Only',
+                      },
+                      {
+                        id: 'mark_scheme_table',
+                        label: 'Mark Scheme Table Only',
+                      },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          soundFx.playSelect();
+                          setPaperStudyMode(
+                            m.id as 'written_paper' | 'split_qp_ms' | 'mark_scheme_table'
+                          );
+                          if (m.id === 'written_paper') {
+                            setShowMarkingSchemeInPreview(false);
+                          } else {
+                            setShowMarkingSchemeInPreview(true);
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                          paperStudyMode === m.id
+                            ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                    Official Curriculum Textbook &amp; Worked Examples
+                  </span>
                 )}
-                {onOpenNotesGenerator && (
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {paperStudyMode === 'written_paper' && questions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMarkingSchemeInPreview((prev) => !prev)}
+                      className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
+                    >
+                      {showMarkingSchemeInPreview ? 'Hide Answers' : 'Reveal Answers'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadResourceFile(previewResource, 'html_booklet')}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download Paper</span>
+                  </button>
+                  {questions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadResourceFile(previewResource, 'marking_scheme')}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Mark Scheme</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
-                      const topic = `${previewResource.subject} (${previewResource.title})`;
+                      const item = previewResource;
                       setPreviewResource(null);
-                      onOpenNotesGenerator(topic, previewResource.examFormat);
+                      handlePracticePastPaperInteractive(item);
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-xs font-extrabold text-indigo-600 dark:text-indigo-400 hover:border-indigo-400 cursor-pointer flex items-center gap-1"
+                    className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Generate AI Notes from Paper</span>
+                    <Play className="w-3 h-3" />
+                    <span>Timed Quiz</span>
                   </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50/70 dark:bg-slate-950">
+                {questions.length > 0 && (
+                  <>
+                    {/* Clean Written Examination Cover Sheet */}
+                    <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                        <div>
+                          <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            {paperMeta.governingHeader} — {paperMeta.qualificationSubheader}
+                          </div>
+                          <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-white mt-0.5">
+                            {paperMeta.paperComponentHeader}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800">
+                            Time: {previewResource.durationMinutes} mins
+                          </span>
+                          <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800">
+                            Max Marks: [{totalPossibleMarks}]
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Candidate Name / Centre Number Boxes */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                        {candidateHeaderBoxes.map((boxLabel, idx) => (
+                          <div
+                            key={boxLabel}
+                            className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40"
+                          >
+                            <label className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">
+                              {boxLabel}
+                            </label>
+                            {idx === 0 ? (
+                              <input
+                                type="text"
+                                value={candidateName}
+                                onChange={(e) => setCandidateName(e.target.value)}
+                                className="w-full bg-transparent font-mono font-semibold text-slate-900 dark:text-white focus:outline-none"
+                              />
+                            ) : (
+                              <input
+                                type="text"
+                                value={candidateCentreNo}
+                                onChange={(e) => setCandidateCentreNo(e.target.value)}
+                                className="w-full bg-transparent font-mono font-semibold text-slate-900 dark:text-white focus:outline-none"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Provenance, Verification Status & Usage Rights */}
+                      {(() => {
+                        const prov = getDocumentProvenanceMeta(previewResource, matchedFolder);
+                        return (
+                          <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                                  {prov.verificationStatus}
+                                </span>
+                                <span aria-hidden="true">·</span>
+                                <span>{prov.completenessStatus}</span>
+                                <span aria-hidden="true">·</span>
+                                <span>Syllabus: {prov.syllabusVersion}</span>
+                              </div>
+                              <span>{prov.usageRights}</span>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-400">
+                              <span>Source Authority: {prov.sourceAuthority}</span>
+                              <span>Reference: {prov.sourceUrlOrReference}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* MODE 3: FULL OFFICIAL MARK SCHEME RUBRIC TABLE */}
+                    {paperStudyMode === 'mark_scheme_table' ? (
+                      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs">
+                        <div className="px-5 py-3.5 bg-emerald-700 text-white flex items-center justify-between">
+                          <span className="text-xs sm:text-sm font-bold">
+                            Official Mark Scheme (MS) — {previewResource.paperCode} ({previewResource.yearOrEdition})
+                          </span>
+                          <span className="text-xs font-semibold bg-white/20 px-2.5 py-0.5 rounded-md">
+                            Total: {totalPossibleMarks} Marks
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200">
+                                <th className="p-3.5 border-r border-slate-200 dark:border-slate-700 w-16">Q#</th>
+                                <th className="p-3.5 border-r border-slate-200 dark:border-slate-700 w-1/3">
+                                  Acceptable Official Answer
+                                </th>
+                                <th className="p-3.5 border-r border-slate-200 dark:border-slate-700 w-20 text-center">
+                                  Marks
+                                </th>
+                                <th className="p-3.5">
+                                  Examiner M1 / A1 Marking Notes &amp; Method Guidance
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                              {questions.map((q) => (
+                                <tr key={q.number} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
+                                  <td className="p-3.5 font-mono font-bold text-indigo-600 dark:text-indigo-400 border-r border-slate-200 dark:border-slate-700">
+                                    Q{q.number}
+                                  </td>
+                                  <td className="p-3.5 font-semibold text-slate-900 dark:text-white border-r border-slate-200 dark:border-slate-700">
+                                    {q.answer}
+                                  </td>
+                                  <td className="p-3.5 font-mono font-bold text-center text-emerald-700 dark:text-emerald-400 border-r border-slate-200 dark:border-slate-700 tabular-nums">
+                                    [{q.marks}]
+                                  </td>
+                                  <td className="p-3.5 text-slate-700 dark:text-slate-300 leading-relaxed">
+                                    {q.markingSchemeNotes}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      /* MODE 1 & 2: WRITTEN EXAM PAPER BOOKLET OR SPLIT-SCREEN WRITTEN QP + MARK SCHEME */
+                      <div className="space-y-4">
+                        {questions.map((q) => {
+                          const qKey = `${previewResource.id}::q${q.number}`;
+                          const workingText = studentWrittenWorking[qKey] || '';
+                          const finalAnsText = studentFinalAnswers[qKey] || '';
+                          const awarded = studentSelfMarks[qKey];
+                          const isFlagged = flaggedQuestionKeys.includes(qKey);
+                          const showMsPanel =
+                            paperStudyMode === 'split_qp_ms' || showMarkingSchemeInPreview;
+
+                          return (
+                            <div
+                              key={q.number}
+                              className={`grid grid-cols-1 ${
+                                showMsPanel ? 'lg:grid-cols-12' : ''
+                              } gap-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-2xs`}
+                            >
+                              {/* Left Side: Written Examination Question + Working Space + Answer Line */}
+                              <div
+                                className={`${
+                                  showMsPanel
+                                    ? 'lg:col-span-7 lg:border-r lg:border-slate-200 dark:lg:border-slate-800 lg:pr-5'
+                                    : ''
+                                } space-y-3.5`}
+                              >
+                                <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                                  <div className="flex items-center gap-2.5">
+                                    <span className="w-7 h-7 rounded-lg bg-slate-900 dark:bg-slate-800 text-white font-mono text-xs font-bold flex items-center justify-center">
+                                      {q.number}
+                                    </span>
+                                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                      {q.section}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleFlagQuestion(qKey)}
+                                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border cursor-pointer ${
+                                        isFlagged
+                                          ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300'
+                                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                                      }`}
+                                    >
+                                      {isFlagged ? 'Flagged' : 'Flag'}
+                                    </button>
+                                    <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+                                      [{q.marks} {q.marks === 1 ? 'Mark' : 'Marks'}]
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Written Exam Question Prompt */}
+                                <p className="text-sm sm:text-base font-serif text-slate-900 dark:text-white leading-relaxed">
+                                  {q.question}
+                                </p>
+
+                                {/* Multiple Choice Options if applicable */}
+                                {q.options && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                    {q.options.map((opt, idx) => {
+                                      const isSelectedOpt = finalAnsText === opt;
+                                      return (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => {
+                                            setStudentFinalAnswers((prev) => ({ ...prev, [qKey]: opt }));
+                                            const isRight =
+                                              opt.trim().toLowerCase() === q.answer.trim().toLowerCase();
+                                            setStudentSelfMarks((prev) => ({
+                                              ...prev,
+                                              [qKey]: isRight ? q.marks : 0,
+                                            }));
+                                          }}
+                                          className={`px-3 py-2 rounded-xl border text-left text-xs font-semibold flex items-center gap-2.5 cursor-pointer transition-all ${
+                                            isSelectedOpt
+                                              ? 'bg-indigo-600 text-white border-indigo-600'
+                                              : 'bg-slate-50 dark:bg-slate-800/70 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-indigo-400'
+                                          }`}
+                                        >
+                                          <span className="w-5 h-5 rounded bg-black/10 dark:bg-white/10 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                            {String.fromCharCode(65 + idx)}
+                                          </span>
+                                          <span>{opt}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {/* Written Working Space */}
+                                <div className="space-y-1.5 pt-1">
+                                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 block">
+                                    Working Space (Show your steps):
+                                  </label>
+                                  <textarea
+                                    rows={2}
+                                    value={workingText}
+                                    onChange={(e) =>
+                                      setStudentWrittenWorking((prev) => ({
+                                        ...prev,
+                                        [qKey]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="Write your formula, substitution, and working steps here..."
+                                    className="w-full p-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/50 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                  />
+                                </div>
+
+                                {/* Final Answer Line + AI Examiner Mark + AI Tutor Buttons */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={markingQuestionKey === qKey}
+                                      onClick={() =>
+                                        handleAiMarkQuestionWorking(qKey, q, previewResource.title)
+                                      }
+                                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+                                    >
+                                      <Sparkles className="w-3.5 h-3.5" />
+                                      <span>
+                                        {markingQuestionKey === qKey
+                                          ? 'AI Marking...'
+                                          : 'AI Mark My Working'}
+                                      </span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      disabled={explainingQuestionKey === qKey}
+                                      onClick={() =>
+                                        handleAskAiTutorForQuestion(qKey, q, previewResource.title)
+                                      }
+                                      className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-400 text-slate-700 dark:text-slate-200 text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+                                    >
+                                      <HelpCircle className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                      <span>
+                                        {explainingQuestionKey === qKey
+                                          ? 'Explaining...'
+                                          : 'Step-by-Step Tutor'}
+                                      </span>
+                                    </button>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-xs font-serif italic text-slate-600 dark:text-slate-400">
+                                      Answer =
+                                    </span>
+                                    <input
+                                      type="text"
+                                      value={finalAnsText}
+                                      onChange={(e) =>
+                                        setStudentFinalAnswers((prev) => ({
+                                          ...prev,
+                                          [qKey]: e.target.value,
+                                        }))
+                                      }
+                                      placeholder="Write final answer..."
+                                      className="sm:w-56 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        soundFx.playSelect();
+                                        const cleanUser = finalAnsText.trim().toLowerCase();
+                                        const cleanOfficial = q.answer.trim().toLowerCase();
+                                        const isMatch =
+                                          cleanUser.length > 0 &&
+                                          (cleanOfficial.includes(cleanUser) ||
+                                            cleanUser.includes(cleanOfficial));
+                                        setStudentSelfMarks((prev) => ({
+                                          ...prev,
+                                          [qKey]: isMatch ? q.marks : 0,
+                                        }));
+                                        setShowMarkingSchemeInPreview(true);
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold cursor-pointer"
+                                    >
+                                      Check Answer
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* AI Examiner Feedback Callout */}
+                                {aiQuestionFeedback[qKey] && (
+                                  <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-slate-800 dark:text-slate-200 leading-relaxed">
+                                    {aiQuestionFeedback[qKey]}
+                                  </div>
+                                )}
+
+                                {/* AI Personal Tutor Worked Solution Callout */}
+                                {aiTutorExplanation[qKey] && (
+                                  <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-slate-800 dark:text-slate-200 space-y-1 leading-relaxed">
+                                    <div className="font-bold text-amber-900 dark:text-amber-300 flex items-center justify-between">
+                                      <span>AI Personal Tutor — Worked Solution &amp; Concept Guide</span>
+                                      <span className="text-[11px] font-normal text-amber-700 dark:text-amber-400">
+                                        AI-Generated Pedagogical Walkthrough
+                                      </span>
+                                    </div>
+                                    <p className="whitespace-pre-line">{aiTutorExplanation[qKey]}</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Right Side: Official Mark Scheme & Self-Grading */}
+                              {showMsPanel && (
+                                <div className="lg:col-span-5 flex flex-col justify-between gap-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/80 rounded-xl p-4">
+                                  <div className="space-y-2.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
+                                        Official Mark Scheme (Q{q.number})
+                                      </span>
+                                      <span className="text-xs font-mono font-semibold text-emerald-700 dark:text-emerald-400">
+                                        [{q.marks} Marks]
+                                      </span>
+                                    </div>
+
+                                    <div className="text-xs font-semibold text-slate-900 dark:text-white bg-white dark:bg-slate-900 p-3 rounded-lg border border-emerald-200/80 dark:border-emerald-800">
+                                      <span className="text-emerald-700 dark:text-emerald-400 block text-[10px] uppercase font-bold mb-0.5">
+                                        Official Answer:
+                                      </span>
+                                      {q.answer}
+                                    </div>
+
+                                    <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                                      <strong className="text-emerald-800 dark:text-emerald-300">
+                                        Examiner Marking Notes:
+                                      </strong>{' '}
+                                      {q.markingSchemeNotes}
+                                    </div>
+                                  </div>
+
+                                  {/* Self-Grading Buttons */}
+                                  <div className="pt-2.5 border-t border-emerald-200/70 dark:border-emerald-800/70 flex flex-wrap items-center justify-between gap-2">
+                                    <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-300">
+                                      Your Marks:
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      {Array.from({ length: q.marks + 1 }, (_, m) => m).map((mVal) => {
+                                        const isSelectedMark = awarded === mVal;
+                                        return (
+                                          <button
+                                            key={mVal}
+                                            type="button"
+                                            onClick={() => {
+                                              soundFx.playSelect();
+                                              setStudentSelfMarks((prev) => ({
+                                                ...prev,
+                                                [qKey]: mVal,
+                                              }));
+                                            }}
+                                            className={`w-7 h-7 rounded-lg text-xs font-bold border cursor-pointer transition-all ${
+                                              isSelectedMark
+                                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-emerald-200 dark:border-slate-700 hover:bg-emerald-100'
+                                            }`}
+                                          >
+                                            {mVal}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {previewResource.chapters && previewResource.chapters.length > 0 && (
+                  <div className="space-y-4">
+                    {previewResource.chapters.map((ch) => (
+                      <div
+                        key={ch.chapterNumber}
+                        className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                            Chapter {ch.chapterNumber}
+                          </span>
+                          {onOpenNotesGenerator && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviewResource(null);
+                                onOpenNotesGenerator(ch.practicePrompt, previewResource.examFormat);
+                              }}
+                              className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                            >
+                              Generate Study Guide on Chapter →
+                            </button>
+                          )}
+                        </div>
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                          {ch.title}
+                        </h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                          {ch.summary}
+                        </p>
+
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-1">
+                          <div className="text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                            Key Formulas &amp; Syllabus Rules
+                          </div>
+                          <ul className="space-y-1 text-xs font-mono text-slate-800 dark:text-slate-200">
+                            {ch.keyFormulasOrRules.map((rule, i) => (
+                              <li key={i}>• {rule}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs space-y-1">
+                          <div className="font-bold text-emerald-900 dark:text-emerald-300">
+                            Worked Example: {ch.workedExample.problem}
+                          </div>
+                          <div className="text-emerald-800 dark:text-emerald-200">
+                            <strong>Solution:</strong> {ch.workedExample.solution}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDownloadResourceFile(previewResource, 'html_booklet')}
-                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Download Booklet (.HTML)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const item = previewResource;
-                    setPreviewResource(null);
-                    handlePracticePastPaperInteractive(item);
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-300 hover:bg-amber-200 text-slate-950 border border-slate-950 text-xs font-black flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Play className="w-3.5 h-3.5 fill-slate-950" />
-                  <span>Start Timed CBT</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-5 flex-1">
-              {previewResource.questions && previewResource.questions.length > 0 && (
-                <div className="space-y-4">
-                  {previewResource.questions.map((q) => (
-                    <div
-                      key={q.number}
-                      className="p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50 space-y-3"
-                    >
-                      <div className="flex items-center justify-between text-xs font-black text-indigo-600 dark:text-indigo-400">
-                        <span>
-                          Question {q.number} · {q.section}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300">
-                          [{q.marks} Marks]
-                        </span>
-                      </div>
-
-                      <p className="text-sm font-bold text-slate-900 dark:text-white leading-relaxed">
-                        {q.question}
-                      </p>
-
-                      {q.options && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {q.options.map((opt, idx) => {
-                            const isCorrectOpt = showMarkingSchemeInPreview && opt === q.answer;
-                            return (
-                              <div
-                                key={idx}
-                                className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 ${
-                                  isCorrectOpt
-                                    ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-400 text-emerald-900 dark:text-emerald-200'
-                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-                                }`}
-                              >
-                                <span className="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black">
-                                  {String.fromCharCode(65 + idx)}
-                                </span>
-                                <span>{opt}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {showMarkingSchemeInPreview && (
-                        <div className="p-3.5 rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border-l-4 border-emerald-500 text-xs space-y-1">
-                          <div className="font-black text-emerald-900 dark:text-emerald-300">
-                            ✓ Official Answer: {q.answer}
-                          </div>
-                          <div className="text-emerald-800 dark:text-emerald-200 font-medium">
-                            <strong>Examiner Marking Scheme:</strong> {q.markingSchemeNotes}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {previewResource.chapters && previewResource.chapters.length > 0 && (
-                <div className="space-y-4">
-                  {previewResource.chapters.map((ch) => (
-                    <div
-                      key={ch.chapterNumber}
-                      className="p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/50 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                          Chapter {ch.chapterNumber}
-                        </span>
-                        {onOpenNotesGenerator && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPreviewResource(null);
-                              onOpenNotesGenerator(ch.practicePrompt, previewResource.examFormat);
-                            }}
-                            className="text-xs font-black text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                          >
-                            Generate Full Study Guide on Chapter →
-                          </button>
-                        )}
-                      </div>
-                      <h3 className="text-base font-black text-slate-900 dark:text-white">
-                        {ch.title}
-                      </h3>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                        {ch.summary}
-                      </p>
-
-                      <div className="p-3.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border-l-4 border-indigo-500 space-y-1">
-                        <div className="text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                          Key Formulas &amp; Syllabus Rules
-                        </div>
-                        <ul className="space-y-1 text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
-                          {ch.keyFormulasOrRules.map((rule, i) => (
-                            <li key={i}>• {rule}</li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div className="p-3.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border-l-4 border-emerald-500 text-xs space-y-1">
-                        <div className="font-black text-emerald-900 dark:text-emerald-300">
-                          Worked Example: {ch.workedExample.problem}
-                        </div>
-                        <div className="text-emerald-800 dark:text-emerald-200 font-medium">
-                          <strong>Solution:</strong> {ch.workedExample.solution}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
+

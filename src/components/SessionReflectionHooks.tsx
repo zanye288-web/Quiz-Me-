@@ -63,7 +63,7 @@ export const SessionReflectionHooks: React.FC<SessionReflectionHooksProps> = ({
     if (!oneLineTakeaway.trim()) return;
     soundFx.playComplete();
 
-    const ownWordsArray = Object.entries(ownWordsMap)
+    const ownWordsArray = (Object.entries(ownWordsMap) as Array<[string, string]>)
       .filter(([, text]) => text.trim().length > 0)
       .map(([qIdStr, text]) => {
         const qId = Number(qIdStr);

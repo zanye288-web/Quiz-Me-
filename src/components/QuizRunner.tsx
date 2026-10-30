@@ -2221,7 +2221,7 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                 {activeExamSpec.paperStructure}
               </span>
               {(() => {
-                const correctSoFar = Object.values(userAnswers).filter((a) => a.checked && a.isCorrect).length;
+                const correctSoFar = Object.values(userAnswers).filter((a: any) => a.checked && a.isCorrect).length;
                 const livePct = answeredCount > 0 ? Math.round((correctSoFar / answeredCount) * 100) : 100;
                 const boardStanding = evaluateExamBoardGrade(activeExamFormat, livePct);
                 return (

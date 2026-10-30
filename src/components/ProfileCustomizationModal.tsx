@@ -134,6 +134,8 @@ export const ProfileCustomizationModal: React.FC<ProfileCustomizationModalProps>
 
   const [displayName, setDisplayName] = useState('');
   const [headline, setHeadline] = useState('');
+  const [school, setSchool] = useState('');
+  const [region, setRegion] = useState('United Kingdom');
   const [bio, setBio] = useState('');
   const [learningGoal, setLearningGoal] = useState('');
   const [avatarType, setAvatarType] = useState<'google' | 'icon' | 'custom' | 'mascot'>('mascot');
@@ -147,6 +149,16 @@ export const ProfileCustomizationModal: React.FC<ProfileCustomizationModalProps>
     if (isOpen) {
       setDisplayName(userProfile?.displayName || user?.displayName || 'Scholar');
       setHeadline(userProfile?.headline || 'Lifelong Learner');
+      setSchool(
+        userProfile?.school ||
+          (typeof window !== 'undefined' && localStorage.getItem('quizme_scholar_school')) ||
+          'St. Paul’s School, London'
+      );
+      setRegion(
+        userProfile?.region ||
+          (typeof window !== 'undefined' && localStorage.getItem('quizme_scholar_region')) ||
+          'United Kingdom'
+      );
       setBio(userProfile?.bio || 'Learning something new every day!');
       setLearningGoal(userProfile?.learningGoal || 'Ace upcoming quizzes');
       setAvatarType(
@@ -176,9 +188,17 @@ export const ProfileCustomizationModal: React.FC<ProfileCustomizationModalProps>
       setIsSaving(true);
       soundFx.playCorrect();
 
+      const trimmedSchool = school.trim() || 'Independent Scholar Academy';
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('quizme_scholar_school', trimmedSchool);
+        localStorage.setItem('quizme_scholar_region', region);
+      }
+
       await updateUserProfileInCloud({
         displayName: displayName.trim() || user?.displayName || 'Scholar',
         headline: headline.trim() || 'Scholar',
+        school: trimmedSchool,
+        region,
         bio: bio.trim(),
         learningGoal: learningGoal.trim(),
         avatarType,
@@ -721,6 +741,43 @@ export const ProfileCustomizationModal: React.FC<ProfileCustomizationModalProps>
                 + {tag}
               </button>
             ))}
+          </div>
+
+          {/* School & Region Affiliation for Global Scholars Leaderboard */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                School / Institution (Leaderboard)
+              </label>
+              <input
+                type="text"
+                value={school}
+                onChange={(e) => setSchool(e.target.value)}
+                maxLength={100}
+                placeholder="e.g. St. Paul’s School, London"
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Academic Region (Leaderboard)
+              </label>
+              <select
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="United Kingdom">🇬🇧 United Kingdom</option>
+                <option value="North America">🇺🇸 North America</option>
+                <option value="Asia-Pacific">🇸🇬 Asia-Pacific</option>
+                <option value="West Africa">🇳🇬 West Africa</option>
+                <option value="East & South Africa">🇿🇦 East & South Africa</option>
+                <option value="Middle East & North Africa">🇦🇪 Middle East & North Africa</option>
+                <option value="Europe">🇪🇺 Continental Europe</option>
+                <option value="South Asia">🇮🇳 South Asia</option>
+              </select>
+            </div>
           </div>
 
           {/* Study Goal & Bio */}

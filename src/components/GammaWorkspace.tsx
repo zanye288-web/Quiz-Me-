@@ -464,8 +464,7 @@ export const GammaWorkspace: React.FC<GammaWorkspaceProps> = ({
       };
       const expandedFallback = expandPresentationDeckToTargetSlides(
         fallbackSeedDeck,
-        requestedSlides,
-        rawInput.slice(0, 68)
+        requestedSlides
       );
       setDeck(expandedFallback);
       setActiveSlideIndex(0);

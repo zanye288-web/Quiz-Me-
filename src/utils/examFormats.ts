@@ -6,12 +6,25 @@ import {
   PersonaType,
 } from '../types/quiz';
 
+export type WorldRegionSlot =
+  | 'All Regions'
+  | 'West & East Africa'
+  | 'United Kingdom & Europe'
+  | 'North & South America'
+  | 'Asia & Oceania'
+  | 'Global / International';
+
 export interface ExamFormatSpec {
   id: ExamFormatId;
   shortName: string;
   fullName: string;
   badgeEmoji: string;
+  countryFlag?: string;
   regionTag: string;
+  countryName?: string;
+  worldRegion?: WorldRegionSlot;
+  governingBody?: string;
+  aiPromptDirective?: string;
   description: string;
   paperStructure: string;
   gradingScaleLabel: string;
@@ -22,30 +35,35 @@ export interface ExamFormatSpec {
   calculatorAllowed: boolean;
   aiBlueprintDirective: string;
   sampleTopics: string[];
+  sampleSubjects?: string[];
 }
 
 export const EXAM_FORMAT_CATALOG: ExamFormatSpec[] = [
   {
     id: 'checkpoint',
-    shortName: 'Checkpoint',
-    fullName: 'Cambridge Lower Secondary / Primary Checkpoint',
+    shortName: 'Checkpoint (Primary & Lower Sec)',
+    fullName: 'Cambridge Primary (Stages 4–6) & Lower Secondary (Stages 7–9) Checkpoint',
     badgeEmoji: '🇬🇧',
-    regionTag: 'Cambridge International',
+    regionTag: 'Cambridge Primary (0096/0097/0058) & Lower Secondary (0862/0893/0861)',
+    countryName: 'United Kingdom / International',
+    worldRegion: 'Global / International',
+    governingBody: 'Cambridge Assessment International Education (CAIE)',
     description:
-      'Diagnostic structured questions testing conceptual understanding, scientific enquiry, and multi-step reasoning scored on the 0.0–6.0 Checkpoint scale.',
-    paperStructure: 'Paper 1 (Core Enquiry & Structured) + Paper 2 (Applied Problem Solving)',
-    gradingScaleLabel: '0.0 – 6.0 Band Scale (50 Raw Marks)',
+      'Classified into Primary Checkpoint (Stages 4–6 · Ages 8–11 · 0096/0097/0058) and Lower Secondary Checkpoint (Stages 7–9 · Ages 11–14 · 0862/0893/0861) with written structured booklets and M1/A1 Mark Schemes up to 2026.',
+    paperStructure: 'Paper 1 (Non-Calculator / Reading & Enquiry) + Paper 2 (Calculator / Applied Structured)',
+    gradingScaleLabel: '0.0 – 6.0 Statement of Achievement Band Scale (50 Raw Marks)',
     defaultQuestionTypes: ['multiple_choice', 'fill_in_blank', 'open_explanation'],
     defaultTimeMinutes: 15,
     defaultPassingScore: 70,
     allowHintsInExam: false,
     calculatorAllowed: true,
     aiBlueprintDirective:
-      'Format strictly as a Cambridge Checkpoint examination paper. Use official Cambridge command words ("State", "Describe", "Explain why", "Calculate", "Predict what happens when"). Include structured multi-part reasoning, scientific enquiry/data interpretation scenarios, and clear mark-scheme explanations.',
+      'Format strictly as a Cambridge Primary (Stages 4-6) or Lower Secondary (Stages 7-9) Checkpoint written examination paper. Use official Cambridge command words ("State", "Describe", "Explain why", "Calculate", "Predict what happens when", "Tick (✓) one box"). Include structured multi-part reasoning, Thinking and Working Mathematically/Scientifically scenarios, and M1/A1/B1 mark-scheme explanations.',
     sampleTopics: [
-      'Cambridge Checkpoint Science: Cells, Forces, Chemical Reactions & Energy Transfer',
-      'Cambridge Checkpoint Mathematics: Algebra, Geometry, Ratios & Data Handling',
-      'Cambridge Checkpoint English: Comprehension, Grammar & Literary Devices',
+      'Cambridge Lower Secondary Checkpoint (Stages 7–9): Math (0862), Science (0893) & English (0861)',
+      'Cambridge Primary Checkpoint (Stages 4–6): Math (0096), Science (0097) & English (0058)',
+      'Cambridge Checkpoint Scientific Enquiry: Variables, Fair Testing, Forces & Chemical Changes',
+      'Cambridge Checkpoint Mathematics: Thinking & Working Mathematically, Algebra, Geometry & Fractions',
     ],
   },
   {
@@ -53,7 +71,10 @@ export const EXAM_FORMAT_CATALOG: ExamFormatSpec[] = [
     shortName: 'WAEC (WASSCE)',
     fullName: 'West African Senior School Certificate Examination (WAEC)',
     badgeEmoji: '🇳🇬',
-    regionTag: 'West Africa (WAEC)',
+    regionTag: 'West Africa (Nigeria, Ghana, Sierra Leone, Gambia, Liberia)',
+    countryName: 'Nigeria & West Africa',
+    worldRegion: 'West & East Africa',
+    governingBody: 'West African Examinations Council (WAEC)',
     description:
       'Official WASSCE format combining Paper 1 (4-Option Objective A–D) and Paper 2 (Structured Theory & Essay) graded on the A1–F9 scale.',
     paperStructure: 'Paper 1 (Objective A–D) + Paper 2 (Theory / Structured Essay)',
@@ -78,6 +99,9 @@ export const EXAM_FORMAT_CATALOG: ExamFormatSpec[] = [
     fullName: 'JAMB Unified Tertiary Matriculation Examination (CBT)',
     badgeEmoji: '⚡',
     regionTag: 'Nigeria (JAMB CBT)',
+    countryName: 'Nigeria',
+    worldRegion: 'West & East Africa',
+    governingBody: 'Joint Admissions and Matriculation Board (JAMB)',
     description:
       'High-speed Computer-Based Test (CBT) with 100% 4-Option Objective MCQs, time-pressured analytical traps, and 400-point UTME aggregate scoring.',
     paperStructure: '100% CBT Objective 4-Option Multiple Choice (A–D)',
@@ -101,6 +125,9 @@ export const EXAM_FORMAT_CATALOG: ExamFormatSpec[] = [
     fullName: 'National Examinations Council (NECO SSCE)',
     badgeEmoji: '🏛️',
     regionTag: 'Nigeria (NECO)',
+    countryName: 'Nigeria',
+    worldRegion: 'West & East Africa',
+    governingBody: 'National Examinations Council (NECO)',
     description:
       'Senior Secondary Certificate Examination format combining Objective questions and Theory definitions aligned with the national curriculum.',
     paperStructure: 'Paper I (Objective) + Paper II (Essay & Theory)',
@@ -118,11 +145,88 @@ export const EXAM_FORMAT_CATALOG: ExamFormatSpec[] = [
     ],
   },
   {
+    id: 'nabteb',
+    shortName: 'NABTEB (NBC/NTC)',
+    fullName: 'National Business and Technical Examinations Board (NABTEB NBC / NTC)',
+    badgeEmoji: '🛠️',
+    regionTag: 'Nigeria (NABTEB Technical & Business)',
+    countryName: 'Nigeria',
+    worldRegion: 'West & East Africa',
+    governingBody: 'National Business and Technical Examinations Board (NABTEB)',
+    description:
+      'National Business Certificate (NBC) and National Technical Certificate (NTC) examinations covering General Education, Engineering Trades, and Business Studies.',
+    paperStructure: 'Paper I (Objective) + Paper II (Essay / Trade Theory & Practical)',
+    gradingScaleLabel: 'NABTEB A1 – F9 Credit Scale',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 50,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as an official NABTEB (NBC/NTC) examination paper combining General Education (Mathematics, Physics, Chemistry, English) and Technical/Business Trade Theory with M1/A1 marking schemes.',
+    sampleTopics: [
+      'NABTEB NBC/NTC General Mathematics, Physics & Technical Drawing',
+      'NABTEB Office Practice, Financial Accounting & Electrical Installation Trade Theory',
+    ],
+  },
+  {
+    id: 'bece',
+    shortName: 'BECE (JSS3 / JHS3)',
+    fullName: 'Basic Education Certificate Examination (WAEC Ghana / NECO Nigeria BECE)',
+    badgeEmoji: '📘',
+    regionTag: 'West Africa (Nigeria & Ghana Junior Secondary BECE)',
+    countryName: 'Nigeria & Ghana',
+    worldRegion: 'West & East Africa',
+    governingBody: 'WAEC (Ghana/Sierra Leone/Gambia) & NECO / State Ministries (Nigeria)',
+    description:
+      'Junior Secondary (JSS3 / JHS3) transition examination covering Mathematics, Integrated/Basic Science, English Studies, and Basic Technology.',
+    paperStructure: 'Paper 1 (Objective Multiple Choice) + Paper 2 (Structured Theory & Essay)',
+    gradingScaleLabel: 'BECE Distinction (A / Stanine 1) to Pass',
+    defaultQuestionTypes: ['multiple_choice', 'fill_in_blank', 'open_explanation'],
+    defaultTimeMinutes: 15,
+    defaultPassingScore: 55,
+    allowHintsInExam: false,
+    calculatorAllowed: false,
+    aiBlueprintDirective:
+      'Format strictly as a Basic Education Certificate Examination (BECE) paper for JSS3/JHS3 candidates with clear foundational objectives and structured theory questions.',
+    sampleTopics: [
+      'BECE Mathematics & Basic Science: Fractions, Simple Equations, Energy & Living Organisms',
+      'BECE English Studies & Basic Technology: Comprehension, Grammar & Technical Drawing',
+    ],
+  },
+  {
+    id: 'nbais',
+    shortName: 'NBAIS (SAISSCE)',
+    fullName: 'National Board for Arabic and Islamic Studies (NBAIS SAISSCE)',
+    badgeEmoji: '🕌',
+    regionTag: 'Nigeria (NBAIS Senior Secondary)',
+    countryName: 'Nigeria',
+    worldRegion: 'West & East Africa',
+    governingBody: 'National Board for Arabic and Islamic Studies (NBAIS)',
+    description:
+      'Senior Arabic and Islamic Secondary School Certificate Examination (SAISSCE) integrating conventional STEM/Humanities subjects with Arabic & Islamic Studies.',
+    paperStructure: 'Paper 1 (Objective) + Paper 2 (Structured Essay & Textual Analysis)',
+    gradingScaleLabel: 'NBAIS A1 – F9 Scale',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 50,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as an official NBAIS SAISSCE examination paper with clear objective items and structured analytical theory questions.',
+    sampleTopics: [
+      'NBAIS SAISSCE Islamic Studies, Arabic Language, General Mathematics & Civic Education',
+    ],
+  },
+  {
     id: 'igcse',
     shortName: 'IGCSE / O-Level',
     fullName: 'Cambridge IGCSE & GCE O-Level (Extended)',
     badgeEmoji: '🌍',
-    regionTag: 'International GCSE',
+    regionTag: 'International GCSE (160+ Countries)',
+    countryName: 'International / UK',
+    worldRegion: 'Global / International',
+    governingBody: 'Cambridge International Education (CIE) & Edexcel',
     description:
       'Extended tier Paper 2 (MCQ), Paper 4 (Structured Theory), and Paper 6 (Alternative to Practical) graded from A* to G (9–1).',
     paperStructure: 'Paper 2 (MCQ) + Paper 4 (Extended Theory) + Paper 6 (Practical)',
@@ -140,15 +244,94 @@ export const EXAM_FORMAT_CATALOG: ExamFormatSpec[] = [
     ],
   },
   {
+    id: 'edexcel_igcse',
+    shortName: 'Pearson Edexcel IGCSE / IAL',
+    fullName: 'Pearson Edexcel International GCSE (9–1) & International AS/A-Level (IAL)',
+    badgeEmoji: '🇬🇧',
+    regionTag: 'UK & International (Pearson Edexcel 4MA1 / WMA11)',
+    countryName: 'United Kingdom / International',
+    worldRegion: 'Global / International',
+    governingBody: 'Pearson Edexcel Qualifications',
+    description:
+      'Pearson Edexcel International GCSE (9–1) Paper 1H/2H and Modular International A-Level (IAL Pure Maths P1–P4, Physics, Chemistry, Biology).',
+    paperStructure: 'Paper 1H & 2H (Calculator Allowed) / IAL Modular Units 1–6',
+    gradingScaleLabel: 'Edexcel Grade 9 – 1 (IGCSE) / A* – E (IAL)',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 65,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as a Pearson Edexcel International GCSE (4MA1 / 4PH1 / 4CH1) or International A-Level (WMA11 / WPH11) paper with M1/A1/B1 Edexcel mark scheme notes.',
+    sampleTopics: [
+      'Pearson Edexcel International GCSE Mathematics A (4MA1) Higher Paper 1H & 2H',
+      'Pearson Edexcel IAL Pure Mathematics P1/P2 & Physics Unit 1',
+    ],
+  },
+  {
+    id: 'gcse_uk',
+    shortName: 'UK GCSE (9–1)',
+    fullName: 'United Kingdom GCSE (AQA / Edexcel / OCR Grade 9–1)',
+    badgeEmoji: '🇬🇧',
+    regionTag: 'United Kingdom (AQA, Edexcel, OCR)',
+    countryName: 'United Kingdom',
+    worldRegion: 'United Kingdom & Europe',
+    governingBody: 'AQA, Pearson Edexcel & OCR Examination Boards',
+    description:
+      'Official UK GCSE Higher & Foundation Tier papers (Paper 1 Non-Calculator, Paper 2 & 3 Calculator) graded on the Ofqual 9–1 numerical scale.',
+    paperStructure: 'Paper 1 + Paper 2 + Paper 3 (Higher & Foundation Tier)',
+    gradingScaleLabel: 'UK Ofqual Grade 9 – 1 Scale',
+    defaultQuestionTypes: ['multiple_choice', 'fill_in_blank', 'open_explanation'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 65,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as an official UK GCSE (AQA / Pearson Edexcel / OCR) Higher Tier paper. Include structured multi-mark reasoning questions, 6-mark extended evaluation prompts, and clear M1/A1/B1 mark scheme breakdown.',
+    sampleTopics: [
+      'AQA / Edexcel GCSE Mathematics (8300 / 1MA1) Higher Paper 1 & 2',
+      'AQA GCSE Combined Trilogy & Separate Sciences (Biology 8461, Chemistry 8462, Physics 8463)',
+      'AQA GCSE English Literature & Language Paper 1 & 2',
+    ],
+  },
+  {
+    id: 'alevel_uk',
+    shortName: 'GCE A-Level',
+    fullName: 'Cambridge International & UK GCE AS & A-Level (9709 / 9702 / 9701)',
+    badgeEmoji: '🎓',
+    regionTag: 'UK & Commonwealth (CAIE, Edexcel, AQA)',
+    countryName: 'United Kingdom & Commonwealth',
+    worldRegion: 'United Kingdom & Europe',
+    governingBody: 'CAIE, Pearson Edexcel & AQA A-Level Boards',
+    description:
+      'Advanced Level university-entry examinations covering Pure Mathematics, Mechanics, Statistics, and Advanced Sciences graded A*–E.',
+    paperStructure: 'AS Level (Papers 1, 2, 3) + A2 Level (Papers 4 & 5)',
+    gradingScaleLabel: 'GCE A-Level A* – E Scale',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 25,
+    defaultPassingScore: 65,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as a Cambridge International / UK GCE A-Level examination paper (e.g., 9709 Mathematics, 9702 Physics, 9701 Chemistry, 9700 Biology). Require rigorous mathematical proofs, multi-step calculus/mechanics derivations, and exact mark-scheme points.',
+    sampleTopics: [
+      'CAIE A-Level Pure Mathematics 1 & 3 (9709): Integration by Parts, Vectors & Differential Equations',
+      'CAIE A-Level Physics (9702) & Chemistry (9701): Quantum Physics, Circular Motion & Organic Synthesis',
+    ],
+  },
+  {
     id: 'sat',
-    shortName: 'Digital SAT',
-    fullName: 'College Board Digital SAT (Adaptive Modules)',
+    shortName: 'Digital SAT / ACT',
+    fullName: 'US College Board Digital SAT & ACT Assessment',
     badgeEmoji: '🇺🇸',
-    regionTag: 'College Board',
+    regionTag: 'United States & Global (College Board / ACT)',
+    countryName: 'United States',
+    worldRegion: 'North & South America',
+    governingBody: 'College Board & ACT Inc.',
     description:
       'Passage-based analytical Reading & Writing and quantitative Math problem solving with Student-Produced Responses (400–1600 scale).',
     paperStructure: 'Module 1 (Foundational) + Module 2 (Adaptive Upper Tier)',
-    gradingScaleLabel: '400 – 1600 Scaled Score',
+    gradingScaleLabel: '400 – 1600 Scaled Score (ACT 1–36)',
     defaultQuestionTypes: ['multiple_choice', 'fill_in_blank'],
     defaultTimeMinutes: 15,
     defaultPassingScore: 70,
@@ -163,13 +346,16 @@ export const EXAM_FORMAT_CATALOG: ExamFormatSpec[] = [
   },
   {
     id: 'ap_ib',
-    shortName: 'AP / IB Exam',
-    fullName: 'Advanced Placement (AP) & IB Diploma Higher Level',
+    shortName: 'AP / IB Diploma',
+    fullName: 'Advanced Placement (AP) & IB Diploma Higher/Standard Level',
     badgeEmoji: '🏆',
-    regionTag: 'College Level / IB',
+    regionTag: 'International Baccalaureate & US AP',
+    countryName: 'USA / Switzerland (Global)',
+    worldRegion: 'Global / International',
+    governingBody: 'International Baccalaureate Organization (IBO) & College Board',
     description:
       'Stimulus-based Section I Multiple Choice and Section II Free-Response Questions (FRQ) scored on the 1–5 AP / 1–7 IB scale.',
-    paperStructure: 'Section I (Stimulus MCQ) + Section II (Free-Response FRQ)',
+    paperStructure: 'Paper 1 (Stimulus MCQ) + Paper 2 (Free-Response FRQ) + Paper 3 (Data)',
     gradingScaleLabel: 'AP 1–5 / IB 1–7 Scale',
     defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'code_media_challenge'],
     defaultTimeMinutes: 25,
@@ -184,11 +370,314 @@ export const EXAM_FORMAT_CATALOG: ExamFormatSpec[] = [
     ],
   },
   {
+    id: 'kcse_kenya',
+    shortName: 'KCSE (Kenya)',
+    fullName: 'Kenya Certificate of Secondary Education (KNEC KCSE)',
+    badgeEmoji: '🇰🇪',
+    regionTag: 'East Africa (Kenya KNEC)',
+    countryName: 'Kenya & East Africa',
+    worldRegion: 'West & East Africa',
+    governingBody: 'Kenya National Examinations Council (KNEC)',
+    description:
+      'Official KNEC KCSE Paper 1, Paper 2, and Paper 3 examinations across Mathematics (121), English (101), Kiswahili, Biology (231), Physics (232), and Chemistry (233) graded on the A to E 12-point scale.',
+    paperStructure: 'Paper 1 (Short Answer/Core) + Paper 2 (Extended/Structured) + Paper 3 (Practical)',
+    gradingScaleLabel: 'KNEC Grade A – E (12-Point Scale)',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 60,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as a Kenya National Examinations Council (KNEC) KCSE paper. Use official KNEC syllabus codes (121 Math, 231 Biology, 232 Physics, 233 Chemistry) and Section I (50 marks) + Section II (50 marks) structured breakdown.',
+    sampleTopics: [
+      'KCSE Mathematics (121/1 & 121/2): Matrices, Commercial Arithmetic, Vectors & Three-Dimensional Geometry',
+      'KCSE Chemistry (233) & Biology (231): Mole Concept, Organic Chemistry & Genetics',
+    ],
+  },
+  {
+    id: 'uneb_uganda',
+    shortName: 'UNEB (UCE & UACE)',
+    fullName: 'Uganda National Examinations Board — UCE (O-Level) & UACE (A-Level)',
+    badgeEmoji: '🇺🇬',
+    regionTag: 'East Africa (Uganda UNEB UCE & UACE)',
+    countryName: 'Uganda & East Africa',
+    worldRegion: 'West & East Africa',
+    governingBody: 'Uganda National Examinations Board (UNEB)',
+    description:
+      'Official Uganda Certificate of Education (UCE) and Uganda Advanced Certificate of Education (UACE Principal Passes A–E) across Mathematics, Sciences, and Humanities.',
+    paperStructure: 'Paper 1 (Core / Pure) + Paper 2 (Applied / Structured) + Paper 3 (Practical)',
+    gradingScaleLabel: 'UACE Principal A–E / UCE Competency Scale',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 60,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as a Uganda National Examinations Board (UNEB) UCE or UACE Principal subject paper with structured derivations and UNEB examiner marking points.',
+    sampleTopics: [
+      'UNEB UACE Principal Mathematics (P425/1 & P425/2) & UCE Mathematics (456)',
+      'UNEB UACE & UCE Biology (553 / P530), Physics (535) & Chemistry (545)',
+    ],
+  },
+  {
+    id: 'zimsec',
+    shortName: 'ZIMSEC (O & A-Level)',
+    fullName: 'Zimbabwe School Examinations Council (ZIMSEC O-Level & A-Level)',
+    badgeEmoji: '🇿🇼',
+    regionTag: 'Southern Africa (Zimbabwe ZIMSEC)',
+    countryName: 'Zimbabwe',
+    worldRegion: 'West & East Africa',
+    governingBody: 'Zimbabwe School Examinations Council (ZIMSEC)',
+    description:
+      'Official ZIMSEC Ordinary Level (4004 Mathematics, Combined Science) and Advanced Level (6042 Pure Maths, Physics, Chemistry) June & November sessions.',
+    paperStructure: 'Paper 1 (Non-Calculator / MCQ) + Paper 2 (Structured & Long Questions)',
+    gradingScaleLabel: 'ZIMSEC Grade A – U Scale',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 60,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as a Zimbabwe School Examinations Council (ZIMSEC) O-Level or A-Level paper with ZIMSEC syllabus codes (4004, 4003, 6042) and step-by-step marking schemes.',
+    sampleTopics: [
+      'ZIMSEC O-Level Mathematics (4004/1 & 4004/2) & Combined Science (4003)',
+      'ZIMSEC A-Level Pure Mathematics (6042) & Chemistry',
+    ],
+  },
+  {
+    id: 'ged',
+    shortName: 'GED (US Diploma)',
+    fullName: 'General Educational Development (GED High School Equivalency Test)',
+    badgeEmoji: '🎓',
+    regionTag: 'United States & International (GED Testing Service)',
+    countryName: 'United States',
+    worldRegion: 'North & South America',
+    governingBody: 'GED Testing Service (ACE / Pearson VUE)',
+    description:
+      'Official 4-subject US High School Equivalency credential covering Mathematical Reasoning, Reasoning Through Language Arts (RLA), Science, and Social Studies (100–200 scale).',
+    paperStructure: 'Part 1 (No Calculator) + Part 2 (TI-30XS Calculator & Data Analysis)',
+    gradingScaleLabel: '100 – 200 Scale (145 Pass · 165+ College Ready)',
+    defaultQuestionTypes: ['multiple_choice', 'fill_in_blank', 'open_explanation'],
+    defaultTimeMinutes: 15,
+    defaultPassingScore: 65,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as an official GED Testing Service assessment across Mathematical Reasoning, Science data analysis, Social Studies primary sources, and Reasoning Through Language Arts.',
+    sampleTopics: [
+      'GED Mathematical Reasoning & Science: Algebraic Functions, Geometry & Experimental Data',
+      'GED Reasoning Through Language Arts (RLA) & Social Studies Civics',
+    ],
+  },
+  {
+    id: 'nsc_matric_sa',
+    shortName: 'NSC Matric (SA)',
+    fullName: 'South Africa National Senior Certificate (DBE / IEB Matric)',
+    badgeEmoji: '🇿🇦',
+    regionTag: 'South Africa (DBE / IEB Matric)',
+    countryName: 'South Africa',
+    worldRegion: 'West & East Africa',
+    governingBody: 'Department of Basic Education (DBE) & Umalusi / IEB',
+    description:
+      'Grade 12 NSC Matric Paper 1 & Paper 2 examinations for Mathematics, Physical Sciences, Life Sciences, and Accounting graded on Achievement Levels 1–7.',
+    paperStructure: 'Paper 1 (Algebra/Calculus or Physics) + Paper 2 (Analytical Geometry/Trig or Chemistry)',
+    gradingScaleLabel: 'NSC Level 7 (80%–100% Distinction) to Level 1',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 60,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as a South African DBE / IEB Grade 12 National Senior Certificate (Matric) examination paper with CAPS-aligned formulas, Euclidean geometry riders, and Physical Sciences Paper 1/2 guidelines.',
+    sampleTopics: [
+      'NSC Matric Mathematics Paper 1 & 2: Cubic Functions, Financial Maths & Euclidean Circle Geometry',
+      'NSC Matric Physical Sciences: Vertical Projectile Motion, Work-Energy Theorem & Chemical Equilibrium',
+    ],
+  },
+  {
+    id: 'jee_neet_india',
+    shortName: 'JEE / NEET / CBSE',
+    fullName: 'India JEE Main/Advanced, NEET-UG & CBSE Class 12 Board',
+    badgeEmoji: '🇮🇳',
+    regionTag: 'India (NTA JEE / NEET & CBSE)',
+    countryName: 'India',
+    worldRegion: 'Asia & Oceania',
+    governingBody: 'National Testing Agency (NTA) & CBSE New Delhi',
+    description:
+      'High-rigor NTA JEE (Physics, Chemistry, Mathematics) and NEET-UG (Physics, Chemistry, Biology) +4/-1 entrance papers and CBSE Class 12 Board exams.',
+    paperStructure: 'Section A (Single Correct MCQ +4/-1) + Section B (Numerical Value Questions)',
+    gradingScaleLabel: 'NTA Percentile & AIR Rank / CBSE 100-Mark Scale',
+    defaultQuestionTypes: ['multiple_choice', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 65,
+    allowHintsInExam: false,
+    calculatorAllowed: false,
+    aiBlueprintDirective:
+      'Format strictly as an NTA JEE Main/Advanced or NEET-UG / CBSE Class 12 examination paper. Include multi-concept analytical physics/chemistry/math problems and NCERT-aligned biological mechanisms.',
+    sampleTopics: [
+      'JEE Main & Advanced Physics & Calculus: Rotational Mechanics, Electrostatics & Definite Integrals',
+      'NEET-UG & CBSE Class 12 Biology & Chemistry: Coordination Compounds, Electrochemistry & Human Physiology',
+    ],
+  },
+  {
+    id: 'gaokao_china',
+    shortName: 'Gaokao (China)',
+    fullName: 'China National College Entrance Examination (Gaokao 全国高考)',
+    badgeEmoji: '🇨🇳',
+    regionTag: 'China (National Unified Gaokao Paper I & II)',
+    countryName: 'China',
+    worldRegion: 'Asia & Oceania',
+    governingBody: 'Ministry of Education of the People’s Republic of China (NEEA)',
+    description:
+      'National Unified Gaokao 750-point examination covering Chinese, Mathematics (Conic Sections, Derivatives, Sequences), English, and Comprehensive Sciences (L综: Physics, Chemistry, Biology).',
+    paperStructure: 'Single/Multiple Choice + Fill-in-the-Blank + 5 Multi-Part Proof/Derivation Problems',
+    gradingScaleLabel: '0 – 750 Gaokao Aggregate Scale (150 per Core Subject)',
+    defaultQuestionTypes: ['multiple_choice', 'fill_in_blank', 'open_explanation'],
+    defaultTimeMinutes: 25,
+    defaultPassingScore: 70,
+    allowHintsInExam: false,
+    calculatorAllowed: false,
+    aiBlueprintDirective:
+      'Format strictly as the Chinese National College Entrance Examination (Gaokao, translated into clear academic English). Emphasize high-rigor algebraic manipulation, conic section geometry, derivative inequalities, and electromagnetic motion.',
+    sampleTopics: [
+      'Gaokao Mathematics National Paper I: Conic Sections (Ellipses/Parabolas), Sequences & Derivative Proofs',
+      'Gaokao Comprehensive Science (Physics & Chemistry): Charged Particles in Magnetic Fields & Redox Equilibrium',
+    ],
+  },
+  {
+    id: 'atar_australia',
+    shortName: 'ATAR (HSC / VCE)',
+    fullName: 'Australia ATAR Senior Secondary (NSW HSC & Victoria VCE)',
+    badgeEmoji: '🇦🇺',
+    regionTag: 'Australia (NSW NESA HSC / Victoria VCAA VCE)',
+    countryName: 'Australia',
+    worldRegion: 'Asia & Oceania',
+    governingBody: 'NESA (NSW HSC) & VCAA (Victoria VCE)',
+    description:
+      'Australian Year 12 HSC and VCE external examinations across Mathematical Methods, Specialist Maths, Chemistry, Physics, and English towards the 99.95 ATAR rank.',
+    paperStructure: 'Section I (Objective MCQ) + Section II (Extended Response & Technology-Active/Free)',
+    gradingScaleLabel: 'Band 6 / Study Score 50 (ATAR 0.00 – 99.95)',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 65,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as an Australian NSW HSC or Victoria VCE Year 12 examination paper. Include Band 6 extended mathematical modeling and scientific analysis prompts.',
+    sampleTopics: [
+      'NSW HSC & VCE Mathematical Methods / Extension 1: Calculus, Continuous Random Variables & Trigonometry',
+      'HSC & VCE Chemistry & Physics: Equilibrium Constants, Spectroscopy & Electromagnetism',
+    ],
+  },
+  {
+    id: 'abitur_germany',
+    shortName: 'Abitur (Germany)',
+    fullName: 'German Abitur & European Baccalaureate (Mathematik, Physik & Chemie LK)',
+    badgeEmoji: '🇩🇪',
+    regionTag: 'Germany & DACH (Leistungskurs Abitur)',
+    countryName: 'Germany & Austria/Switzerland',
+    worldRegion: 'United Kingdom & Europe',
+    governingBody: 'Kultusministerkonferenz (KMK) Germany',
+    description:
+      'German Gymnasium Leistungskurs (Advanced Course) Abitur examinations covering Analysis, Linear Algebra/Analytic Geometry, Stochastics, and Natural Sciences (0–15 Notenpunkte, Grade 1.0–4.0).',
+    paperStructure: 'Teil A (Hilfsmittelfrei / No Calculator) + Teil B (CAS / Scientific Context)',
+    gradingScaleLabel: '15 – 0 Notenpunkte (Abiturnote 1.0 – 4.0)',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 60,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as a German Abitur Leistungskurs examination (in English with German technical terminology references where helpful). Cover Analysis (Kurvendiskussion), Analytic Geometry (Planes/Vectors in R³), and Stochastics.',
+    sampleTopics: [
+      'Abitur Mathematik Leistungskurs: Kurvendiskussion (e-Functions), 3D Vector Planes & Binomial Stochastics',
+      'Abitur Physik & Chemie LK: Induction, Quantum Photoelectric Effect & Acid-Base Titration Curves',
+    ],
+  },
+  {
+    id: 'bac_france',
+    shortName: 'Baccalauréat (FR)',
+    fullName: 'French Baccalauréat Général (Spécialité Mathématiques & Physique-Chimie)',
+    badgeEmoji: '🇫🇷',
+    regionTag: 'France & Francophonie (Bac Général)',
+    countryName: 'France',
+    worldRegion: 'United Kingdom & Europe',
+    governingBody: 'Ministère de l’Éducation Nationale (France)',
+    description:
+      'Official French Terminale Spécialité Mathématiques, Physique-Chimie, and SVT Baccalauréat papers graded on the 0–20 scale (Mention Très Bien ≥ 16/20).',
+    paperStructure: '4 Compulsory Structured Exercises (Probabilités, Suites/Fonctions, Géométrie dans l’espace)',
+    gradingScaleLabel: '0 – 20 Scale (Mention Très Bien ≥ 16/20)',
+    defaultQuestionTypes: ['multiple_choice', 'open_explanation', 'fill_in_blank'],
+    defaultTimeMinutes: 20,
+    defaultPassingScore: 60,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as a French Baccalauréat Général Terminale Spécialité examination (presented in English). Emphasize recurrence sequences (raisonnement par récurrence), 3D orthogonal geometry, differential equations, and acid-base/mechanics synthesis.',
+    sampleTopics: [
+      'Baccalauréat Spécialité Mathématiques: Suites par Récurrence, Logarithme Népérien & Géométrie 3D',
+      'Baccalauréat Physique-Chimie: Cinétique Chimique, Mouvement dans un Champ Uniforme & Ondes',
+    ],
+  },
+  {
+    id: 'enem_brazil',
+    shortName: 'ENEM (Brazil)',
+    fullName: 'Brazil Exame Nacional do Ensino Médio (ENEM & FUVEST)',
+    badgeEmoji: '🇧🇷',
+    regionTag: 'Brazil & Latin America (INEP ENEM)',
+    countryName: 'Brazil',
+    worldRegion: 'North & South America',
+    governingBody: 'INEP — Ministério da Educação (MEC Brazil)',
+    description:
+      'Brazilian national university entrance examination testing contextualized problem-solving in Mathematics, Natural Sciences (Ciências da Natureza), and Humanities scored via Item Response Theory (TRI 0–1000).',
+    paperStructure: 'Day 1 (Languages, Humanities & Essay) + Day 2 (45 Nature Sciences + 45 Mathematics)',
+    gradingScaleLabel: 'TRI 0 – 1000 Scaled Score',
+    defaultQuestionTypes: ['multiple_choice'],
+    defaultTimeMinutes: 15,
+    defaultPassingScore: 65,
+    allowHintsInExam: false,
+    calculatorAllowed: false,
+    aiBlueprintDirective:
+      'Format strictly as the Brazilian ENEM (Exame Nacional do Ensino Médio) in English. Each question must open with a real-world scientific, economic, or environmental context paragraph followed by a 5-option or 4-option analytical problem.',
+    sampleTopics: [
+      'ENEM Matemática e suas Tecnologias: Combinatorics, Spatial Geometry, Ratio/Scale & Statistics',
+      'ENEM Ciências da Natureza: Ecology, Electrochemistry, Calorimetry & Electrical Power',
+    ],
+  },
+  {
+    id: 'ielts_toefl',
+    shortName: 'IELTS / TOEFL / GRE',
+    fullName: 'Global English Proficiency & Graduate Admissions (IELTS, TOEFL iBT & GRE)',
+    badgeEmoji: '🌐',
+    regionTag: 'Global University Admissions (British Council / ETS)',
+    countryName: 'Global / International',
+    worldRegion: 'Global / International',
+    governingBody: 'British Council, IDP, Cambridge & ETS',
+    description:
+      'International academic English reading comprehension, lexical precision, academic writing cohesion, and GRE quantitative/verbal reasoning (IELTS Band 0–9 / TOEFL 0–120).',
+    paperStructure: 'Academic Reading Passages + Lexical/Grammatical Precision + Quantitative Reasoning',
+    gradingScaleLabel: 'IELTS Band 0.0 – 9.0 / TOEFL 0 – 120 / GRE 260 – 340',
+    defaultQuestionTypes: ['multiple_choice', 'fill_in_blank', 'open_explanation'],
+    defaultTimeMinutes: 15,
+    defaultPassingScore: 70,
+    allowHintsInExam: false,
+    calculatorAllowed: true,
+    aiBlueprintDirective:
+      'Format strictly as an Academic IELTS / TOEFL iBT / GRE Verbal & Quantitative assessment. Include True/False/Not Given analytical inference, academic vocabulary in context, and quantitative comparison questions.',
+    sampleTopics: [
+      'IELTS Academic Reading & Writing Task 2: Inference, Paraphrasing & Lexical Cohesion',
+      'TOEFL iBT & GRE Verbal/Quantitative: Academic Passage Synthesis & Data Interpretation',
+    ],
+  },
+  {
     id: 'standard_exam',
     shortName: 'Standard Exam',
     fullName: 'General Proctored Academic Exam',
     badgeEmoji: '📝',
     regionTag: 'Universal',
+    countryName: 'Universal',
+    worldRegion: 'Global / International',
+    governingBody: 'Universal Academic Standards Board',
     description:
       'Balanced timed assessment across cognitive domains with percentage and letter grade reporting.',
     paperStructure: 'Mixed Objective & Short Response',
@@ -205,9 +694,25 @@ export const EXAM_FORMAT_CATALOG: ExamFormatSpec[] = [
 ];
 
 export function getExamFormatSpec(formatId?: ExamFormatId): ExamFormatSpec {
-  return (
-    EXAM_FORMAT_CATALOG.find((f) => f.id === formatId) || EXAM_FORMAT_CATALOG[0]
-  );
+  const found =
+    EXAM_FORMAT_CATALOG.find((f) => f.id === formatId) || EXAM_FORMAT_CATALOG[0];
+  return {
+    ...found,
+    countryFlag: found.countryFlag || found.badgeEmoji,
+    governingBody: found.governingBody || found.regionTag,
+    aiPromptDirective: found.aiPromptDirective || found.aiBlueprintDirective,
+    sampleSubjects: found.sampleSubjects || found.sampleTopics,
+  };
+}
+
+export function getAllExamFormatSpecs(): ExamFormatSpec[] {
+  return EXAM_FORMAT_CATALOG.map((found) => ({
+    ...found,
+    countryFlag: found.countryFlag || found.badgeEmoji,
+    governingBody: found.governingBody || found.regionTag,
+    aiPromptDirective: found.aiPromptDirective || found.aiBlueprintDirective,
+    sampleSubjects: found.sampleSubjects || found.sampleTopics,
+  }));
 }
 
 /**
@@ -225,12 +730,12 @@ export function evaluateExamBoardGrade(
   const pct = Math.max(0, Math.min(100, Math.round(accuracyPercent)));
   const spec = getExamFormatSpec(formatId);
 
-  if (formatId === 'waec' || formatId === 'neco') {
+  if (formatId === 'waec' || formatId === 'neco' || formatId === 'nabteb' || formatId === 'nbais') {
     let grade = 'F9 (Fail)';
     let verdict = 'Needs Remediation — Below Credit Pass';
     if (pct >= 75) {
       grade = 'A1 (Excellent)';
-      verdict = 'Distinction — Top WASSCE Honours!';
+      verdict = 'Distinction — Top Honours!';
     } else if (pct >= 70) {
       grade = 'B2 (Very Good)';
       verdict = 'Strong Distinction Standing!';
@@ -727,7 +1232,7 @@ export function buildPrebuiltExamByFormat(
     app_name: 'Quiz Me!',
     persona,
     examFormat: formatId,
-    quiz_title: `${spec.badgeEmoji} ${spec.fullName} — Official Mock Paper`,
+    quiz_title: `${spec.badgeEmoji} ${spec.fullName} — Syllabus-Aligned Practice Paper`,
     summary: `${spec.description} (${spec.paperStructure})`,
     difficulty: 'Intermediate',
     tags: ['#ExamMode', `#Format_${formatId}`],
@@ -740,10 +1245,10 @@ export function buildPrebuiltExamByFormat(
         difficulty: 'Intermediate',
         bloom_level: 'Apply',
         points: 20,
-        question: `[${spec.shortName.toUpperCase()} • SECTION I Q1] An object of mass 5 kg accelerates uniformly from 2 m/s to 10 m/s in 4 seconds. What is the magnitude of the resultant force acting on the object?`,
+        question: `[${spec.shortName.toUpperCase()} • PRACTICE SECTION I Q1] An object of mass 5 kg accelerates uniformly from 2 m/s to 10 m/s in 4 seconds. What is the magnitude of the resultant force acting on the object?`,
         options: ['10 N', '20 N', '40 N', '8 N'],
         correct_answer: '10 N',
-        explanation: `[${spec.shortName} Mark Scheme] Acceleration a = (v − u) / t = (10 − 2) / 4 = 2 m/s². Resultant force F = ma = 5 kg × 2 m/s² = 10 N.`,
+        explanation: `[${spec.shortName} Practice Solution Guide] Acceleration a = (v − u) / t = (10 − 2) / 4 = 2 m/s². Resultant force F = ma = 5 kg × 2 m/s² = 10 N.`,
         gamified_feedback: {
           success_quote: `${spec.badgeEmoji} Section I Mark Verified!`,
           hint: 'Calculate acceleration a = (v - u)/t first, then multiply by mass m.',
@@ -757,7 +1262,7 @@ export function buildPrebuiltExamByFormat(
         difficulty: 'Intermediate',
         bloom_level: 'Analyze',
         points: 20,
-        question: `[${spec.shortName.toUpperCase()} • SECTION I Q2] Why does Binary Search achieve O(log N) time complexity on a sorted array of N elements?`,
+        question: `[${spec.shortName.toUpperCase()} • PRACTICE SECTION I Q2] Why does Binary Search achieve O(log N) time complexity on a sorted array of N elements?`,
         options: [
           'It halves the remaining search interval after every midpoint comparison',
           'It inspects every element sequentially from index 0 to N-1',
@@ -765,7 +1270,7 @@ export function buildPrebuiltExamByFormat(
           'It hashes every element into a single bucket',
         ],
         correct_answer: 'It halves the remaining search interval after every midpoint comparison',
-        explanation: `[${spec.shortName} Mark Scheme] Eliminating half of the remaining candidates on each comparison yields at most log₂(N) steps.`,
+        explanation: `[${spec.shortName} Practice Solution Guide] Eliminating half of the remaining candidates on each comparison yields at most log₂(N) steps.`,
         gamified_feedback: {
           success_quote: `${spec.badgeEmoji} Logarithmic Halving Mastered!`,
           hint: 'How much of the search space is discarded after each midpoint check?',

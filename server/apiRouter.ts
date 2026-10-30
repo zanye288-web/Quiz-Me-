@@ -24,6 +24,7 @@ import {
 import { searchAllImages, searchWebImages, searchWikimediaImages } from './imageService';
 import { resolveThematicVisual, THEMATIC_VISUAL_ASSETS } from '../src/utils/thematicImages';
 import { synthesizeGoogleCloudSpeech } from './ttsService';
+import { searchOpenAccessLibrary, convertOerToExamPaperAI } from './oerService';
 import {
   securityHeadersMiddleware,
   aiGenerationRateLimiter,
@@ -764,17 +765,28 @@ apiRouter.get('/live/room/:roomCode', (req: Request, res: Response) => {
 // Create or upsert a live session room
 apiRouter.post('/live/create', (req: Request, res: Response) => {
   try {
-    const { session } = req.body;
-    if (!session || !session.roomCode) {
+    const { session, hostId } = req.body || {};
+    if (!session || !session.roomCode || typeof session.roomCode !== 'string') {
       return res.status(400).json({ success: false, error: 'Invalid session payload.' });
     }
-    const code = String(session.roomCode).trim().toUpperCase();
-    const cleanSession = JSON.parse(JSON.stringify({
-      ...session,
-      id: code,
-      roomCode: code,
-      updatedAt: Date.now(),
-    }));
+    const code = String(session.roomCode).trim().toUpperCase().slice(0, 12);
+    const existing = liveRoomsStore.get(code);
+    const callerHostId = String(hostId || session.hostId || '').trim();
+    if (existing && existing.hostId && callerHostId && existing.hostId !== callerHostId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Only the room host can overwrite this session.',
+      });
+    }
+    const cleanSession = JSON.parse(
+      JSON.stringify({
+        ...session,
+        id: code,
+        roomCode: code,
+        hostId: existing?.hostId || callerHostId || 'host',
+        updatedAt: Date.now(),
+      })
+    );
     liveRoomsStore.set(code, cleanSession);
     res.json({ success: true, session: cleanSession });
   } catch (err) {
@@ -785,7 +797,7 @@ apiRouter.post('/live/create', (req: Request, res: Response) => {
 // Join an existing live session room
 apiRouter.post('/live/join', (req: Request, res: Response) => {
   try {
-    const { roomCode, participant, fallbackSession } = req.body;
+    const { roomCode, participant, fallbackSession } = req.body || {};
     const code = String(roomCode || '').trim().toUpperCase();
     let room = liveRoomsStore.get(code);
     if (!room && fallbackSession && fallbackSession.roomCode) {
@@ -801,15 +813,18 @@ apiRouter.post('/live/join', (req: Request, res: Response) => {
     if (!participant || !participant.id) {
       return res.status(400).json({ success: false, error: 'Invalid participant data.' });
     }
+    const safeId = String(participant.id).slice(0, 80);
     room.participants = room.participants || {};
-    room.participants[participant.id] = {
+    room.participants[safeId] = {
       ...participant,
-      score: room.participants[participant.id]?.score ?? 0,
-      streak: room.participants[participant.id]?.streak ?? 0,
-      answers: room.participants[participant.id]?.answers ?? {},
-      hasAnsweredCurrent: room.participants[participant.id]?.hasAnsweredCurrent ?? false,
+      id: safeId,
+      name: sanitizeString(participant.name, 60, 'Scholar'),
+      score: room.participants[safeId]?.score ?? 0,
+      streak: room.participants[safeId]?.streak ?? 0,
+      answers: room.participants[safeId]?.answers ?? {},
+      hasAnsweredCurrent: room.participants[safeId]?.hasAnsweredCurrent ?? false,
       isReady: true,
-      joinedAt: room.participants[participant.id]?.joinedAt ?? Date.now(),
+      joinedAt: room.participants[safeId]?.joinedAt ?? Date.now(),
       lastActive: Date.now(),
     };
     room.updatedAt = Date.now();
@@ -820,10 +835,10 @@ apiRouter.post('/live/join', (req: Request, res: Response) => {
   }
 });
 
-// Update room status / advance question / add participants
+// Update room status / advance question / add participants — Host ownership validated
 apiRouter.post('/live/update', (req: Request, res: Response) => {
   try {
-    const { roomCode, updates, resetAnsweredFlags, fallbackSession } = req.body;
+    const { roomCode, hostId, updates, resetAnsweredFlags, fallbackSession } = req.body || {};
     const code = String(roomCode || '').trim().toUpperCase();
     let room = liveRoomsStore.get(code);
     if (!room && fallbackSession && fallbackSession.roomCode) {
@@ -833,13 +848,34 @@ apiRouter.post('/live/update', (req: Request, res: Response) => {
     if (!room) {
       return res.status(404).json({ success: false, error: 'Room not found.' });
     }
+
+    const callerHostId = String(hostId || '').trim();
+    const isHostMutation =
+      (updates && (updates.status !== undefined || updates.currentQuestionIndex !== undefined)) ||
+      Boolean(resetAnsweredFlags);
+    if (
+      isHostMutation &&
+      room.hostId &&
+      callerHostId &&
+      room.hostId !== callerHostId &&
+      !String(room.hostId).startsWith('auto_host_')
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Only the room host can update session status or advance questions.',
+      });
+    }
+
     if (updates && typeof updates === 'object') {
-      if (updates.participants && typeof updates.participants === 'object') {
-        room.participants = { ...(room.participants || {}), ...updates.participants };
-        const { participants: _p, ...rest } = updates;
+      const safeUpdates = { ...updates };
+      delete safeUpdates.hostId;
+      delete safeUpdates.roomCode;
+      if (safeUpdates.participants && typeof safeUpdates.participants === 'object') {
+        room.participants = { ...(room.participants || {}), ...safeUpdates.participants };
+        const { participants: _p, ...rest } = safeUpdates;
         Object.assign(room, rest);
       } else {
-        Object.assign(room, updates);
+        Object.assign(room, safeUpdates);
       }
     }
     if (resetAnsweredFlags && room.participants) {
@@ -855,11 +891,14 @@ apiRouter.post('/live/update', (req: Request, res: Response) => {
   }
 });
 
-// Submit participant answer
+// Submit participant answer with bounded score/streak validation
 apiRouter.post('/live/answer', (req: Request, res: Response) => {
   try {
-    const { roomCode, participantId, questionIndex, answer, newScore, newStreak, fallbackSession } = req.body;
+    const { roomCode, participantId, questionIndex, answer, newScore, newStreak, fallbackSession } = req.body || {};
     const code = String(roomCode || '').trim().toUpperCase();
+    if (!code || !participantId || !answer) {
+      return res.status(400).json({ success: false, error: 'Invalid answer payload.' });
+    }
     let room = liveRoomsStore.get(code);
     if (!room && fallbackSession && fallbackSession.roomCode) {
       room = JSON.parse(JSON.stringify(fallbackSession));
@@ -868,10 +907,12 @@ apiRouter.post('/live/answer', (req: Request, res: Response) => {
     if (!room) {
       return res.status(404).json({ success: false, error: 'Room not found.' });
     }
+    const safePid = String(participantId).slice(0, 80);
+    const safeQIdx = clampInteger(questionIndex, 0, 500, 0);
     room.participants = room.participants || {};
-    if (!room.participants[participantId]) {
-      room.participants[participantId] = {
-        id: participantId,
+    if (!room.participants[safePid]) {
+      room.participants[safePid] = {
+        id: safePid,
         name: 'Scholar',
         avatarSeed: 'scholar',
         avatarColor: 'indigo',
@@ -885,14 +926,20 @@ apiRouter.post('/live/answer', (req: Request, res: Response) => {
         lastActive: Date.now(),
       };
     }
-    const p = room.participants[participantId];
+    const p = room.participants[safePid];
     p.answers = p.answers || {};
-    p.answers[questionIndex] = {
+    p.answers[safeQIdx] = {
       ...answer,
       answeredAt: Date.now(),
     };
-    p.score = typeof newScore === 'number' ? newScore : p.score + (answer?.pointsEarned || 0);
-    p.streak = typeof newStreak === 'number' ? newStreak : p.streak;
+    const boundedScore =
+      typeof newScore === 'number'
+        ? clampInteger(newScore, 0, 250000, p.score)
+        : clampInteger(p.score + (Number(answer?.pointsEarned) || 0), 0, 250000, p.score);
+    const boundedStreak =
+      typeof newStreak === 'number' ? clampInteger(newStreak, 0, 500, p.streak) : p.streak;
+    p.score = boundedScore;
+    p.streak = boundedStreak;
     p.hasAnsweredCurrent = true;
     p.lastActive = Date.now();
     room.updatedAt = Date.now();
@@ -1394,6 +1441,50 @@ apiRouter.post('/one-by-one/validate', searchRateLimiter, handleWordChainValidat
 apiRouter.post('/word-chain/validate', searchRateLimiter, handleWordChainValidate);
 apiRouter.post('/one-by-one/ai-turn', searchRateLimiter, handleWordChainAiTurn);
 apiRouter.post('/word-chain/ai-turn', searchRateLimiter, handleWordChainAiTurn);
+
+// ============================================================================
+// OPEN-ACCESS EDUCATIONAL REPOSITORIES & CURRICULA (9 PLATFORMS)
+// ============================================================================
+apiRouter.post('/oer/search', searchRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { query, repositoryId, targetExamBoard, subject, priorityRegion } = req.body || {};
+    const sanitizedQuery = sanitizeString(query, 120, '');
+    const results = await searchOpenAccessLibrary({
+      query: sanitizedQuery,
+      repositoryId,
+      targetExamBoard,
+      subject,
+      priorityRegion,
+    });
+    res.json({ success: true, ...results });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to search Open-Access repositories.'),
+    });
+  }
+});
+
+apiRouter.post('/oer/convert-to-paper', aiGenerationRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { resourceId, chapterId, passageText, targetExamBoard, targetSubject, questionCount, paperType } = req.body || {};
+    const result = await convertOerToExamPaperAI({
+      resourceId: sanitizeString(resourceId, 100, ''),
+      chapterId: chapterId ? sanitizeString(chapterId, 100) : undefined,
+      passageText: passageText ? sanitizeString(passageText, 10_000) : undefined,
+      targetExamBoard: targetExamBoard || 'waec',
+      targetSubject: sanitizeString(targetSubject, 100, 'General Science'),
+      questionCount: clampInteger(questionCount, 3, 12, 5),
+      paperType,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to transform OER into exam paper.'),
+    });
+  }
+});
 
 
 

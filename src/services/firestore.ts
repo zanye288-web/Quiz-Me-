@@ -83,6 +83,9 @@ export interface UserProfileDocument {
   photoURL: string | null;
   role: PersonaType;
   headline?: string;
+  school?: string;
+  region?: string;
+  quizMasteryScore?: number;
   bio?: string;
   avatarType?: 'google' | 'icon' | 'custom' | 'mascot';
   avatarIcon?: string;
@@ -235,6 +238,8 @@ export async function upsertUserProfile(
   try {
     const userDocRef = doc(db, 'users', userId);
     const snap = await getDoc(userDocRef);
+    let mergedProfile: UserProfileDocument;
+
     if (!snap.exists()) {
       const initialProfile: UserProfileDocument = {
         userId,
@@ -258,13 +263,44 @@ export async function upsertUserProfile(
         updatedAt: serverTimestamp(),
         ...data,
       };
+      mergedProfile = initialProfile;
       await setDoc(userDocRef, initialProfile);
     } else {
+      mergedProfile = {
+        ...(snap.data() as UserProfileDocument),
+        ...data,
+      };
       await updateDoc(userDocRef, {
         ...data,
         updatedAt: serverTimestamp(),
       });
     }
+
+    // Sync minimal public profile for community leaderboards (strictly no email or private PII)
+    const publicProfileRef = doc(db, 'public_profiles', userId);
+    const publicPayload: Record<string, any> = {
+      uid: userId,
+      userId,
+      displayName: mergedProfile.displayName || 'Scholar',
+      photoURL: mergedProfile.photoURL ?? null,
+      role: mergedProfile.role || 'Student',
+      level: mergedProfile.level ?? 1,
+      levelSystemVersion: mergedProfile.levelSystemVersion ?? LEVEL_SYSTEM_VERSION,
+      xp: mergedProfile.xp ?? 0,
+      streak: mergedProfile.streak ?? 0,
+      quizzesCompleted: mergedProfile.quizzesCompleted ?? 0,
+      totalCorrect: mergedProfile.totalCorrect ?? 0,
+      totalQuestions: mergedProfile.totalQuestions ?? 0,
+      updatedAt: new Date().toISOString(),
+    };
+    if (mergedProfile.school) publicPayload.school = mergedProfile.school;
+    if (mergedProfile.region) publicPayload.region = mergedProfile.region;
+    if (mergedProfile.quizMasteryScore !== undefined) {
+      publicPayload.quizMasteryScore = mergedProfile.quizMasteryScore;
+    }
+    if (mergedProfile.badges) publicPayload.badges = mergedProfile.badges;
+
+    await setDoc(publicProfileRef, publicPayload, { merge: true }).catch(() => {});
   } catch (err) {
     console.warn('Notice saving user profile to Firestore:', err);
   }
@@ -757,17 +793,16 @@ export async function deleteQuizComment(quizId: string, commentId: string): Prom
   }
 }
 
-// 5. Global Leaderboard from Real Firestore Users
+// 5. Global Leaderboard from Real Firestore Public Profiles (No private PII exposed)
 export async function fetchLeaderboardUsers(currentUserId?: string): Promise<LeaderboardUser[]> {
   try {
-    const usersColRef = collection(db, 'users');
+    const publicProfilesColRef = collection(db, 'public_profiles');
     let snap;
     try {
-      const q = query(usersColRef, orderBy('xp', 'desc'), limit(50));
+      const q = query(publicProfilesColRef, orderBy('xp', 'desc'), limit(50));
       snap = await getDocs(q);
     } catch {
-      // Fallback in case index is pending or orderBy fails
-      snap = await getDocs(usersColRef);
+      snap = await getDocs(publicProfilesColRef);
     }
 
     const results: LeaderboardUser[] = [];
@@ -787,7 +822,7 @@ export async function fetchLeaderboardUsers(currentUserId?: string): Promise<Lea
     let rank = 1;
     rawList.forEach((u) => {
       const totalQ = u.totalQuestions || 0;
-      const accuracy = totalQ > 0 ? Math.round(((u.totalCorrect || 0) / totalQ) * 100) : 100;
+      const accuracy = totalQ > 0 ? Math.round(((u.totalCorrect || 0) / totalQ) * 100) : 0;
 
       const realXp = u.levelSystemVersion === LEVEL_SYSTEM_VERSION ? (u.xp || 0) : 0;
       const realLevel = u.levelSystemVersion === LEVEL_SYSTEM_VERSION ? calculateLevelFromXp(realXp) : 1;
@@ -800,6 +835,13 @@ export async function fetchLeaderboardUsers(currentUserId?: string): Promise<Lea
           : rankInfo.title;
 
       const userId = u.userId || `user_${rank}`;
+      const quizzesCompleted = u.quizzesCompleted || 0;
+      const computedMastery =
+        typeof u.quizMasteryScore === 'number'
+          ? u.quizMasteryScore
+          : totalQ > 0
+          ? Math.min(100, Math.round(accuracy * 0.75 + Math.min(25, quizzesCompleted * 2.5)))
+          : 0;
 
       results.push({
         rank: rank++,
@@ -811,8 +853,12 @@ export async function fetchLeaderboardUsers(currentUserId?: string): Promise<Lea
         persona: u.role || 'Student',
         level: realLevel,
         xp: realXp,
-        streak: u.streak || 1,
+        streak: u.streak || 0,
         accuracy,
+        quizMastery: computedMastery,
+        quizzesCompleted,
+        school: u.school || undefined,
+        region: (u.region as any) || undefined,
         tier,
         badgeTitle,
         isCurrentUser: currentUserId ? userId === currentUserId : false,
@@ -821,19 +867,18 @@ export async function fetchLeaderboardUsers(currentUserId?: string): Promise<Lea
 
     return results;
   } catch (err) {
-    console.warn('Notice fetching leaderboard users from Firestore:', err);
+    console.warn('Notice fetching leaderboard public profiles from Firestore:', err);
     return [];
   }
 }
 
-// 6. Reset all signed-in users' levels in Firestore to Level 1 / 0 XP for the V3 Leveling System Revamp
+// 6. Migrate only the current signed-in user's own profile to V3 Leveling System (Never mutates other users)
 export async function resetAllSignedInUsersLevelsInFirestore(currentUserId?: string): Promise<number> {
   if (!auth.currentUser && !currentUserId) return 0;
   let resetCount = 0;
   try {
-    // 1. Always ensure current user's own document is reset if not already on LEVEL_SYSTEM_VERSION
     const activeUid = auth.currentUser?.uid || currentUserId;
-    if (activeUid) {
+    if (activeUid && auth.currentUser?.uid === activeUid) {
       const ownDocRef = doc(db, 'users', activeUid);
       const ownSnap = await getDoc(ownDocRef);
       if (ownSnap.exists()) {
@@ -849,33 +894,8 @@ export async function resetAllSignedInUsersLevelsInFirestore(currentUserId?: str
         }
       }
     }
-
-    // 2. Also sweep all user documents in the users collection that haven't been migrated to LEVEL_SYSTEM_VERSION
-    const usersColRef = collection(db, 'users');
-    const snap = await getDocs(usersColRef);
-    const promises: Promise<any>[] = [];
-
-    snap.forEach((docSnap) => {
-      const data = docSnap.data() as UserProfileDocument;
-      if (data.levelSystemVersion !== LEVEL_SYSTEM_VERSION) {
-        promises.push(
-          updateDoc(docSnap.ref, {
-            level: 1,
-            xp: 0,
-            levelSystemVersion: LEVEL_SYSTEM_VERSION,
-            updatedAt: serverTimestamp(),
-          }).then(() => {
-            resetCount++;
-          }).catch(() => {})
-        );
-      }
-    });
-
-    if (promises.length > 0) {
-      await Promise.all(promises);
-    }
   } catch (err) {
-    console.warn('Notice during global V3 level reset:', err);
+    console.warn('Notice during own user V3 level migration:', err);
   }
   return resetCount;
 }

@@ -9,7 +9,7 @@ import {
   getDocs,
   onSnapshot,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { QuizResponse, Question } from '../types/quiz';
 import {
   LiveSessionData,
@@ -330,9 +330,9 @@ export async function fetchActiveLiveRooms(): Promise<ActiveLiveRoomSummary[]> {
 
 function createInitialBotsMap(now: number): Record<string, LiveParticipant> {
   const simulatedNames = [
-    { name: 'Alex Rivera', color: 'rose', seed: 'alex' },
-    { name: 'Sophia Chen', color: 'emerald', seed: 'sophia' },
-    { name: 'Marcus Vance', color: 'amber', seed: 'marcus' },
+    { name: 'Alex (Practice Bot)', color: 'rose', seed: 'alex' },
+    { name: 'Sophia (Practice Bot)', color: 'emerald', seed: 'sophia' },
+    { name: 'Marcus (Practice Bot)', color: 'amber', seed: 'marcus' },
   ];
   const bots: Record<string, LiveParticipant> = {};
   for (const profile of simulatedNames) {
@@ -356,7 +356,8 @@ function createInitialBotsMap(now: number): Record<string, LiveParticipant> {
 }
 
 /**
- * Host creates a new live quiz session room
+ * Host creates a new live quiz session room.
+ * Enforces authenticated user UID as hostId when authenticated with Firebase.
  */
 export async function createLiveSession(
   quiz: QuizResponse,
@@ -367,6 +368,7 @@ export async function createLiveSession(
   const roomCode = (options?.customRoomCode || generateRoomCode()).trim().toUpperCase();
   const normalizedQuiz = normalizeQuizForLiveBattle(quiz);
   const now = Date.now();
+  const verifiedHostId = auth.currentUser?.uid || host.id;
 
   const defaultSettings: LiveSessionSettings = {
     timePerQuestion: 20,
@@ -377,8 +379,8 @@ export async function createLiveSession(
   };
 
   const initialParticipants: Record<string, LiveParticipant> = {
-    [host.id]: {
-      id: host.id,
+    [verifiedHostId]: {
+      id: verifiedHostId,
       name: `${host.name || 'Host'} (Host)`,
       avatarSeed: 'host-crown',
       avatarColor: 'indigo',
@@ -397,7 +399,7 @@ export async function createLiveSession(
   const initialData: LiveSessionData = stripUndefined({
     id: roomCode,
     roomCode,
-    hostId: host.id,
+    hostId: verifiedHostId,
     hostName: host.name || 'Quiz Master',
     ...(host.avatar ? { hostAvatar: host.avatar } : {}),
     quiz: normalizedQuiz,
@@ -419,17 +421,19 @@ export async function createLiveSession(
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session: initialData }),
+      body: JSON.stringify({ session: initialData, hostId: verifiedHostId }),
     },
     1800
   );
 
-  // 3. Save to Firestore asynchronously in background so it NEVER hangs room creation
-  try {
-    const sessionRef = doc(db, COLLECTION_NAME, roomCode);
-    setDoc(sessionRef, initialData, { merge: true }).catch(() => {});
-  } catch {
-    // ignore
+  // 3. Save to Firestore asynchronously in background if authenticated
+  if (auth.currentUser) {
+    try {
+      const sessionRef = doc(db, COLLECTION_NAME, roomCode);
+      setDoc(sessionRef, initialData, { merge: true }).catch(() => {});
+    } catch {
+      // ignore
+    }
   }
 
   return { roomCode, session: initialData };
@@ -645,7 +649,8 @@ export function subscribeLiveSession(
 }
 
 /**
- * Host updates session state (e.g., starts countdown, advances to review/finished)
+ * Host updates session state (e.g., starts countdown, advances to review/finished).
+ * Validates host ownership before mutating session status.
  */
 export async function updateSessionStatus(
   roomCode: string,
@@ -654,6 +659,13 @@ export async function updateSessionStatus(
 ): Promise<void> {
   const cleanCode = roomCode.trim().toUpperCase();
   const now = Date.now();
+  const cached = getLocalSessionCache(cleanCode);
+
+  if (cached && auth.currentUser && cached.hostId && cached.hostId !== auth.currentUser.uid) {
+    console.warn('Only the session host can update live session status.');
+    return;
+  }
+
   const updates = stripUndefined({
     status,
     updatedAt: now,
@@ -661,7 +673,6 @@ export async function updateSessionStatus(
   });
 
   // 1. Optimistically update local cache & broadcast immediately (0ms UI update!)
-  const cached = getLocalSessionCache(cleanCode);
   let merged: LiveSessionData | null = null;
   if (cached) {
     merged = {
@@ -679,6 +690,7 @@ export async function updateSessionStatus(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         roomCode: cleanCode,
+        hostId: auth.currentUser?.uid || cached?.hostId,
         updates,
         fallbackSession: merged || cached || undefined,
       }),
@@ -689,12 +701,14 @@ export async function updateSessionStatus(
     saveLocalSessionCache(cleanCode, res.data.session);
   }
 
-  // 3. Update Firestore asynchronously in background
-  try {
-    const sessionRef = doc(db, COLLECTION_NAME, cleanCode);
-    setDoc(sessionRef, updates, { merge: true }).catch(() => {});
-  } catch {
-    // ignore
+  // 3. Update Firestore asynchronously in background if authenticated
+  if (auth.currentUser) {
+    try {
+      const sessionRef = doc(db, COLLECTION_NAME, cleanCode);
+      setDoc(sessionRef, updates, { merge: true }).catch(() => {});
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -892,11 +906,11 @@ export async function addSimulatedParticipants(
 ): Promise<void> {
   const cleanCode = roomCode.trim().toUpperCase();
   const simulatedNames = [
-    { name: 'Alex Rivera', color: 'rose', seed: 'alex' },
-    { name: 'Sophia Chen', color: 'indigo', seed: 'sophia' },
-    { name: 'Marcus Vance', color: 'amber', seed: 'marcus' },
-    { name: 'Elena Rostova', color: 'teal', seed: 'elena' },
-    { name: 'Devon King', color: 'emerald', seed: 'devon' },
+    { name: 'Alex (Practice Bot)', color: 'rose', seed: 'alex' },
+    { name: 'Sophia (Practice Bot)', color: 'indigo', seed: 'sophia' },
+    { name: 'Marcus (Practice Bot)', color: 'amber', seed: 'marcus' },
+    { name: 'Elena (Practice Bot)', color: 'teal', seed: 'elena' },
+    { name: 'Devon (Practice Bot)', color: 'emerald', seed: 'devon' },
   ];
 
   const newBots: Record<string, LiveParticipant> = {};

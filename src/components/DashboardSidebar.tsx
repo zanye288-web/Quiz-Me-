@@ -37,7 +37,7 @@ import { UserAvatar } from './UserAvatar';
 import { MascotAvatar } from './MascotAvatar';
 import { AppLogo } from './AppLogo';
 
-export type DashboardTab = 'studio' | 'exam' | 'past_papers' | 'searcher' | 'games' | 'notes' | 'gamma' | 'flashcards' | 'curricula' | 'community' | 'live' | 'music' | 'authoring' | 'suggestions' | 'achievements' | 'analytics' | 'history' | 'settings' | 'runner' | 'complete';
+export type DashboardTab = 'studio' | 'exam' | 'past_papers' | 'searcher' | 'games' | 'notes' | 'gamma' | 'flashcards' | 'curricula' | 'community' | 'live' | 'music' | 'authoring' | 'suggestions' | 'leaderboard' | 'achievements' | 'analytics' | 'history' | 'settings' | 'runner' | 'complete';
 
 interface DashboardSidebarProps {
   activeTab: DashboardTab;
@@ -190,10 +190,18 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       title: 'Player Rank & Career',
       items: [
         {
+          id: 'leaderboard' as DashboardTab,
+          label: 'Scholars Leaderboard',
+          shortLabel: 'Rankings',
+          icon: Trophy,
+          badge: 'GLOBAL',
+          description: 'Global Scholars Leaderboard by XP & quiz mastery across schools & regions',
+        },
+        {
           id: 'achievements' as DashboardTab,
           label: 'Trophies & Badges',
           shortLabel: 'Badges',
-          icon: Trophy,
+          icon: Award,
           badge: '1K+',
           description: 'Unlock 1,000+ quiz medals, trophies & titles',
         },

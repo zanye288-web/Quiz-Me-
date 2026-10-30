@@ -11,6 +11,9 @@
         "photoURL": { "type": ["string", "null"], "description": "User avatar photo URL" },
         "role": { "type": "string", "enum": ["Student", "Teacher"], "description": "Active user persona" },
         "headline": { "type": "string", "description": "User academic headline or specialization" },
+        "school": { "type": "string", "description": "User school, college, or educational institution" },
+        "region": { "type": "string", "description": "User geographical or exam board region" },
+        "quizMasteryScore": { "type": "number", "minimum": 0, "maximum": 100, "description": "Overall quiz mastery score percentage" },
         "bio": { "type": "string", "description": "User personal bio or study motto" },
         "avatarType": { "type": "string", "enum": ["google", "icon", "custom", "mascot"], "description": "Avatar display mode" },
         "avatarIcon": { "type": "string", "description": "Selected avatar emoji or icon" },
@@ -141,13 +144,36 @@
         "savedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "quizId", "quizTitle"]
+    },
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Minimal public profile data for leaderboards and community features without exposing private PII or email.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": ["string", "null"] },
+        "role": { "type": "string", "enum": ["Student", "Teacher", "Professional"] },
+        "level": { "type": "number" },
+        "xp": { "type": "number" },
+        "streak": { "type": "number" },
+        "quizzesCompleted": { "type": "number" },
+        "totalCorrect": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "school": { "type": "string" },
+        "region": { "type": "string" },
+        "countryCode": { "type": "string" },
+        "examBoardFocus": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName"]
     }
   },
   "collections": {
     "users": {
       "path": "users/{userId}",
       "entity": "UserProfile",
-      "description": "User profile with gamified stats and achievements",
+      "description": "Private user profile with gamified stats and achievements",
       "subcollections": {
         "history": {
           "path": "users/{userId}/history/{recordId}",
@@ -164,6 +190,11 @@
           "description": "Quizzes saved or bookmarked by the user"
         }
       }
+    },
+    "public_profiles": {
+      "path": "public_profiles/{userId}",
+      "entity": "PublicProfile",
+      "description": "Minimal public profile data for community leaderboards"
     },
     "quizzes": {
       "path": "quizzes/{quizId}",

@@ -130,29 +130,29 @@ export interface DifficultyRatingMeta {
 }
 
 const DIFFICULTY_TIERS_ORDER: DifficultyType[] = [
-  'Foundational',
+  'Beginner',
   'Intermediate',
-  'Advanced',
-  'Expert',
+  'Master',
 ];
 
 function getQuizDifficultyRatingMeta(
   quiz: QuizResponse | null | undefined,
   fallbackDifficulty: DifficultyType = 'Intermediate'
 ): DifficultyRatingMeta {
-  const rawDiff: DifficultyType = quiz?.difficulty || fallbackDifficulty;
+  const rawDiff: string = quiz?.difficulty || fallbackDifficulty;
 
   // Compute subtle bonus complexity from question count & open/code items if quiz is present
   const qCount = quiz?.questions?.length || 0;
   const openOrCodeCount =
-    quiz?.questions?.filter((q) => q.type === 'open_ended' || Boolean(q.code_snippet)).length || 0;
+    quiz?.questions?.filter((q) => q.type === 'open_explanation' || Boolean(q.code_snippet)).length || 0;
   const complexityNudge = Math.min(6, Math.round(openOrCodeCount * 1.5 + (qCount >= 20 ? 3 : 0)));
 
   switch (rawDiff) {
+    case 'Beginner':
     case 'Foundational': {
       const ratingPercent = Math.min(34, 24 + complexityNudge);
       return {
-        difficulty: 'Foundational',
+        difficulty: 'Beginner',
         comicTag: 'EASY BREEZE',
         ratingPercent,
         needleAngle: -64 + complexityNudge,
@@ -181,27 +181,13 @@ function getQuizDifficultyRatingMeta(
         segmentIndex: 1,
       };
     }
-    case 'Advanced': {
-      const ratingPercent = Math.min(86, 76 + complexityNudge);
-      return {
-        difficulty: 'Advanced',
-        comicTag: 'HIGH VOLTAGE',
-        ratingPercent,
-        needleAngle: 28 + complexityNudge,
-        xpMultiplier: '1.6x XP',
-        cognitiveDesc: 'Deep synthesis, edge-case traps & rigorous proofs',
-        hexColor: '#f59e0b',
-        badgeBgClass: 'bg-amber-300 text-slate-950 border-slate-900',
-        pillClass: 'bg-amber-300 hover:bg-amber-200 text-slate-950 border-slate-900',
-        surfaceClass: 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-500',
-        segmentIndex: 2,
-      };
-    }
+    case 'Advanced':
+    case 'Master':
     case 'Expert':
     default: {
       const ratingPercent = Math.min(99, 93 + Math.min(6, complexityNudge));
       return {
-        difficulty: 'Expert',
+        difficulty: 'Master',
         comicTag: 'BOSS TIER!',
         ratingPercent,
         needleAngle: 66 + Math.min(6, complexityNudge),

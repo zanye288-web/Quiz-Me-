@@ -211,13 +211,13 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
         };
       case 'exam':
         return {
-          title: 'Official Exam Mode · Checkpoint, WAEC, JAMB, IGCSE & SAT',
+          title: 'Official Exam Mode · 19 Global Boards (WAEC, JAMB, GCSE, A-Level, SAT, JEE, Gaokao & More)',
           subtitle: 'Timed standardized exam simulator with authentic grading scales and AI paper generator',
         };
       case 'past_papers':
         return {
-          title: 'Past Papers & Exam Textbooks Hub',
-          subtitle: 'Download printable WAEC, JAMB, Checkpoint, NECO, IGCSE & SAT past papers, marking schemes & textbooks',
+          title: 'PastPapersAcademy Hub · 19 Countries & Exam Boards',
+          subtitle: 'Categorized slot directory for QP, MS, ER, GT, CBT & Textbooks across Africa, UK, Europe, Americas & Asia',
         };
       case 'searcher':
         return {
@@ -324,11 +324,11 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
   };
 
   const primaryArcadePills: Array<{ id: DashboardTab; emoji: string; label: string; badge?: string }> = [
-    { id: 'studio', emoji: '⚡', label: 'Play & Create' },
-    { id: 'exam', emoji: '🎓', label: 'Exam Mode', badge: 'WAEC/JAMB' },
-    { id: 'past_papers', emoji: '📚', label: 'Past Papers Hub', badge: 'PDF/BOOK' },
-    { id: 'gamma', emoji: '🖥️', label: 'Presentation Maker', badge: 'PPTX/PDF' },
-    { id: 'notes', emoji: '📝', label: 'Notes Generator' },
+    { id: 'studio', emoji: '⚡', label: 'Quiz Studio' },
+    { id: 'past_papers', emoji: '📚', label: 'Past Papers', badge: '19 BOARDS' },
+    { id: 'exam', emoji: '🎓', label: 'Exam Mode', badge: 'CBT' },
+    { id: 'gamma', emoji: '🖥️', label: 'Slides Maker', badge: '100+ PPTX' },
+    { id: 'notes', emoji: '📝', label: 'AI Notes' },
     { id: 'curricula', emoji: '🎯', label: 'Quiz Decks' },
   ];
 
@@ -337,17 +337,17 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
   const effortStatus = getDailyEffortVerificationStatus();
 
   return (
-    <header className="sticky top-0 z-20 bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b-2 border-slate-900 dark:border-slate-800 transition-colors shadow-xs">
-      <div className="max-w-[1460px] mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-3">
+    <header className="sticky top-0 z-20 w-full bg-white/95 dark:bg-slate-950/95 backdrop-blur-xl border-b-2 border-slate-900 dark:border-slate-800 transition-colors shadow-xs">
+      <div className="w-full max-w-[1600px] mx-auto px-2.5 sm:px-5 h-14 sm:h-16 flex items-center justify-between gap-2 min-w-0">
         {/* ZONE 1: All Modes Drawer Button & Vibrant QuizMe! Arcade Brand */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => {
               soundFx.playClick();
               onToggleMobileSidebar();
             }}
-            className="comic-panel-sm arcade-btn flex items-center gap-2 px-3 py-2 rounded-2xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 hover:bg-amber-50 dark:hover:bg-slate-800 transition-all cursor-pointer text-xs font-black whitespace-nowrap"
+            className="comic-panel-sm arcade-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 hover:bg-amber-50 dark:hover:bg-slate-800 transition-all cursor-pointer text-xs font-black whitespace-nowrap"
             aria-label="Open All Modes & Game Menu"
             title="Open All 16 Quiz Modes, Trophies & Tools"
           >
@@ -361,17 +361,17 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
               soundFx.playClick();
               onSelectTab('studio');
             }}
-            className="flex items-center gap-2 group cursor-pointer"
+            className="flex items-center gap-1.5 group cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-2xl bg-indigo-600 border-2 border-slate-950 border-b-4 border-b-slate-950 flex items-center justify-center text-amber-300 font-black text-lg shadow-sm group-hover:scale-105 transition-transform">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-600 border-2 border-slate-950 border-b-4 border-b-slate-950 flex items-center justify-center text-amber-300 font-black text-base shadow-sm group-hover:scale-105 transition-transform">
               ⚡
             </div>
             <div className="text-left">
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg sm:text-xl font-black tracking-tight text-slate-900 dark:text-white">
+              <div className="flex items-center gap-1">
+                <span className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
                   QuizMe!
                 </span>
-                <span className="comic-badge hidden sm:inline-block px-2 py-0.5 rounded-lg bg-amber-300 border-2 border-slate-950 text-slate-950 text-[10px] font-black uppercase tracking-wider">
+                <span className="comic-badge hidden xl:inline-block px-1.5 py-0.5 rounded-md bg-amber-300 border border-slate-950 text-slate-950 text-[9px] font-black uppercase tracking-wider">
                   ARCADE
                 </span>
               </div>
@@ -382,7 +382,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
         {/* ZONE 2: Modern Floating Glass Arcade Pill Dock */}
         <nav
           aria-label="Primary Quiz Arcade Navigation"
-          className="comic-panel-sm hidden lg:flex items-center gap-1 p-1.5 rounded-2xl bg-slate-100/95 dark:bg-slate-900/95"
+          className="comic-panel-sm hidden lg:flex items-center gap-1 p-1 rounded-2xl bg-slate-100/95 dark:bg-slate-900/95 max-w-full overflow-x-auto scrollbar-none min-w-0"
         >
           {primaryArcadePills.map((item, idx) => {
             const isActive = activeTab === item.id;
@@ -394,7 +394,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                   soundFx.playClick();
                   onSelectTab(item.id);
                 }}
-                className={`arcade-btn relative px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                className={`arcade-btn relative px-2.5 xl:px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-[11px] xl:text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   idx >= 5 ? 'hidden xl:flex' : 'flex'
                 } ${
                   isActive
@@ -402,10 +402,10 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                     : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800'
                 }`}
               >
-                <span className="text-sm leading-none">{item.emoji}</span>
+                <span className="text-xs leading-none">{item.emoji}</span>
                 <span>{item.label}</span>
                 {item.badge && !isActive && (
-                  <span className="comic-badge px-1.5 py-0.2 rounded-md bg-rose-500 border border-slate-950 text-white text-[9px] font-black uppercase tracking-wider">
+                  <span className="comic-badge hidden 2xl:inline-block px-1.5 py-0.2 rounded-md bg-rose-500 border border-slate-950 text-white text-[8px] font-black uppercase tracking-wider">
                     {item.badge}
                   </span>
                 )}

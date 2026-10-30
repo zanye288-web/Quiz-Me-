@@ -159,6 +159,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       },
     },
     {
+      id: 'nav_leaderboard',
+      title: 'Global Scholars Leaderboard',
+      subtitle: 'Top scholars ranked by XP and quiz mastery, filtered by school or region',
+      category: 'Navigation',
+      icon: <Award className="w-4 h-4 text-emerald-500" />,
+      action: () => {
+        onSelectTab('leaderboard');
+        onClose();
+      },
+    },
+    {
       id: 'nav_analytics',
       title: 'Performance & XP Analytics',
       subtitle: 'Bloom taxonomy mastery, leaderboard & badge showcase',

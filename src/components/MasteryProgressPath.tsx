@@ -98,7 +98,7 @@ export const MasteryProgressPath: React.FC<MasteryProgressPathProps> = ({
   const handleStartDailyChallenge = () => {
     soundFx.playSelect();
     if (onLaunchCustomQuiz) {
-      onLaunchCustomQuiz(buildDailyChallengeQuiz(persona));
+      onLaunchCustomQuiz(buildDailyChallengeQuiz(persona as PersonaType));
     } else if (onLaunchInterleavedQuiz) {
       onLaunchInterleavedQuiz();
     }
@@ -107,7 +107,7 @@ export const MasteryProgressPath: React.FC<MasteryProgressPathProps> = ({
   const handleStartBossChallenge = (topic: string) => {
     soundFx.playSelect();
     if (onLaunchCustomQuiz) {
-      onLaunchCustomQuiz(buildTopicBossChallengeQuiz(topic, persona));
+      onLaunchCustomQuiz(buildTopicBossChallengeQuiz(topic, persona as PersonaType));
     } else if (onLaunchInterleavedQuiz) {
       onLaunchInterleavedQuiz();
     }
@@ -124,7 +124,7 @@ export const MasteryProgressPath: React.FC<MasteryProgressPathProps> = ({
   const handleStartComparisonDrill = (pair: ConfusedConceptPair) => {
     soundFx.playSelect();
     if (onLaunchCustomQuiz) {
-      onLaunchCustomQuiz(buildConceptComparisonDrillQuiz(pair, persona));
+      onLaunchCustomQuiz(buildConceptComparisonDrillQuiz(pair, persona as PersonaType));
     } else if (onLaunchInterleavedQuiz) {
       onLaunchInterleavedQuiz();
     }
@@ -447,7 +447,7 @@ export const MasteryProgressPath: React.FC<MasteryProgressPathProps> = ({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {Object.values(bossMap).map((tb, idx) => {
+          {(Object.values(bossMap) as TopicBossProgress[]).map((tb, idx) => {
             const isMastered = tb.status === 'Mastered';
             const isSolid = tb.status === 'Solid';
             const pct = Math.min(100, Math.round((tb.solidQuestionsCount / Math.max(1, tb.targetSolidQuestions)) * 100));

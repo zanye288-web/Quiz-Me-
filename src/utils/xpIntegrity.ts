@@ -437,15 +437,30 @@ export function getRewardedTriviaIdsToday(): number[] {
  * Verifies Games Arena XP (Word-Chain, Math Boss Rush, Spelling Bee)
  * so duplicate words/equations, 0-score matches, or hint/pause abuse cannot farm XP.
  */
-export function verifyArenaItemXp(params: {
-  mode: 'word_chain' | 'math_boss' | 'spelling_bee';
-  signature: string;
-  rawXp: number;
-  usedPauseOrHint?: boolean;
-}): { xp: number; allowed: boolean; reason?: string } {
-  const { mode, signature, rawXp, usedPauseOrHint = false } = params;
+export function verifyArenaItemXp(
+  arg1:
+    | {
+        mode: 'word_chain' | 'one_by_one' | 'math_boss' | 'spelling_bee';
+        signature: string;
+        rawXp: number;
+        usedPauseOrHint?: boolean;
+      }
+    | 'word_chain'
+    | 'one_by_one'
+    | 'math_boss'
+    | 'spelling_bee',
+  signatureArg?: string,
+  rawXpArg?: number,
+  usedPauseOrHintArg?: boolean
+): { xp: number; xpAwarded: number; allowed: boolean; reason?: string } {
+  const mode = typeof arg1 === 'object' ? arg1.mode : arg1;
+  const signature = typeof arg1 === 'object' ? arg1.signature : signatureArg || '';
+  const rawXp = typeof arg1 === 'object' ? arg1.rawXp : rawXpArg || 0;
+  const usedPauseOrHint =
+    typeof arg1 === 'object' ? Boolean(arg1.usedPauseOrHint) : Boolean(usedPauseOrHintArg);
+
   if (rawXp <= 0) {
-    return { xp: 0, allowed: false, reason: 'No XP earned for 0 score.' };
+    return { xp: 0, xpAwarded: 0, allowed: false, reason: 'No XP earned for 0 score.' };
   }
 
   const ledger = loadIntegrityLedger();
@@ -453,6 +468,7 @@ export function verifyArenaItemXp(params: {
   if (ledger.arenaXpToday >= MAX_DAILY_ARENA_XP) {
     return {
       xp: 0,
+      xpAwarded: 0,
       allowed: false,
       reason: 'Daily Arcade Arena XP cap (600 XP/day) reached! Play full quizzes to continue leveling up.',
     };
@@ -463,6 +479,7 @@ export function verifyArenaItemXp(params: {
     if (ledger.rewardedBeeWords.includes(normSig)) {
       return {
         xp: 0,
+        xpAwarded: 0,
         allowed: false,
         reason: `Already mastered "${normSig}" today (0 duplicate XP).`,
       };
@@ -472,6 +489,7 @@ export function verifyArenaItemXp(params: {
     if (ledger.rewardedMathEquations.includes(normSig)) {
       return {
         xp: 0,
+        xpAwarded: 0,
         allowed: false,
         reason: 'Already solved this exact equation today (0 duplicate XP).',
       };
@@ -481,6 +499,7 @@ export function verifyArenaItemXp(params: {
     if (ledger.rewardedChainWords.includes(normSig)) {
       return {
         xp: 0,
+        xpAwarded: 0,
         allowed: false,
         reason: 'Already claimed XP for this word chain today.',
       };
@@ -498,7 +517,7 @@ export function verifyArenaItemXp(params: {
   }
   saveIntegrityLedger(ledger);
 
-  return { xp: clampedXp, allowed: true };
+  return { xp: clampedXp, xpAwarded: clampedXp, allowed: true };
 }
 
 /**
@@ -509,6 +528,8 @@ export function getDailyEffortVerificationStatus(): {
   unlocked: boolean;
   verifiedQuestionsToday: number;
   requiredQuestions: number;
+  verifiedCorrectToday: number;
+  requiredCorrect: number;
   verifiedEffortUnitsToday: number;
 } {
   const ledger = loadIntegrityLedger();
@@ -519,6 +540,9 @@ export function getDailyEffortVerificationStatus(): {
     unlocked,
     verifiedQuestionsToday: ledger.verifiedQuestionsToday,
     requiredQuestions,
+    verifiedCorrectToday: ledger.verifiedQuestionsToday,
+    requiredCorrect: requiredQuestions,
     verifiedEffortUnitsToday: ledger.verifiedEffortUnitsToday,
   };
 }
+

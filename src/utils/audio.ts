@@ -2337,6 +2337,52 @@ class SoundEngine {
       return true;
     }
   }
+
+  public playUrgentTick(secondsLeft = 3) {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      const pitch = secondsLeft <= 2 ? 987.77 : 783.99;
+      osc.frequency.setValueAtTime(pitch, now);
+      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(now);
+      osc.stop(now + 0.065);
+    } catch {
+      // ignore audio fallback
+    }
+  }
+
+  public playBuzzer() {
+    if (!this.enabled) return;
+    const ctx = this.getContext();
+    const dest = this.getMasterOutput();
+    if (!ctx || !dest) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(165, now);
+      osc.frequency.linearRampToValueAtTime(110, now + 0.28);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+      osc.connect(gain);
+      gain.connect(dest);
+      osc.start(now);
+      osc.stop(now + 0.32);
+    } catch {
+      // ignore audio fallback
+    }
+  }
 }
 
 export type BgMusicTrackId =

@@ -219,38 +219,43 @@ export const ExamModeHubView: React.FC<ExamModeHubViewProps> = ({
     }
   };
 
+  const [examRegionFilter, setExamRegionFilter] = useState<string>('All Regions');
+  const filteredExamFormats = EXAM_FORMAT_CATALOG.filter((fmt) =>
+    examRegionFilter === 'All Regions' ? true : fmt.worldRegion === examRegionFilter
+  );
+
   // Sample grade preview for the selected board
   const sampleDistinction = evaluateExamBoardGrade(selectedFormatId, 82);
   const sampleCredit = evaluateExamBoardGrade(selectedFormatId, 62);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 animate-in fade-in duration-300">
+    <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5 animate-in fade-in duration-300 overflow-x-hidden">
       {/* 1. HERO BANNER: OFFICIAL EXAM MODE & CBT SIMULATOR */}
-      <div className="comic-tab-hero rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          <div className="space-y-2.5 max-w-3xl">
+      <div className="comic-tab-hero rounded-3xl p-5 sm:p-7 text-white relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+          <div className="space-y-2 max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
               <span className="comic-badge px-3 py-0.5 rounded-lg bg-amber-300 text-slate-950 border-2 border-slate-950 text-[11px] font-black uppercase tracking-wider">
-                🎓 OFFICIAL EXAM MODE CENTER
+                🎓 OFFICIAL EXAM MODE CENTER (19 COUNTRIES &amp; BOARDS)
               </span>
               <span className="px-3 py-0.5 rounded-full bg-slate-950/60 border border-white/25 text-emerald-300 text-xs font-extrabold">
-                Checkpoint • WAEC (WASSCE) • JAMB CBT • NECO • IGCSE • SAT • AP/IB
+                WAEC • JAMB • GCSE • A-Level • KCSE • Matric • SAT • AP/IB • JEE • Gaokao • ATAR • Abitur • ENEM
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight">
-              Standardized Examination Simulator &amp; Past-Paper Studio
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight leading-tight">
+              Global Standardized Examination Simulator &amp; Past-Paper Studio
             </h1>
             <p className="text-xs sm:text-sm text-indigo-100 leading-relaxed font-medium">
-              Practice under authentic examination board conditions with official command words, Paper 1 Objective &amp; Paper 2 Theory structures, CBT question jumpers, and authentic board grading scales ({activeSpec.gradingScaleLabel}).
+              Practice under authentic examination board conditions across 19 national &amp; international boards with official command words, Paper 1 Objective &amp; Paper 2 Theory structures, and authentic grading scales ({activeSpec.gradingScaleLabel}).
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => handleLaunchInstantMock(selectedFormatId)}
-              className="arcade-btn px-5 py-3 rounded-2xl bg-amber-300 hover:bg-amber-200 text-slate-950 border-2 border-slate-950 font-black text-xs sm:text-sm shadow-lg cursor-pointer flex items-center gap-2"
+              className="arcade-btn px-4 py-2.5 rounded-2xl bg-amber-300 hover:bg-amber-200 text-slate-950 border-2 border-slate-950 font-black text-xs sm:text-sm shadow-lg cursor-pointer flex items-center gap-2"
             >
               <span>⚡ Launch {activeSpec.shortName} Mock Now</span>
               <ArrowRight className="w-4 h-4" />
@@ -266,7 +271,7 @@ export const ExamModeHubView: React.FC<ExamModeHubViewProps> = ({
                     selectedFormatId
                   );
                 }}
-                className="arcade-btn px-4 py-3 rounded-2xl bg-slate-950/70 hover:bg-slate-950 text-white border-2 border-white/30 font-black text-xs sm:text-sm cursor-pointer flex items-center gap-2"
+                className="arcade-btn px-3.5 py-2.5 rounded-2xl bg-slate-950/70 hover:bg-slate-950 text-white border-2 border-white/30 font-black text-xs sm:text-sm cursor-pointer flex items-center gap-2"
               >
                 <FileText className="w-4 h-4 text-cyan-300" />
                 <span>Exam Notes Generator</span>
@@ -280,7 +285,7 @@ export const ExamModeHubView: React.FC<ExamModeHubViewProps> = ({
                   soundFx.playClick();
                   onOpenPastPapersHub(selectedFormatId);
                 }}
-                className="arcade-btn px-4 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-2 border-slate-950 font-black text-xs sm:text-sm cursor-pointer flex items-center gap-2"
+                className="arcade-btn px-3.5 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-2 border-slate-950 font-black text-xs sm:text-sm cursor-pointer flex items-center gap-2"
               >
                 <BookOpen className="w-4 h-4" />
                 <span>Past Papers &amp; Textbooks</span>
@@ -290,68 +295,96 @@ export const ExamModeHubView: React.FC<ExamModeHubViewProps> = ({
         </div>
       </div>
 
-      {/* 2. STANDARDIZED EXAM FORMAT SELECTOR GRID (Checkpoint, WAEC, JAMB, NECO, IGCSE, SAT, AP/IB, Standard) */}
+      {/* 2. STANDARDIZED EXAM FORMAT SELECTOR GRID (19 Global Countries & Tests) */}
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
           <div>
-            <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
               <GraduationCap className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <span>1. Select Your Examination Format</span>
+              <span>1. Select Your Country &amp; Examination Board ({filteredExamFormats.length} Boards)</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Each format configures authentic paper structure, question types, command phrasing, and official board grading
+              Filter by world region or pick any national/international board below to configure official paper structure and grading
             </p>
           </div>
           <span className="text-xs font-black px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 self-start sm:self-center">
-            Active Board: {activeSpec.badgeEmoji} {activeSpec.fullName}
+            Active Board: {activeSpec.countryFlag} {activeSpec.fullName}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {EXAM_FORMAT_CATALOG.map((fmt) => {
+        {/* World Region Filter Bar */}
+        <div className="flex flex-wrap items-center gap-1.5 pb-1">
+          {[
+            { id: 'All Regions', label: '🌍 All 19 Countries & Boards' },
+            { id: 'West & East Africa', label: '🇳🇬🇰🇪🇿🇦 Africa (WAEC, JAMB, NECO, KCSE, Matric)' },
+            { id: 'United Kingdom & Europe', label: '🇬🇧🇩🇪🇫🇷 UK & Europe (GCSE, A-Level, Abitur, Bac)' },
+            { id: 'North & South America', label: '🇺🇸🇧🇷 Americas (SAT, AP/IB, ENEM Brazil)' },
+            { id: 'Asia & Oceania', label: '🇮🇳🇨🇳🇦🇺 Asia & Oceania (JEE/NEET, Gaokao, ATAR)' },
+            { id: 'Global / International', label: '🏛️ Cambridge IGCSE, Checkpoint & IELTS/TOEFL' },
+          ].map((reg) => (
+            <button
+              key={reg.id}
+              type="button"
+              onClick={() => {
+                soundFx.playSelect();
+                setExamRegionFilter(reg.id);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                examRegionFilter === reg.id
+                  ? 'bg-indigo-600 text-white border-slate-950 shadow-2xs'
+                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-indigo-400'
+              }`}
+            >
+              {reg.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {filteredExamFormats.map((fmt) => {
             const isSelected = selectedFormatId === fmt.id;
             return (
               <div
                 key={fmt.id}
                 onClick={() => handleSelectFormat(fmt.id)}
-                className={`comic-pop-card rounded-3xl p-4 border-2 border-b-[5px] transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                className={`comic-pop-card rounded-2xl p-3.5 border-2 border-b-4 transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
                   isSelected
                     ? 'border-indigo-600 dark:border-amber-400 border-b-indigo-900 bg-indigo-50/90 dark:bg-indigo-950/70 ring-2 ring-indigo-500/25 shadow-md'
                     : 'border-slate-200 dark:border-slate-800 border-b-slate-400 dark:border-b-slate-700 bg-white dark:bg-slate-900 hover:border-indigo-400'
                 }`}
               >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="w-10 h-10 rounded-2xl bg-slate-900 dark:bg-slate-800 text-white flex items-center justify-center text-xl shadow-2xs">
-                      {fmt.badgeEmoji}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="w-9 h-9 rounded-xl bg-slate-900 dark:bg-slate-800 text-white flex items-center justify-center text-lg shadow-2xs">
+                      {fmt.countryFlag || fmt.badgeEmoji}
                     </span>
                     <span
-                      className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-lg border ${
+                      className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border truncate max-w-[130px] ${
                         isSelected
                           ? 'bg-amber-300 text-slate-950 border-slate-950'
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                       }`}
                     >
-                      {fmt.regionTag}
+                      {fmt.countryName}
                     </span>
                   </div>
 
                   <div>
-                    <h3 className="text-base font-black text-slate-900 dark:text-white leading-snug">
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white leading-snug">
                       {fmt.shortName}
                     </h3>
-                    <p className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                    <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5 line-clamp-1">
                       {fmt.paperStructure}
                     </p>
                   </div>
 
-                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3">
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
                     {fmt.description}
                   </p>
                 </div>
 
-                <div className="pt-2.5 border-t border-slate-200/80 dark:border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-700 dark:text-slate-300">
+                <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] font-extrabold text-slate-700 dark:text-slate-300">
                     <span className="truncate">{fmt.gradingScaleLabel}</span>
                   </div>
 
@@ -363,7 +396,7 @@ export const ExamModeHubView: React.FC<ExamModeHubViewProps> = ({
                         handleSelectFormat(fmt.id);
                         handleLaunchInstantMock(fmt.id);
                       }}
-                      className="flex-1 py-1.5 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                      className="flex-1 py-1.5 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-black flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
                     >
                       <Zap className="w-3 h-3 text-amber-300" />
                       <span>Instant Mock</span>

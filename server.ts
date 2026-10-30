@@ -1,66 +1,85 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import { apiRouter } from './server/apiRouter';
 import { securityHeadersMiddleware } from './server/securityMiddleware';
 
 dotenv.config();
 
-const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+async function startServer() {
+  const app = express();
+  const PORT = parseInt(process.env.PORT || '3000', 10);
 
-// Security hardening: Disable Express fingerprinting header
-app.disable('x-powered-by');
+  // Security hardening: Disable Express fingerprinting header
+  app.disable('x-powered-by');
 
-// Security response headers across all routes
-app.use(securityHeadersMiddleware);
+  // Security response headers across all routes
+  app.use(securityHeadersMiddleware);
 
-// Body parser with size limits to prevent memory exhaustion
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+  // Body parser with size limits to prevent memory exhaustion
+  app.use(express.json({ limit: '25mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-// Mount API endpoints
-app.use('/api', apiRouter);
+  // Mount API endpoints
+  app.use('/api', apiRouter);
 
-// Serve static assets from dist folder with proper cache headers
-const distPath = path.join(process.cwd(), 'dist');
-app.use(
-  express.static(distPath, {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('index.html') || filePath.endsWith('sw.js')) {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      }
-    },
-  })
-);
+  const distPath = path.join(process.cwd(), 'dist');
+  const isProd = process.env.NODE_ENV === 'production' && fs.existsSync(path.join(distPath, 'index.html'));
 
-// Return 404 for missing static asset files instead of SPA HTML fallback
-app.get(['/assets/*', '*.js', '*.css', '*.map'], (_req, res) => {
-  res.status(404).end();
-});
+  if (!isProd) {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    // Serve static assets from dist folder with proper cache headers
+    app.use(
+      express.static(distPath, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('index.html') || filePath.endsWith('sw.js')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          }
+        },
+      })
+    );
 
-// SPA fallback to index.html with no-cache header so published updates show immediately
-app.get('*', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(distPath, 'index.html'));
-});
+    // Return 404 for missing static asset files instead of SPA HTML fallback
+    app.get(['/assets/*', '*.js', '*.css', '*.map'], (_req, res) => {
+      res.status(404).end();
+    });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Quiz Me! server running on http://0.0.0.0:${PORT}`);
-});
+    // SPA fallback to index.html with no-cache header so published updates show immediately
+    app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
 
-// Graceful shutdown handler: close server on SIGTERM/SIGINT to prevent dangling connections
-function gracefulShutdown(signal: string) {
-  console.log(`\n${signal} received. Shutting down gracefully...`);
-  server.close(() => {
-    console.log('Server closed.');
-    process.exit(0);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Quiz Me! server running on http://0.0.0.0:${PORT}`);
   });
-  setTimeout(() => {
-    console.warn('Forcing shutdown after timeout.');
-    process.exit(1);
-  }, 10_000).unref();
+
+  // Graceful shutdown handler: close server on SIGTERM/SIGINT to prevent dangling connections
+  function gracefulShutdown(signal: string) {
+    console.log(`\n${signal} received. Shutting down gracefully...`);
+    server.close(() => {
+      console.log('Server closed.');
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.warn('Forcing shutdown after timeout.');
+      process.exit(1);
+    }, 10_000).unref();
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+startServer().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});

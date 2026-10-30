@@ -217,9 +217,12 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
           `Review ${activeExamSpec.shortName} past paper command words for ${rawTopic}.`,
           `Always state definitions using exact syllabus terminology.`,
         ],
+        quickRevision: [
+          `Core Definitions & Command Words for ${rawTopic}`,
+          `${activeExamSpec.shortName} Method Marks (M1) & Accuracy Marks (A1) Checklist`,
+        ],
         selfCheckQuestions: [
           {
-            id: 1,
             question: `Which strategy is most critical when answering a ${activeExamSpec.shortName} question on ${rawTopic}?`,
             options: [
               'State the governing principle/formula clearly and include proper units',
@@ -227,7 +230,7 @@ export const IngestStudio: React.FC<IngestStudioProps> = ({
               'Guess based on option length',
               'Ignore command words in the prompt',
             ],
-            correctAnswer: 'State the governing principle/formula clearly and include proper units',
+            answer: 'State the governing principle/formula clearly and include proper units',
             explanation: `${activeExamSpec.governingBody} marking schemes award method marks (M1) for explicit principles/formulas and accuracy marks (A1) for correct units.`,
           },
         ],

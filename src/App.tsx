@@ -22,6 +22,7 @@ import { ProfileCustomizationModal } from './components/ProfileCustomizationModa
 import { FlashcardStudio } from './components/FlashcardStudio';
 import { GammaWorkspace } from './components/GammaWorkspace';
 import { AchievementsView } from './components/AchievementsView';
+import { GlobalScholarsLeaderboard } from './components/GlobalScholarsLeaderboard';
 import { QuizUploadModal } from './components/QuizUploadModal';
 import { LiveSessionHub } from './components/live/LiveSessionHub';
 import { LiveSessionRoom } from './components/live/LiveSessionRoom';
@@ -72,6 +73,18 @@ import {
   SavedQuizDocument,
 } from './services/firestore';
 import { detectSharedQuizInUrl, clearSharedQuizParamsFromUrl } from './utils/shareUtils';
+import { ExamToolboxModal, ToolboxTab } from './components/superpowers/ExamToolboxModal';
+import { DiagnosticMasteryHeatmapModal } from './components/superpowers/DiagnosticMasteryHeatmapModal';
+import { AudioRevisionPodcastPlayer } from './components/superpowers/AudioRevisionPodcastPlayer';
+import { PrintableCheatSheetModal } from './components/superpowers/PrintableCheatSheetModal';
+import { DataBackupSyncModal } from './components/superpowers/DataBackupSyncModal';
+import { FloatingExamToolkitDock } from './components/superpowers/FloatingExamToolkitDock';
+import { STEMLaboratoryModal } from './components/superpowers/STEMLaboratoryModal';
+import { HumanitiesLiteratureModal } from './components/superpowers/HumanitiesLiteratureModal';
+import { MathematicsSandboxModal } from './components/superpowers/MathematicsSandboxModal';
+import { ExamSimulationSuiteModal } from './components/superpowers/ExamSimulationSuiteModal';
+import { CandidateWellnessModal } from './components/superpowers/CandidateWellnessModal';
+import { MnemonicsMemoryVaultModal } from './components/superpowers/MnemonicsMemoryVaultModal';
 
 const STATS_STORAGE_KEY = 'quizme_assessment_stats_v3_revamped';
 const CONFIG_STORAGE_KEY = 'quizme_assessment_config_v1';
@@ -235,6 +248,20 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Superpowers Examination Suite Modals
+  const [isExamToolboxOpen, setIsExamToolboxOpen] = useState<boolean>(false);
+  const [toolboxInitialTab, setToolboxInitialTab] = useState<ToolboxTab>('formulas');
+  const [isHeatmapOpen, setIsHeatmapOpen] = useState<boolean>(false);
+  const [isPodcastOpen, setIsPodcastOpen] = useState<boolean>(false);
+  const [isCheatSheetOpen, setIsCheatSheetOpen] = useState<boolean>(false);
+  const [isBackupOpen, setIsBackupOpen] = useState<boolean>(false);
+  const [isStemModalOpen, setIsStemModalOpen] = useState<boolean>(false);
+  const [isHumanitiesModalOpen, setIsHumanitiesModalOpen] = useState<boolean>(false);
+  const [isMathSandboxOpen, setIsMathSandboxOpen] = useState<boolean>(false);
+  const [isExamSimOpen, setIsExamSimOpen] = useState<boolean>(false);
+  const [isWellnessOpen, setIsWellnessOpen] = useState<boolean>(false);
+  const [isMnemonicsOpen, setIsMnemonicsOpen] = useState<boolean>(false);
+
   // Global Keyboard Shortcuts (Cmd+K / Ctrl+K, ?)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -262,8 +289,108 @@ export default function App() {
           return;
         }
 
+        // Quick open Calculator (Alt+C)
+        if (e.altKey && e.key.toLowerCase() === 'c') {
+          e.preventDefault();
+          soundFx.playClick();
+          setToolboxInitialTab('calculator');
+          setIsExamToolboxOpen(true);
+          return;
+        }
+
+        // Quick open Formula Booklet (Alt+F)
+        if (e.altKey && e.key.toLowerCase() === 'f') {
+          e.preventDefault();
+          soundFx.playClick();
+          setToolboxInitialTab('formulas');
+          setIsExamToolboxOpen(true);
+          return;
+        }
+
+        // Quick open Working Scratchpad (Alt+S)
+        if (e.altKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          soundFx.playClick();
+          setToolboxInitialTab('scratchpad');
+          setIsExamToolboxOpen(true);
+          return;
+        }
+
+        // Quick open Diagnostic Topic Heatmap (Alt+H)
+        if (e.altKey && e.key.toLowerCase() === 'h') {
+          e.preventDefault();
+          soundFx.playClick();
+          setIsHeatmapOpen((prev) => !prev);
+          return;
+        }
+
+        // Quick open Audio Revision Podcast (Alt+P)
+        if (e.altKey && e.key.toLowerCase() === 'p') {
+          e.preventDefault();
+          soundFx.playClick();
+          setIsPodcastOpen((prev) => !prev);
+          return;
+        }
+
+        // Quick open OMR Bubble Sheet (Alt+O)
+        if (e.altKey && e.key.toLowerCase() === 'o') {
+          e.preventDefault();
+          soundFx.playClick();
+          setToolboxInitialTab('omr_sheet');
+          setIsExamToolboxOpen(true);
+          return;
+        }
+
+        // Quick open STEM Laboratory (Alt+L)
+        if (e.altKey && e.key.toLowerCase() === 'l') {
+          e.preventDefault();
+          soundFx.playClick();
+          setIsStemModalOpen((prev) => !prev);
+          return;
+        }
+
+        // Quick open Humanities & Literature Suite (Alt+E)
+        if (e.altKey && e.key.toLowerCase() === 'e') {
+          e.preventDefault();
+          soundFx.playClick();
+          setIsHumanitiesModalOpen((prev) => !prev);
+          return;
+        }
+
+        // Quick open Mathematics Sandbox (Alt+M)
+        if (e.altKey && e.key.toLowerCase() === 'm') {
+          e.preventDefault();
+          soundFx.playClick();
+          setIsMathSandboxOpen((prev) => !prev);
+          return;
+        }
+
+        // Quick open JAMB CBT & Exam Dockets (Alt+J)
+        if (e.altKey && e.key.toLowerCase() === 'j') {
+          e.preventDefault();
+          soundFx.playClick();
+          setIsExamSimOpen((prev) => !prev);
+          return;
+        }
+
+        // Quick open Candidate Wellness Coach (Alt+W)
+        if (e.altKey && e.key.toLowerCase() === 'w') {
+          e.preventDefault();
+          soundFx.playClick();
+          setIsWellnessOpen((prev) => !prev);
+          return;
+        }
+
+        // Quick open Mnemonics Memory Vault (Alt+V)
+        if (e.altKey && e.key.toLowerCase() === 'v') {
+          e.preventDefault();
+          soundFx.playClick();
+          setIsMnemonicsOpen((prev) => !prev);
+          return;
+        }
+
         // Toggle Sound Mute on 'm' or 'M'
-        if (e.key.toLowerCase() === 'm' && !e.metaKey && !e.ctrlKey) {
+        if (e.key.toLowerCase() === 'm' && !e.metaKey && !e.ctrlKey && !e.altKey) {
           e.preventDefault();
           handleToggleSound();
           return;
@@ -793,7 +920,7 @@ export default function App() {
       )}
 
       {/* Main Content Workspace */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 max-w-full h-screen overflow-y-auto overflow-x-hidden">
         {/* Top Bar with Breadcrumbs & Fast Action Controls (Hidden in Focus Mode) */}
         {!isFocusModeActive && (
           <DashboardTopbar
@@ -828,7 +955,7 @@ export default function App() {
         )}
 
         {/* Dashboard Dynamic Content Views */}
-        <main className={isFocusModeActive ? 'flex-1 w-full min-h-screen p-0' : activeTab === 'runner' ? 'flex-1 pb-3' : 'flex-1 pb-16 md:pb-6'}>
+        <main className={isFocusModeActive ? 'flex-1 w-full min-h-screen p-0' : activeTab === 'runner' ? 'flex-1 w-full max-w-full pb-3 overflow-x-hidden' : 'flex-1 w-full max-w-full pb-16 md:pb-6 overflow-x-hidden'}>
           {activeTab === 'studio' && (
             <IngestStudio
               persona={persona}
@@ -955,6 +1082,16 @@ export default function App() {
                 });
               }}
             />
+          )}
+
+          {activeTab === 'leaderboard' && (
+            <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
+              <GlobalScholarsLeaderboard
+                stats={stats}
+                persona={persona}
+                onStartPracticeQuiz={() => setActiveTab('studio')}
+              />
+            </div>
           )}
 
           {activeTab === 'achievements' && (
@@ -1297,7 +1434,7 @@ export default function App() {
       {!isFocusModeActive && activeTab !== 'runner' && (
         <nav
           aria-label="Mobile Navigation"
-          className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800/80 px-2 py-1 shadow-lg flex items-center justify-around"
+          className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-800/80 px-1.5 py-1 shadow-lg flex items-center justify-around"
         >
           <button
             type="button"
@@ -1305,7 +1442,7 @@ export default function App() {
               soundFx.playClick();
               setActiveTab('studio');
             }}
-            className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1.5 px-2.5 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
               activeTab === 'studio'
                 ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/60'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -1319,16 +1456,32 @@ export default function App() {
             type="button"
             onClick={() => {
               soundFx.playClick();
+              setActiveTab('past_papers');
+            }}
+            className={`flex flex-col items-center justify-center py-1.5 px-2.5 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
+              activeTab === 'past_papers'
+                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/60'
+                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 mb-0.5" />
+            <span>Past Papers</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              soundFx.playClick();
               setActiveTab('exam');
             }}
-            className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1.5 px-2.5 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
               activeTab === 'exam'
                 ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/60'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <GraduationCap className="w-4 h-4 mb-0.5" />
-            <span>Exam Mode</span>
+            <span>Exams</span>
           </button>
 
           <button
@@ -1337,7 +1490,7 @@ export default function App() {
               soundFx.playClick();
               setActiveTab('notes');
             }}
-            className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1.5 px-2.5 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
               activeTab === 'notes'
                 ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/60'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -1351,32 +1504,16 @@ export default function App() {
             type="button"
             onClick={() => {
               soundFx.playClick();
-              setActiveTab('flashcards');
+              setActiveTab('gamma');
             }}
-            className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
-              activeTab === 'flashcards'
+            className={`flex flex-col items-center justify-center py-1.5 px-2.5 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
+              activeTab === 'gamma'
                 ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/60'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <Layers className="w-4 h-4 mb-0.5" />
-            <span>Flashcards</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              soundFx.playClick();
-              setActiveTab('analytics');
-            }}
-            className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-[10px] font-black transition-all cursor-pointer ${
-              activeTab === 'analytics'
-                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/60'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4 mb-0.5" />
-            <span>Stats</span>
+            <span>Slides</span>
           </button>
 
           <button
@@ -1385,7 +1522,7 @@ export default function App() {
               soundFx.playClick();
               setIsMobileSidebarOpen(true);
             }}
-            className="flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl text-[10px] font-black text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center py-1.5 px-2.5 rounded-2xl text-[10px] font-black text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all cursor-pointer"
           >
             <Menu className="w-4 h-4 mb-0.5" />
             <span>Menu</span>
@@ -1614,6 +1751,89 @@ export default function App() {
           onOpenStarterTutorial={() => setIsStarterTutorialOpen(true)}
         />
       )}
+
+      {/* Floating Exam Toolkit Superpowers Dock */}
+      {!isFocusModeActive && (
+        <FloatingExamToolkitDock
+          onOpenToolbox={(tab) => {
+            setToolboxInitialTab(tab);
+            setIsExamToolboxOpen(true);
+          }}
+          onOpenHeatmap={() => setIsHeatmapOpen(true)}
+          onOpenPodcast={() => setIsPodcastOpen(true)}
+          onOpenCheatSheet={() => setIsCheatSheetOpen(true)}
+          onOpenBackup={() => setIsBackupOpen(true)}
+          onOpenStem={() => setIsStemModalOpen(true)}
+          onOpenHumanities={() => setIsHumanitiesModalOpen(true)}
+          onOpenMathSandbox={() => setIsMathSandboxOpen(true)}
+          onOpenExamSim={() => setIsExamSimOpen(true)}
+          onOpenWellness={() => setIsWellnessOpen(true)}
+          onOpenMnemonics={() => setIsMnemonicsOpen(true)}
+        />
+      )}
+
+      {/* Superpowers Modals */}
+      <ExamToolboxModal
+        isOpen={isExamToolboxOpen}
+        onClose={() => setIsExamToolboxOpen(false)}
+        initialTab={toolboxInitialTab}
+        currentExamFormat={activeQuiz?.examFormat || 'waec'}
+      />
+
+      <DiagnosticMasteryHeatmapModal
+        isOpen={isHeatmapOpen}
+        onClose={() => setIsHeatmapOpen(false)}
+        persona={persona}
+        onStartQuiz={handleStartQuiz}
+        studentName={userProfile?.displayName || user?.displayName || 'Scholar'}
+      />
+
+      <AudioRevisionPodcastPlayer
+        isOpen={isPodcastOpen}
+        onClose={() => setIsPodcastOpen(false)}
+      />
+
+      <PrintableCheatSheetModal
+        isOpen={isCheatSheetOpen}
+        onClose={() => setIsCheatSheetOpen(false)}
+      />
+
+      <DataBackupSyncModal
+        isOpen={isBackupOpen}
+        onClose={() => setIsBackupOpen(false)}
+        userStats={stats}
+      />
+
+      <STEMLaboratoryModal
+        isOpen={isStemModalOpen}
+        onClose={() => setIsStemModalOpen(false)}
+      />
+
+      <HumanitiesLiteratureModal
+        isOpen={isHumanitiesModalOpen}
+        onClose={() => setIsHumanitiesModalOpen(false)}
+      />
+
+      <MathematicsSandboxModal
+        isOpen={isMathSandboxOpen}
+        onClose={() => setIsMathSandboxOpen(false)}
+      />
+
+      <ExamSimulationSuiteModal
+        isOpen={isExamSimOpen}
+        onClose={() => setIsExamSimOpen(false)}
+        studentName={userProfile?.displayName || user?.displayName || 'Scholar Candidate'}
+      />
+
+      <CandidateWellnessModal
+        isOpen={isWellnessOpen}
+        onClose={() => setIsWellnessOpen(false)}
+      />
+
+      <MnemonicsMemoryVaultModal
+        isOpen={isMnemonicsOpen}
+        onClose={() => setIsMnemonicsOpen(false)}
+      />
 
       {/* Global Pomodoro Study Overlay */}
       <PomodoroTimerOverlay />
