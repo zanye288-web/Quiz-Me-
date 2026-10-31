@@ -21,6 +21,9 @@ import {
   validateWordChainAI,
   generateAiWordChainTurnAI,
   scanWorksheetAI,
+  evaluateWrittenAnswerAI,
+  conductOralExamTurnAI,
+  auditQuestionQualityAI,
 } from './geminiService';
 import { requireAuth, optionalAuth, AuthRequest } from '../src/middleware/auth.ts';
 import * as dbRepo from '../src/db/repository.ts';
@@ -1744,6 +1747,125 @@ apiRouter.delete('/db/history', requireAuth, async (req: AuthRequest, res: Respo
     res.status(500).json({ error: 'Failed to clear quiz history' });
   }
 });
+
+// ============================================================================
+// EXAMINER INTELLIGENCE & ORAL EXAM ENDPOINTS
+// ============================================================================
+
+// 1. Written Answer Examiner Evaluation
+apiRouter.post('/examiner/evaluate-written', aiGenerationRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const {
+      questionText,
+      studentAnswerText,
+      imageBase64,
+      mimeType,
+      subject,
+      topic,
+      examBoard,
+      maxMarks,
+      officialMarkScheme,
+    } = req.body || {};
+
+    if (!questionText || (!studentAnswerText && !imageBase64)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide both the question and the student\'s typed or image answer.',
+      });
+    }
+
+    const evaluation = await evaluateWrittenAnswerAI({
+      questionText: sanitizeString(questionText, 3_000),
+      studentAnswerText: studentAnswerText ? sanitizeString(studentAnswerText, 10_000) : '',
+      imageBase64,
+      mimeType: mimeType || 'image/jpeg',
+      subject: subject ? sanitizeString(subject, 100) : undefined,
+      topic: topic ? sanitizeString(topic, 150) : undefined,
+      examBoard: examBoard ? sanitizeString(examBoard, 80) : undefined,
+      maxMarks: clampInteger(maxMarks, 1, 100, 10),
+      officialMarkScheme: officialMarkScheme ? sanitizeString(officialMarkScheme, 5_000) : undefined,
+    });
+
+    res.json({ success: true, evaluation });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to evaluate written answer.'),
+    });
+  }
+});
+
+// 2. Oral Examination Turn (Viva Voce)
+apiRouter.post('/examiner/oral-turn', aiGenerationRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const {
+      subject,
+      topic,
+      examBoard,
+      academicLevel,
+      currentTurn,
+      totalTurns,
+      examinerQuestion,
+      studentTranscript,
+      conversationHistory,
+    } = req.body || {};
+
+    if (!examinerQuestion || !studentTranscript) {
+      return res.status(400).json({
+        success: false,
+        error: 'Examiner question and student transcript are required.',
+      });
+    }
+
+    const turnResult = await conductOralExamTurnAI({
+      subject: sanitizeString(subject || 'General Academic', 100),
+      topic: sanitizeString(topic || 'Core Concept', 120),
+      examBoard: sanitizeString(examBoard || 'General', 80),
+      academicLevel: sanitizeString(academicLevel || 'Standard Level', 60),
+      currentTurn: clampInteger(currentTurn, 1, 20, 1),
+      totalTurns: clampInteger(totalTurns, 1, 20, 5),
+      examinerQuestion: sanitizeString(examinerQuestion, 2_000),
+      studentTranscript: sanitizeString(studentTranscript, 5_000),
+      conversationHistory: Array.isArray(conversationHistory) ? conversationHistory : [],
+    });
+
+    res.json({ success: true, ...turnResult });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to process oral exam turn.'),
+    });
+  }
+});
+
+// 3. Question Quality & Verification Audit
+apiRouter.post('/examiner/audit-question', aiGenerationRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { question, options, correctAnswer, explanation, subject, topic, examBoard } = req.body || {};
+
+    if (!question) {
+      return res.status(400).json({ success: false, error: 'Question text is required for quality audit.' });
+    }
+
+    const audit = await auditQuestionQualityAI({
+      question: sanitizeString(question, 2_000),
+      options: Array.isArray(options) ? options.map((o: any) => sanitizeString(String(o), 500)) : undefined,
+      correctAnswer: correctAnswer ? sanitizeString(correctAnswer, 500) : undefined,
+      explanation: explanation ? sanitizeString(explanation, 2_000) : undefined,
+      subject: subject ? sanitizeString(subject, 100) : undefined,
+      topic: topic ? sanitizeString(topic, 150) : undefined,
+      examBoard: examBoard ? sanitizeString(examBoard, 80) : undefined,
+    });
+
+    res.json({ success: true, audit });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to audit question quality.'),
+    });
+  }
+});
+
 
 
 

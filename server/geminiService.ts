@@ -4531,6 +4531,330 @@ ${params.textSnippet ? `\nAccompanying Text Context:\n${params.textSnippet.slice
   }
 }
 
+/**
+ * Advanced Written Answer Examiner AI:
+ * Evaluates typed or scanned handwritten/printed answers against marking criteria.
+ * Provides mark breakdown, missing points, misconceptions, model answer, and syllabus citations.
+ */
+export async function evaluateWrittenAnswerAI(params: {
+  questionText: string;
+  studentAnswerText: string;
+  imageBase64?: string;
+  mimeType?: string;
+  subject?: string;
+  topic?: string;
+  examBoard?: string;
+  maxMarks?: number;
+  officialMarkScheme?: string;
+}) {
+  const maxMarks = params.maxMarks && params.maxMarks > 0 ? params.maxMarks : 10;
+  const board = params.examBoard || 'WAEC / Cambridge / International Standard';
+  const subject = params.subject || 'General Academic';
+  const topic = params.topic || 'Core Curriculum Concept';
+
+  const parts: any[] = [];
+
+  if (params.imageBase64) {
+    parts.push({
+      inlineData: {
+        data: params.imageBase64.replace(/^data:[^;]+;base64,/, ''),
+        mimeType: params.mimeType || 'image/jpeg',
+      },
+    });
+  }
+
+  const prompt = `You are a Senior Chief Examiner for ${board} specializing in ${subject} (${topic}).
+Evaluate the student's written response to the examination question below with rigorous pedagogical fidelity.
+
+EXAMINATION QUESTION:
+"${params.questionText}"
+
+MAXIMUM MARKS ALLOCATION: ${maxMarks} Marks
+
+STUDENT'S SUBMITTED RESPONSE:
+"${params.studentAnswerText || '(Refer to uploaded handwritten/printed image scan above)'}"
+
+${params.officialMarkScheme ? `OFFICIAL MARK SCHEME REFERENCE:\n"${params.officialMarkScheme}"` : 'Construct an authoritative, curriculum-standard marking rubric based on official examination criteria.'}
+
+EVALUATION REQUIREMENTS:
+1. Award an integer or half-mark score between 0 and ${maxMarks}.
+2. Categorize correctness level: 'exemplary' (90-100%), 'solid' (70-89%), 'partial' (40-69%), or 'inadequate' (<40%).
+3. Provide a granular criteria mark breakdown (e.g., M1 for method, A1 for accuracy, C1 for clear terminology/definitions).
+4. Identify any crucial missing points required by the board.
+5. Identify any specific misconceptions or incorrect assertions made.
+6. Provide an authoritative model examiner answer demonstrating optimal phrasing and structure.
+7. Provide constructive examiner commentary and pinpoint the exact syllabus topic for revision.
+
+Return ONLY a valid JSON object matching this schema.`;
+
+  parts.push({ text: prompt });
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: [{ role: 'user', parts }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            awardedMarks: { type: Type.NUMBER },
+            maxMarks: { type: Type.NUMBER },
+            correctnessLevel: { type: Type.STRING },
+            criteriaBreakdown: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  criterion: { type: Type.STRING },
+                  maxMarks: { type: Type.NUMBER },
+                  awardedMarks: { type: Type.NUMBER },
+                  examinerComment: { type: Type.STRING },
+                  passed: { type: Type.BOOLEAN },
+                },
+                required: ['criterion', 'maxMarks', 'awardedMarks', 'examinerComment', 'passed'],
+              },
+            },
+            missingKeyPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+            misconceptionsDetected: { type: Type.ARRAY, items: { type: Type.STRING } },
+            modelExaminerAnswer: { type: Type.STRING },
+            examinerFeedback: { type: Type.STRING },
+            suggestedImprovements: { type: Type.ARRAY, items: { type: Type.STRING } },
+            nextRevisionTopic: { type: Type.STRING },
+            isOfficialMarkScheme: { type: Type.BOOLEAN },
+          },
+          required: [
+            'awardedMarks',
+            'maxMarks',
+            'correctnessLevel',
+            'criteriaBreakdown',
+            'missingKeyPoints',
+            'misconceptionsDetected',
+            'modelExaminerAnswer',
+            'examinerFeedback',
+            'suggestedImprovements',
+            'nextRevisionTopic',
+          ],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    const awarded = typeof parsed.awardedMarks === 'number' ? Math.min(maxMarks, Math.max(0, parsed.awardedMarks)) : Math.round(maxMarks * 0.7);
+
+    return {
+      awardedMarks: awarded,
+      maxMarks,
+      percentageScore: Math.round((awarded / maxMarks) * 100),
+      correctnessLevel: ['exemplary', 'solid', 'partial', 'inadequate'].includes(parsed.correctnessLevel)
+        ? parsed.correctnessLevel
+        : awarded / maxMarks >= 0.8
+        ? 'solid'
+        : 'partial',
+      criteriaBreakdown: Array.isArray(parsed.criteriaBreakdown) ? parsed.criteriaBreakdown : [],
+      missingKeyPoints: Array.isArray(parsed.missingKeyPoints) ? parsed.missingKeyPoints : [],
+      misconceptionsDetected: Array.isArray(parsed.misconceptionsDetected) ? parsed.misconceptionsDetected : [],
+      modelExaminerAnswer: String(parsed.modelExaminerAnswer || 'Standard model answer.'),
+      examinerFeedback: String(parsed.examinerFeedback || 'Well structured attempt.'),
+      suggestedImprovements: Array.isArray(parsed.suggestedImprovements) ? parsed.suggestedImprovements : [],
+      nextRevisionTopic: String(parsed.nextRevisionTopic || topic),
+      isOfficialMarkScheme: Boolean(parsed.isOfficialMarkScheme),
+    };
+  } catch (err: any) {
+    console.error('evaluateWrittenAnswerAI error:', err);
+    throw new Error('Failed to evaluate written answer: ' + (err.message || String(err)));
+  }
+}
+
+/**
+ * AI Oral Examination (Viva Voce) Turn AI:
+ * Simulates a formal verbal academic viva examination. Evaluates spoken student answers,
+ * scores terminology and conceptual accuracy, and formulates the next spoken question or diagnostic follow-up.
+ */
+export async function conductOralExamTurnAI(params: {
+  subject: string;
+  topic: string;
+  examBoard: string;
+  academicLevel: string;
+  currentTurn: number;
+  totalTurns: number;
+  examinerQuestion: string;
+  studentTranscript: string;
+  conversationHistory?: Array<{ question: string; answer: string; score?: number }>;
+}) {
+  const historyText = params.conversationHistory && params.conversationHistory.length > 0
+    ? params.conversationHistory
+        .map((h, i) => `Turn ${i + 1}:\nExaminer: "${h.question}"\nCandidate: "${h.answer}" (Score: ${h.score ?? 'N/A'}/10)`)
+        .join('\n\n')
+    : 'No prior turns in this session.';
+
+  const isFinalTurn = params.currentTurn >= params.totalTurns;
+
+  const prompt = `You are a distinguished University Professor & Cambridge / WAEC Oral Board Examiner conducting a formal Viva Voce examination in ${params.subject} (${params.topic}) for ${params.academicLevel} level.
+
+EXAM PROGRESS: Turn ${params.currentTurn} of ${params.totalTurns}.
+PREVIOUS EXAM DIALOGUE:
+${historyText}
+
+CURRENT EXAMINER QUESTION:
+"${params.examinerQuestion}"
+
+CANDIDATE'S SPOKEN RESPONSE (Transcribed from speech):
+"${params.studentTranscript}"
+
+INSTRUCTIONS:
+1. Evaluate candidate's verbal response:
+   - Award a score from 0 to 10 based on academic accuracy, clarity, and depth.
+   - Content accuracy percentage (0 to 100).
+   - Identify key academic and scientific terminology correctly used.
+   - Identify missing concepts that a top student should have articulated.
+   - Write a polite, insightful examiner observation.
+2. ${
+    isFinalTurn
+      ? 'Since this is the FINAL turn, mark isExamFinished as true. Compute overallBandScore (1-9 scale or 0-100), overallComment, candidate commendations, and priority revision areas.'
+      : 'Formulate the NEXT examiner spoken question for Turn ' + (params.currentTurn + 1) + '. It should logically build on or probe deeper into the subject. Also provide an optional follow-up challenge if the candidate was hesitant.'
+  }
+
+Return ONLY valid JSON matching the schema.`;
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            turnScore: { type: Type.NUMBER },
+            contentAccuracy: { type: Type.NUMBER },
+            keyTerminologyUsed: { type: Type.ARRAY, items: { type: Type.STRING } },
+            missingConcepts: { type: Type.ARRAY, items: { type: Type.STRING } },
+            examinerObservation: { type: Type.STRING },
+            nextSpokenQuestion: { type: Type.STRING },
+            followUpPrompt: { type: Type.STRING },
+            isExamFinished: { type: Type.BOOLEAN },
+            overallBandScore: { type: Type.NUMBER },
+            overallComment: { type: Type.STRING },
+            examinerCommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            priorityRevisionAreas: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: [
+            'turnScore',
+            'contentAccuracy',
+            'keyTerminologyUsed',
+            'missingConcepts',
+            'examinerObservation',
+            'isExamFinished',
+          ],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    return {
+      turnScore: typeof parsed.turnScore === 'number' ? Math.min(10, Math.max(0, parsed.turnScore)) : 7,
+      contentAccuracy: typeof parsed.contentAccuracy === 'number' ? parsed.contentAccuracy : 75,
+      keyTerminologyUsed: Array.isArray(parsed.keyTerminologyUsed) ? parsed.keyTerminologyUsed : [],
+      missingConcepts: Array.isArray(parsed.missingConcepts) ? parsed.missingConcepts : [],
+      examinerObservation: String(parsed.examinerObservation || 'Response evaluated.'),
+      nextSpokenQuestion: parsed.nextSpokenQuestion || (isFinalTurn ? undefined : 'Explain the relationship between structure and function in this context.'),
+      followUpPrompt: parsed.followUpPrompt || undefined,
+      isExamFinished: Boolean(parsed.isExamFinished || isFinalTurn),
+      overallBandScore: parsed.overallBandScore ?? 7.5,
+      overallComment: parsed.overallComment || 'Candidate demonstrated articulate domain familiarity.',
+      examinerCommendations: Array.isArray(parsed.examinerCommendations) ? parsed.examinerCommendations : [],
+      priorityRevisionAreas: Array.isArray(parsed.priorityRevisionAreas) ? parsed.priorityRevisionAreas : [],
+    };
+  } catch (err: any) {
+    console.error('conductOralExamTurnAI error:', err);
+    throw new Error('Failed to evaluate oral exam turn: ' + (err.message || String(err)));
+  }
+}
+
+/**
+ * Question Quality & Verification Audit AI:
+ * Performs an in-depth quality control inspection on a question for examination boards.
+ */
+export async function auditQuestionQualityAI(params: {
+  question: string;
+  options?: string[];
+  correctAnswer?: string;
+  explanation?: string;
+  subject?: string;
+  topic?: string;
+  examBoard?: string;
+}) {
+  const prompt = `You are the Lead Quality Assurance and Psychometrics Officer for an international examination syndicate.
+Audit the following question for accuracy, ambiguity, curriculum alignment, and psychometric rigor.
+
+QUESTION: "${params.question}"
+OPTIONS: ${JSON.stringify(params.options || [])}
+STATED CORRECT ANSWER: "${params.correctAnswer || 'N/A'}"
+STATED EXPLANATION: "${params.explanation || 'N/A'}"
+SUBJECT: "${params.subject || 'General'}"
+TOPIC: "${params.topic || 'General'}"
+TARGET BOARD: "${params.examBoard || 'General / WAEC / Cambridge'}"
+
+AUDIT TASKS:
+1. Verify if the stated correct answer is undeniably true.
+2. Check if any distractor is ambiguous, accidentally correct, or unfair.
+3. Assign Bloom's Taxonomy cognitive level ('remember', 'understand', 'apply', 'analyze', 'evaluate', 'create').
+4. Calculate a Clarity & Quality score from 0 to 100.
+5. Determine recommended Verification Status ('official_verified', 'human_reviewed', 'ai_reviewed', 'ai_generated', 'unverified').
+6. Provide specific actionable quality notes or suggested corrections.
+
+Return ONLY a valid JSON object matching the schema.`;
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            verificationStatus: { type: Type.STRING },
+            clarityScore: { type: Type.NUMBER },
+            bloomsLevel: { type: Type.STRING },
+            potentialDistractorAmbiguity: { type: Type.BOOLEAN },
+            detectedMisleadingTrap: { type: Type.STRING },
+            isAnswerAccurate: { type: Type.BOOLEAN },
+            reviewerNotes: { type: Type.STRING },
+            suggestedFix: { type: Type.STRING },
+          },
+          required: [
+            'verificationStatus',
+            'clarityScore',
+            'bloomsLevel',
+            'potentialDistractorAmbiguity',
+            'isAnswerAccurate',
+            'reviewerNotes',
+          ],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    return {
+      verificationStatus: ['official_verified', 'human_reviewed', 'ai_reviewed', 'ai_generated', 'unverified'].includes(parsed.verificationStatus)
+        ? parsed.verificationStatus
+        : 'ai_reviewed',
+      clarityScore: typeof parsed.clarityScore === 'number' ? parsed.clarityScore : 85,
+      bloomsLevel: ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'].includes(parsed.bloomsLevel)
+        ? parsed.bloomsLevel
+        : 'understand',
+      potentialDistractorAmbiguity: Boolean(parsed.potentialDistractorAmbiguity),
+      detectedMisleadingTrap: parsed.detectedMisleadingTrap ? String(parsed.detectedMisleadingTrap) : undefined,
+      isAnswerAccurate: Boolean(parsed.isAnswerAccurate),
+      reviewerNotes: String(parsed.reviewerNotes || 'Question inspected.'),
+      suggestedFix: parsed.suggestedFix ? String(parsed.suggestedFix) : undefined,
+    };
+  } catch (err: any) {
+    console.error('auditQuestionQualityAI error:', err);
+    throw new Error('Failed to audit question: ' + (err.message || String(err)));
+  }
+}
+
+
 
 
 

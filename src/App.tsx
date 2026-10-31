@@ -90,6 +90,13 @@ import { MistakeNotebookView, saveMistakeToNotebook } from './components/Mistake
 import { AdaptiveStudyPlannerView } from './components/AdaptiveStudyPlannerView';
 import { SmartWorksheetScannerView } from './components/SmartWorksheetScannerView';
 import { InteractiveLearningLabView } from './components/InteractiveLearningLabView';
+import { SyllabusTrackerView } from './components/SyllabusTrackerView';
+import { WrittenAnswerExaminer } from './components/WrittenAnswerExaminer';
+import { KnowledgeDependencyGraphView } from './components/KnowledgeDependencyGraphView';
+import { ClassroomWorkspaceView } from './components/ClassroomWorkspaceView';
+import { OralExaminationStudio } from './components/OralExaminationStudio';
+import { QuestionIntelligenceView } from './components/QuestionIntelligenceView';
+import { LearningTimelineView } from './components/LearningTimelineView';
 import { FoundationProvider } from './context/FoundationContext';
 import { FoundationExplorerModal } from './components/superpowers/FoundationExplorerModal';
 import { saveRelationalHistory } from './services/relationalDb';
@@ -1419,6 +1426,163 @@ export default function App() {
 
           {activeTab === 'lab' && (
             <InteractiveLearningLabView />
+          )}
+
+          {activeTab === 'syllabus' && (
+            <SyllabusTrackerView
+              onStartQuizOnTopic={(subj, top) => {
+                handleStartQuiz({
+                  app_name: 'Quiz Me!',
+                  quiz_title: `${subj} — ${top}`,
+                  summary: `Curriculum-aligned practice on ${top}`,
+                  difficulty: 'Intermediate',
+                  persona,
+                  questions: [
+                    {
+                      id: 1,
+                      type: 'multiple_choice',
+                      question: `Which verified principle underpins ${top}?`,
+                      options: [
+                        `Primary invariant relation in ${top}`,
+                        `Arbitrary empirical parameter`,
+                        `Discontinuous deviation state`,
+                        `External reference artifact`,
+                      ],
+                      correct_answer: `Primary invariant relation in ${top}`,
+                      explanation: `Deepening understanding of ${top} aligns with official examination standards.`,
+                      topic: top,
+                      difficulty: 'Intermediate',
+                      gamified_feedback: {
+                        success_quote: 'Syllabus mastery advancing!',
+                        hint: 'Focus on first principles.',
+                      },
+                    },
+                  ],
+                });
+              }}
+              onOpenNotesOnTopic={(subj, top) => {
+                setNotesInitialTopic(top);
+                setActiveTab('notes');
+              }}
+              onOpenFlashcardsOnTopic={(subj, top) => {
+                setActiveTab('flashcards');
+              }}
+            />
+          )}
+
+          {activeTab === 'written_examiner' && (
+            <WrittenAnswerExaminer
+              onSaveMistake={(m) => {
+                saveMistakeToNotebook({
+                  quizTitle: `${m.subject} Written Exam`,
+                  question: m.questionText,
+                  userAnswer: m.studentAnswer,
+                  correctAnswer: m.correctAnswer,
+                  explanation: m.explanation,
+                  subject: m.subject,
+                  topic: m.topic,
+                  misconceptionReason: 'Examiner mark scheme criteria & method review needed.',
+                });
+              }}
+              onOpenNotes={(subj, top) => {
+                setNotesInitialTopic(top);
+                setActiveTab('notes');
+              }}
+            />
+          )}
+
+          {activeTab === 'oral_exam' && (
+            <OralExaminationStudio
+              onOpenNotes={(subj, top) => {
+                setNotesInitialTopic(top);
+                setActiveTab('notes');
+              }}
+              onOpenMistakeNotebook={() => setActiveTab('mistakes')}
+            />
+          )}
+
+          {activeTab === 'dependency_graph' && (
+            <KnowledgeDependencyGraphView
+              onStartQuizOnTopic={(subj, top) => {
+                handleStartQuiz({
+                  app_name: 'Quiz Me!',
+                  quiz_title: `${subj} — ${top} Prerequisite Diagnostic`,
+                  summary: `Diagnostic assessment to verify foundational grasp of ${top}`,
+                  difficulty: 'Intermediate',
+                  persona,
+                  questions: [
+                    {
+                      id: 1,
+                      type: 'multiple_choice',
+                      question: `In ${subj}, which axiom forms the necessary prerequisite foundation for ${top}?`,
+                      options: [
+                        `Fundamental prerequisite axiom for ${top}`,
+                        `Secondary downstream corollary`,
+                        `External qualitative observation`,
+                        `Empirical approximation without proof`,
+                      ],
+                      correct_answer: `Fundamental prerequisite axiom for ${top}`,
+                      explanation: `Mastering this prerequisite unlocks higher-level concepts on the knowledge graph.`,
+                      topic: top,
+                      difficulty: 'Intermediate',
+                      gamified_feedback: {
+                        success_quote: 'Foundational gap repaired!',
+                        hint: 'Remember the core rule.',
+                      },
+                    },
+                  ],
+                });
+              }}
+              onOpenNotesOnTopic={(subj, top) => {
+                setNotesInitialTopic(top);
+                setActiveTab('notes');
+              }}
+            />
+          )}
+
+          {activeTab === 'classroom' && (
+            <ClassroomWorkspaceView
+              onLaunchAssignmentQuiz={(title, subj) => {
+                handleStartQuiz({
+                  app_name: 'Quiz Me!',
+                  quiz_title: title,
+                  summary: `Teacher assignment: ${title} (${subj})`,
+                  difficulty: 'Intermediate',
+                  persona,
+                  questions: [
+                    {
+                      id: 1,
+                      type: 'multiple_choice',
+                      question: `For this assignment on ${subj}, evaluate the primary condition governing the system:`,
+                      options: [
+                        `Standard equilibrium and conservation law`,
+                        `Perturbation without restoring force`,
+                        `Spontaneous divergence`,
+                        `Inconsistent boundary condition`,
+                      ],
+                      correct_answer: `Standard equilibrium and conservation law`,
+                      explanation: `Satisfying teacher rubric requirements and demonstrating structured reasoning.`,
+                      topic: subj,
+                      difficulty: 'Intermediate',
+                      gamified_feedback: {
+                        success_quote: 'Assignment submission registered!',
+                        hint: 'Verify units and steps.',
+                      },
+                    },
+                  ],
+                });
+              }}
+            />
+          )}
+
+          {activeTab === 'verification' && (
+            <QuestionIntelligenceView />
+          )}
+
+          {activeTab === 'timeline' && (
+            <LearningTimelineView
+              onNavigateTab={(tab) => setActiveTab(tab as any)}
+            />
           )}
 
           {activeTab === 'suggestions' && (

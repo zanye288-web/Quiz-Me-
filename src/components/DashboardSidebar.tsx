@@ -32,6 +32,12 @@ import {
   AlertTriangle,
   Camera,
   FlaskConical,
+  BookMarked,
+  FileEdit,
+  GitFork,
+  Mic,
+  ShieldCheck,
+  TrendingUp,
 } from 'lucide-react';
 import { PersonaType, UserStats as UserStatsType, QuizResponse } from '../types/quiz';
 import { useTheme } from '../context/ThemeContext';
@@ -68,7 +74,14 @@ export type DashboardTab =
   | 'mistakes'
   | 'planner'
   | 'scanner'
-  | 'lab';
+  | 'lab'
+  | 'syllabus'
+  | 'written_examiner'
+  | 'dependency_graph'
+  | 'classroom'
+  | 'oral_exam'
+  | 'verification'
+  | 'timeline';
 
 interface DashboardSidebarProps {
   activeTab: DashboardTab;
@@ -106,6 +119,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
 
   const [expandedGroups, setExpandedGroups] = React.useState<Record<string, boolean>>({
     'Play & Compete': true,
+    'Examiner & Curriculum': true,
     'Create & Study': true,
     'Player Rank & Career': true,
   });
@@ -129,6 +143,22 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           icon: GraduationCap,
           badge: 'WAEC/JAMB',
           description: 'Checkpoint, WAEC, JAMB, NECO, IGCSE, SAT & AP/IB mock exams',
+        },
+        {
+          id: 'written_examiner' as DashboardTab,
+          label: 'Written Answer Examiner',
+          shortLabel: 'Written Exam',
+          icon: FileEdit,
+          badge: 'CHIEF AI',
+          description: 'AI Chief Examiner marks written answers with mark schemes & OCR',
+        },
+        {
+          id: 'oral_exam' as DashboardTab,
+          label: 'AI Oral Exam (Viva Voce)',
+          shortLabel: 'Oral Exam',
+          icon: Mic,
+          badge: 'VOICE',
+          description: 'Defend your knowledge in a live verbal viva with the examiner',
         },
         {
           id: 'searcher' as DashboardTab,
@@ -173,8 +203,40 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       ],
     },
     {
-      title: 'Create & Study',
+      title: 'Examiner & Curriculum',
       items: [
+        {
+          id: 'syllabus' as DashboardTab,
+          label: 'Live Syllabus Tracker',
+          shortLabel: 'Syllabus',
+          icon: BookMarked,
+          badge: 'WAEC/CAIE',
+          description: 'Track official syllabuses, subtopic objectives & mastery',
+        },
+        {
+          id: 'dependency_graph' as DashboardTab,
+          label: 'Knowledge Dependency Graph',
+          shortLabel: 'Concept DAG',
+          icon: GitFork,
+          badge: 'GRAPH',
+          description: 'Interactive concept DAG to diagnose foundational prerequisite gaps',
+        },
+        {
+          id: 'classroom' as DashboardTab,
+          label: 'Classroom & Teacher',
+          shortLabel: 'Classroom',
+          icon: Users,
+          badge: 'ASSIGN',
+          description: 'Create rooms, invite students with codes, and track submissions',
+        },
+        {
+          id: 'verification' as DashboardTab,
+          label: 'Question Quality & Verification',
+          shortLabel: 'QC Audit',
+          icon: ShieldCheck,
+          badge: 'QC',
+          description: 'Audit questions for ambiguity, mark schemes & Bloom taxonomy',
+        },
         {
           id: 'intelligence' as DashboardTab,
           label: 'Learning Intelligence',
@@ -199,6 +261,11 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           badge: 'SCHEDULE',
           description: 'Personalized exam countdown, spaced revision & daily timetable',
         },
+      ],
+    },
+    {
+      title: 'Create & Study',
+      items: [
         {
           id: 'scanner' as DashboardTab,
           label: 'Worksheet Scanner',
@@ -267,6 +334,14 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           icon: Trophy,
           badge: 'GLOBAL',
           description: 'Global Scholars Leaderboard by XP & quiz mastery across schools & regions',
+        },
+        {
+          id: 'timeline' as DashboardTab,
+          label: 'Learning Timeline',
+          shortLabel: 'Timeline',
+          icon: TrendingUp,
+          badge: 'HISTORY',
+          description: 'Visual chronological log of examinations, vivas & milestones',
         },
         {
           id: 'achievements' as DashboardTab,
