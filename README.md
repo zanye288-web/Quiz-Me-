@@ -65,6 +65,42 @@ Keep real credentials in local environment files or your deployment provider's s
 
 Firebase and any optional database services must also be configured with the credentials and settings required by the relevant parts of the application. Do not use production credentials for local testing.
 
+### Connect a Supabase (PostgreSQL) database
+
+The server's relational features (profiles, quizzes, history, leaderboard) use PostgreSQL through Drizzle ORM. Supabase works as a hosted PostgreSQL database; Firebase Authentication and Firestore are unchanged.
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. In **Project Settings → Database → Connection string**, copy the **Session pooler** string (host `aws-0-<region>.pooler.supabase.com`, user `postgres.<project-ref>`). Prefer it over the direct connection, which is IPv6-only on many plans.
+3. Add these to your `.env` (and your host's secret manager):
+
+   ```env
+   DATABASE_URL="postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres"
+   SQL_SSL="true"
+   ```
+
+   Alternatively, set `SQL_HOST`, `SQL_PORT`, `SQL_USER`, `SQL_PASSWORD`, `SQL_DB_NAME` (plus `SQL_ADMIN_USER` and `SQL_ADMIN_PASSWORD` for migrations). See `.env.example`.
+4. Create the tables from the Drizzle schema:
+
+   ```bash
+   npx drizzle-kit push --config src/db/drizzle.config.ts
+   ```
+
+   Run this against the Session pooler or direct connection, not the Transaction pooler (port 6543).
+5. Lock the tables down. Supabase exposes `public` tables through its REST API, and tables created by Drizzle have row-level security off. The app only reaches the database through the Express server, so enable RLS with no policies by running this in the Supabase SQL editor:
+
+   ```sql
+   alter table users enable row level security;
+   alter table quizzes enable row level security;
+   alter table quiz_history enable row level security;
+   alter table quiz_likes enable row level security;
+   alter table quiz_saves enable row level security;
+   alter table quiz_comments enable row level security;
+   alter table favorites enable row level security;
+   alter table followed_creators enable row level security;
+   ```
+
+   The server connects as the Postgres role, which bypasses RLS, so the app keeps working.
+
 ### Run locally
 
 ```bash
