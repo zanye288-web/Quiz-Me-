@@ -643,7 +643,7 @@ export default function App() {
               correctAnswer: matchedQ.correct_answer,
               explanation: matchedQ.explanation || 'Verified conceptual answer rationale.',
               misconceptionReason: `Selected "${ans.userAnswer}" instead of "${matchedQ.correct_answer}".`,
-              options: matchedQ.options,
+              options: matchedQ.options ?? undefined,
             });
           }
         }

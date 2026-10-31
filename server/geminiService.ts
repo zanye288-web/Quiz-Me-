@@ -2331,9 +2331,9 @@ export async function generateStudyRecommendationsAI(input: StudyRecommendations
     const uniqueFailedTopics = Array.from(new Set(failedTopics)).filter(Boolean).slice(0, 4);
     const uniquePassedTopics = Array.from(new Set(passedTopics)).filter(Boolean).slice(0, 4);
 
-    const videos = [];
-    const websites = [];
-    const documents = [];
+    const videos: any[] = [];
+    const websites: any[] = [];
+    const documents: any[] = [];
 
     // Remedial resources for failed questions
     input.failedQuestions.slice(0, 4).forEach((q, idx) => {

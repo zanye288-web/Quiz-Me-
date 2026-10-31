@@ -3,8 +3,8 @@ import { UserStats, QuizResponse } from '../types/quiz';
 import { QuizHistoryRecord } from '../components/HistoryView';
 import { SavedQuizDocument, UserProfileDocument, QuizComment } from './firestore';
 
-async function getAuthHeader(): Promise<HeadersInit> {
-  const headers: HeadersInit = {
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
   const user = auth.currentUser;

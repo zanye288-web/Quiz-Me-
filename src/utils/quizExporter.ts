@@ -241,7 +241,7 @@ export function downloadQuizDocFile(quiz: QuizResponse, includeAnswers = true, f
       <h1>${escapeHtml(quiz.quiz_title)}</h1>
       <div class="header-meta">
         <strong>Date:</strong> ${dateStr} &nbsp;|&nbsp;
-        <strong>Difficulty:</strong> ${escapeHtml(quiz.difficulty)} &nbsp;|&nbsp;
+        <strong>Difficulty:</strong> ${escapeHtml(quiz.difficulty ?? 'Not specified')} &nbsp;|&nbsp;
         <strong>Total Questions:</strong> ${quiz.questions.length} &nbsp;|&nbsp;
         <strong>Platform:</strong> Quiz Me! Assessment Engine
       </div>
