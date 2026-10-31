@@ -85,6 +85,14 @@ import { MathematicsSandboxModal } from './components/superpowers/MathematicsSan
 import { ExamSimulationSuiteModal } from './components/superpowers/ExamSimulationSuiteModal';
 import { CandidateWellnessModal } from './components/superpowers/CandidateWellnessModal';
 import { MnemonicsMemoryVaultModal } from './components/superpowers/MnemonicsMemoryVaultModal';
+import { LearningIntelligenceHubView } from './components/LearningIntelligenceHubView';
+import { MistakeNotebookView, saveMistakeToNotebook } from './components/MistakeNotebookView';
+import { AdaptiveStudyPlannerView } from './components/AdaptiveStudyPlannerView';
+import { SmartWorksheetScannerView } from './components/SmartWorksheetScannerView';
+import { InteractiveLearningLabView } from './components/InteractiveLearningLabView';
+import { FoundationProvider } from './context/FoundationContext';
+import { FoundationExplorerModal } from './components/superpowers/FoundationExplorerModal';
+import { saveRelationalHistory } from './services/relationalDb';
 
 const STATS_STORAGE_KEY = 'quizme_assessment_stats_v3_revamped';
 const CONFIG_STORAGE_KEY = 'quizme_assessment_config_v1';
@@ -114,6 +122,7 @@ export default function App() {
   const [isLevelRoadmapOpen, setIsLevelRoadmapOpen] = useState<boolean>(false);
   const [isOptionalOnboarding, setIsOptionalOnboarding] = useState<boolean>(false);
   const [hasPromptedProfile, setHasPromptedProfile] = useState<boolean>(false);
+  const [isFoundationExplorerOpen, setIsFoundationExplorerOpen] = useState<boolean>(false);
   const [isStarterTutorialOpen, setIsStarterTutorialOpen] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(STARTER_TUTORIAL_STORAGE_KEY) !== 'true';
@@ -609,11 +618,38 @@ export default function App() {
 
     setHistoryRecords((prev) => [newRecord, ...prev]);
 
-    // Save to Firestore
+    // Save to Firestore & PostgreSQL Cloud SQL
     if (user) {
       saveQuizHistoryToFirestore(user.uid, newRecord).catch((err) => {
         console.error('Error saving quiz history to Firestore:', err);
       });
+      saveRelationalHistory(newRecord).catch((err) => {
+        console.warn('Notice saving history to Cloud SQL:', err);
+      });
+    }
+
+    // Auto-save incorrect answers to Mistake Notebook for targeted remediation
+    try {
+      results.answers.forEach((ans) => {
+        if (!ans.isCorrect && ans.userAnswer && ans.userAnswer !== '(Time Expired)') {
+          const matchedQ = results.quiz.questions?.find((q) => q.id === ans.questionId);
+          if (matchedQ) {
+            saveMistakeToNotebook({
+              quizTitle: results.quiz.quiz_title,
+              subject: results.quiz.tags?.[0] || 'General Studies',
+              topic: matchedQ.topic || results.quiz.quiz_title,
+              question: matchedQ.question,
+              userAnswer: ans.userAnswer,
+              correctAnswer: matchedQ.correct_answer,
+              explanation: matchedQ.explanation || 'Verified conceptual answer rationale.',
+              misconceptionReason: `Selected "${ans.userAnswer}" instead of "${matchedQ.correct_answer}".`,
+              options: matchedQ.options,
+            });
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('Notice auto-saving mistakes to notebook:', e);
     }
 
     // Check pre-existing badge statuses
@@ -855,10 +891,11 @@ export default function App() {
   }
 
   return (
-    <div className="relative h-screen atelier-canvas-bg text-slate-900 dark:text-slate-100 flex flex-row transition-colors duration-200 antialiased selection:bg-violet-600 selection:text-white overflow-hidden">
-      {/* Interactive Particle Visual Effects & RTX Ray-Traced Lighting Layers */}
-      <ParticleBackgroundCanvas />
-      <RtxLightingOverlay />
+    <FoundationProvider>
+      <div className="relative h-screen atelier-canvas-bg text-slate-900 dark:text-slate-100 flex flex-row transition-colors duration-200 antialiased selection:bg-violet-600 selection:text-white overflow-hidden">
+        {/* Interactive Particle Visual Effects & RTX Ray-Traced Lighting Layers */}
+        <ParticleBackgroundCanvas />
+        <RtxLightingOverlay />
 
       {/* Vibrant Aurora Ambient Illumination */}
       {ambientOrbsEnabled && (
@@ -1254,6 +1291,134 @@ export default function App() {
                 handleInspectRawJson(customQuiz);
               }}
             />
+          )}
+
+          {activeTab === 'intelligence' && (
+            <LearningIntelligenceHubView
+              stats={stats}
+              history={historyRecords}
+              onStartTargetedPractice={(topic, subject) => {
+                soundFx.playClick();
+                handleStartQuiz({
+                  app_name: 'Quiz Me!',
+                  quiz_title: `${subject}: ${topic} Remediation`,
+                  summary: `Targeted diagnostic practice on ${topic}`,
+                  difficulty: 'Intermediate',
+                  persona,
+                  questions: [
+                    {
+                      id: 1,
+                      type: 'multiple_choice',
+                      question: `Explain the fundamental scientific or mathematical axiom underlying ${topic}.`,
+                      options: [
+                        `First-order conservation principle applicable to ${topic}`,
+                        `Empirical inverse variance relationship`,
+                        `Equilibrium balancing criterion`,
+                        `Limiting rate boundary constraint`,
+                      ],
+                      correct_answer: `First-order conservation principle applicable to ${topic}`,
+                      explanation: `In ${subject}, ${topic} is founded upon first-principles balancing laws.`,
+                      topic,
+                      difficulty: 'Intermediate',
+                      gamified_feedback: {
+                        success_quote: 'Concept reinforced!',
+                        hint: 'Think from first principles.',
+                      },
+                    },
+                  ],
+                  tags: [subject, topic, 'Adaptive Practice'],
+                });
+              }}
+              onOpenNotesForTopic={(topic) => {
+                setNotesInitialTopic(topic);
+                setActiveTab('notes');
+              }}
+              onOpenMistakeNotebook={() => setActiveTab('mistakes')}
+              onAskTutorTopic={(topic) => {
+                handleOpenTutor({
+                  id: 1001,
+                  type: 'multiple_choice',
+                  question: `How does the core concept of ${topic} work? Can you guide me through it Socratically?`,
+                  correct_answer: `Fundamental concept of ${topic}`,
+                  explanation: `Mastery breakdown for ${topic}`,
+                  topic,
+                  gamified_feedback: {
+                    success_quote: 'Great inquiry!',
+                    hint: 'Observe the foundational definition.',
+                  },
+                });
+              }}
+            />
+          )}
+
+          {activeTab === 'mistakes' && (
+            <MistakeNotebookView
+              onPracticeQuiz={handleStartQuiz}
+              onOpenNotesForTopic={(topic) => {
+                setNotesInitialTopic(topic);
+                setActiveTab('notes');
+              }}
+              onAskTutor={handleOpenTutor}
+            />
+          )}
+
+          {activeTab === 'planner' && (
+            <AdaptiveStudyPlannerView
+              stats={stats}
+              history={historyRecords}
+              onStartActivity={(item) => {
+                if (item.type === 'notes_study') {
+                  setNotesInitialTopic(item.topic);
+                  setActiveTab('notes');
+                } else if (item.type === 'mistake_remediation') {
+                  setActiveTab('mistakes');
+                } else {
+                  handleStartQuiz({
+                    app_name: 'Quiz Me!',
+                    quiz_title: `${item.subject} — ${item.topic}`,
+                    summary: `Scheduled spaced revision session (${item.durationMinutes} min)`,
+                    difficulty: 'Intermediate',
+                    persona,
+                    questions: [
+                      {
+                        id: 1,
+                        type: 'multiple_choice',
+                        question: `Which statement represents the core verified rule for ${item.topic}?`,
+                        options: [
+                          `Fundamental invariant relationship for ${item.topic}`,
+                          `Arbitrary constant variation`,
+                          `Discontinuous step function`,
+                          `Null hypothesis condition`,
+                        ],
+                        correct_answer: `Fundamental invariant relationship for ${item.topic}`,
+                        explanation: `Reviewing ${item.topic} reinforces retrieval pathways in long-term memory.`,
+                        topic: item.topic,
+                        difficulty: 'Intermediate',
+                        gamified_feedback: {
+                          success_quote: 'Spaced recall achieved!',
+                          hint: 'Connect to prior knowledge.',
+                        },
+                      },
+                    ],
+                  });
+                }
+              }}
+            />
+          )}
+
+          {activeTab === 'scanner' && (
+            <SmartWorksheetScannerView
+              onStartQuizWithQuestions={handleStartQuiz}
+              onGenerateNotesFromText={(title) => {
+                setNotesInitialTopic(title);
+                setActiveTab('notes');
+              }}
+              onExportWorksheet={(q) => setWorksheetQuiz(q)}
+            />
+          )}
+
+          {activeTab === 'lab' && (
+            <InteractiveLearningLabView />
           )}
 
           {activeTab === 'suggestions' && (
@@ -1769,6 +1934,7 @@ export default function App() {
           onOpenExamSim={() => setIsExamSimOpen(true)}
           onOpenWellness={() => setIsWellnessOpen(true)}
           onOpenMnemonics={() => setIsMnemonicsOpen(true)}
+          onOpenFoundation={() => setIsFoundationExplorerOpen(true)}
         />
       )}
 
@@ -1835,8 +2001,15 @@ export default function App() {
         onClose={() => setIsMnemonicsOpen(false)}
       />
 
+      {/* Foundation Explorer Modal */}
+      <FoundationExplorerModal
+        isOpen={isFoundationExplorerOpen}
+        onClose={() => setIsFoundationExplorerOpen(false)}
+      />
+
       {/* Global Pomodoro Study Overlay */}
       <PomodoroTimerOverlay />
-    </div>
+      </div>
+    </FoundationProvider>
   );
 }

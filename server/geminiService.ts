@@ -4395,6 +4395,143 @@ Return JSON with word (UPPERCASE), definition (1 concise sentence), and detailed
   }
 }
 
+export interface ScannedQuestionItem {
+  id: number;
+  questionNumber?: string;
+  question: string;
+  mathFormulas?: string[];
+  questionType: 'multiple_choice' | 'open_ended' | 'fill_blank';
+  options?: string[];
+  correctAnswer?: string;
+  explanation?: string;
+  confidence: 'high' | 'medium' | 'uncertain';
+  notes: string;
+}
+
+export interface WorksheetScanResult {
+  title: string;
+  subject: string;
+  detectedTopic: string;
+  confidenceScore: number;
+  rawTextPreview: string;
+  extractedQuestions: ScannedQuestionItem[];
+  extractionNotes: string[];
+}
+
+export async function scanWorksheetAI(params: {
+  imageBase64?: string;
+  mimeType?: string;
+  textSnippet?: string;
+  fileName?: string;
+}): Promise<WorksheetScanResult> {
+  const parts: any[] = [];
+
+  if (params.imageBase64 && params.mimeType) {
+    const cleanBase64 = params.imageBase64.includes(',')
+      ? params.imageBase64.split(',')[1]
+      : params.imageBase64;
+    parts.push({
+      inlineData: {
+        data: cleanBase64,
+        mimeType: params.mimeType,
+      },
+    });
+  }
+
+  const instructions = `You are an expert OCR & Educational Assessment Extraction AI for Quiz Me!.
+Your task is to analyze the provided worksheet/exam image or document and perform high-fidelity extraction of questions.
+
+STRICT ACCURACY RULES:
+1. Preserve exact wording of questions, formulas, equations (format in clean LaTeX or standard Unicode like x^2, \\frac{a}{b}, H2O).
+2. Never invent questions or claim high confidence on unreadable/blurry text. If handwriting is illegible, mark confidence as "uncertain".
+3. Identify question numbers (e.g. "1a", "2", "Question 5").
+4. Extract options for multiple choice questions (A, B, C, D).
+5. If answers or mark schemes are visible, extract the correct answer and brief rationale.
+6. Categorize subject (e.g. Mathematics, Physics, Chemistry, Biology, History, English, Economics) and specific subtopic.
+
+Return a structured JSON document with:
+- title: concise title for this worksheet
+- subject: broad subject
+- detectedTopic: specific curriculum topic
+- confidenceScore: integer 0-100 indicating overall extraction confidence
+- rawTextPreview: summary of what was visible
+- extractedQuestions: array of questions with { id, questionNumber, question, mathFormulas, questionType ('multiple_choice' | 'open_ended' | 'fill_blank'), options (array of strings if MC), correctAnswer, explanation, confidence ('high' | 'medium' | 'uncertain'), notes }
+- extractionNotes: array of strings noting any ambiguities or blurry sections for the student to review.
+${params.textSnippet ? `\nAccompanying Text Context:\n${params.textSnippet.slice(0, 4000)}` : ''}`;
+
+  parts.push({ text: instructions });
+
+  try {
+    const response = await callGeminiWithFallback({
+      contents: parts,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            subject: { type: Type.STRING },
+            detectedTopic: { type: Type.STRING },
+            confidenceScore: { type: Type.INTEGER },
+            rawTextPreview: { type: Type.STRING },
+            extractedQuestions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.INTEGER },
+                  questionNumber: { type: Type.STRING },
+                  question: { type: Type.STRING },
+                  mathFormulas: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  questionType: { type: Type.STRING },
+                  options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  correctAnswer: { type: Type.STRING },
+                  explanation: { type: Type.STRING },
+                  confidence: { type: Type.STRING },
+                  notes: { type: Type.STRING },
+                },
+                required: ['id', 'question', 'questionType', 'confidence'],
+              },
+            },
+            extractionNotes: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ['title', 'subject', 'detectedTopic', 'confidenceScore', 'extractedQuestions'],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || '{}');
+    return {
+      title: parsed.title || params.fileName || 'Scanned Exam Worksheet',
+      subject: parsed.subject || 'General Studies',
+      detectedTopic: parsed.detectedTopic || 'Exam Practice',
+      confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 88,
+      rawTextPreview: parsed.rawTextPreview || 'Worksheet extraction completed.',
+      extractedQuestions: Array.isArray(parsed.extractedQuestions)
+        ? parsed.extractedQuestions.map((q: any, i: number) => ({
+            id: q.id || i + 1,
+            questionNumber: q.questionNumber || `${i + 1}`,
+            question: String(q.question || `Extracted Item ${i + 1}`),
+            mathFormulas: Array.isArray(q.mathFormulas) ? q.mathFormulas : [],
+            questionType: ['multiple_choice', 'open_ended', 'fill_blank'].includes(q.questionType)
+              ? q.questionType
+              : 'multiple_choice',
+            options: Array.isArray(q.options) && q.options.length > 0 ? q.options : undefined,
+            correctAnswer: q.correctAnswer ? String(q.correctAnswer) : undefined,
+            explanation: q.explanation ? String(q.explanation) : undefined,
+            confidence: ['high', 'medium', 'uncertain'].includes(q.confidence) ? q.confidence : 'medium',
+            notes: String(q.notes || ''),
+          }))
+        : [],
+      extractionNotes: Array.isArray(parsed.extractionNotes) ? parsed.extractionNotes : [],
+    };
+  } catch (err: any) {
+    console.error('Worksheet scan AI error:', err);
+    throw new Error('Failed to scan worksheet: ' + (err.message || String(err)));
+  }
+}
+
+
 
 
 

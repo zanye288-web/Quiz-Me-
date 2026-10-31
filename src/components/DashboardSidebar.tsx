@@ -27,6 +27,11 @@ import {
   Search,
   Gamepad2,
   FolderDown,
+  Brain,
+  Calendar,
+  AlertTriangle,
+  Camera,
+  FlaskConical,
 } from 'lucide-react';
 import { PersonaType, UserStats as UserStatsType, QuizResponse } from '../types/quiz';
 import { useTheme } from '../context/ThemeContext';
@@ -37,7 +42,33 @@ import { UserAvatar } from './UserAvatar';
 import { MascotAvatar } from './MascotAvatar';
 import { AppLogo } from './AppLogo';
 
-export type DashboardTab = 'studio' | 'exam' | 'past_papers' | 'searcher' | 'games' | 'notes' | 'gamma' | 'flashcards' | 'curricula' | 'community' | 'live' | 'music' | 'authoring' | 'suggestions' | 'leaderboard' | 'achievements' | 'analytics' | 'history' | 'settings' | 'runner' | 'complete';
+export type DashboardTab =
+  | 'studio'
+  | 'exam'
+  | 'past_papers'
+  | 'searcher'
+  | 'games'
+  | 'notes'
+  | 'gamma'
+  | 'flashcards'
+  | 'curricula'
+  | 'community'
+  | 'live'
+  | 'music'
+  | 'authoring'
+  | 'suggestions'
+  | 'leaderboard'
+  | 'achievements'
+  | 'analytics'
+  | 'history'
+  | 'settings'
+  | 'runner'
+  | 'complete'
+  | 'intelligence'
+  | 'mistakes'
+  | 'planner'
+  | 'scanner'
+  | 'lab';
 
 interface DashboardSidebarProps {
   activeTab: DashboardTab;
@@ -144,6 +175,46 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     {
       title: 'Create & Study',
       items: [
+        {
+          id: 'intelligence' as DashboardTab,
+          label: 'Learning Intelligence',
+          shortLabel: 'Intelligence',
+          icon: Brain,
+          badge: 'AI MAP',
+          description: 'Adaptive mastery loop, knowledge graph & gap diagnostics',
+        },
+        {
+          id: 'mistakes' as DashboardTab,
+          label: 'Mistake Notebook',
+          shortLabel: 'Mistakes',
+          icon: AlertTriangle,
+          badge: 'GAPS',
+          description: 'Review saved missed questions, inspect misconceptions & retry',
+        },
+        {
+          id: 'planner' as DashboardTab,
+          label: 'Adaptive Planner',
+          shortLabel: 'Planner',
+          icon: Calendar,
+          badge: 'SCHEDULE',
+          description: 'Personalized exam countdown, spaced revision & daily timetable',
+        },
+        {
+          id: 'scanner' as DashboardTab,
+          label: 'Worksheet Scanner',
+          shortLabel: 'Scanner',
+          icon: Camera,
+          badge: 'OCR',
+          description: 'Photograph worksheets or exam papers and extract into interactive quizzes',
+        },
+        {
+          id: 'lab' as DashboardTab,
+          label: 'Interactive STEM Lab',
+          shortLabel: 'Lab',
+          icon: FlaskConical,
+          badge: 'SIMS',
+          description: 'Physics kinematics, Chemistry titration, Biology osmosis & Math grapher',
+        },
         {
           id: 'past_papers' as DashboardTab,
           label: 'Past Papers Hub',

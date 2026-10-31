@@ -20,7 +20,10 @@ import {
   organizeExamWithMarkSchemeAI,
   validateWordChainAI,
   generateAiWordChainTurnAI,
+  scanWorksheetAI,
 } from './geminiService';
+import { requireAuth, optionalAuth, AuthRequest } from '../src/middleware/auth.ts';
+import * as dbRepo from '../src/db/repository.ts';
 import { searchAllImages, searchWebImages, searchWikimediaImages } from './imageService';
 import { resolveThematicVisual, THEMATIC_VISUAL_ASSETS } from '../src/utils/thematicImages';
 import { synthesizeGoogleCloudSpeech } from './ttsService';
@@ -1485,6 +1488,263 @@ apiRouter.post('/oer/convert-to-paper', aiGenerationRateLimiter, async (req: Req
     });
   }
 });
+
+// ============================================================================
+// SMART WORKSHEET & EXAM OCR SCANNER
+// ============================================================================
+apiRouter.post('/scan-worksheet', aiGenerationRateLimiter, async (req: Request, res: Response) => {
+  try {
+    const { imageBase64, mimeType, textSnippet, fileName } = req.body || {};
+    if (!imageBase64 && !textSnippet) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide either an image (photo/scan) or document text to scan.',
+      });
+    }
+
+    const result = await scanWorksheetAI({
+      imageBase64,
+      mimeType: mimeType || 'image/jpeg',
+      textSnippet: textSnippet ? sanitizeString(textSnippet, 10_000) : undefined,
+      fileName: fileName ? sanitizeString(fileName, 120) : undefined,
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: sanitizeErrorMessage(err, 'Failed to scan worksheet.'),
+    });
+  }
+});
+
+// ============================================================================
+// RELATIONAL DATABASE (POSTGRESQL / CLOUD SQL) DATA ENDPOINTS
+// ============================================================================
+
+// 1. User Profile
+apiRouter.get('/db/profile', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    const profile = await dbRepo.getOrCreateUser(
+      uid,
+      req.user?.email,
+      req.user?.name,
+      req.user?.picture
+    );
+    res.json({ success: true, profile });
+  } catch (err) {
+    console.error('Error in /api/db/profile GET:', err);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
+apiRouter.post('/db/profile', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    const updates = req.body || {};
+    const updated = await dbRepo.updateUserProfile(uid, updates);
+    res.json({ success: true, profile: updated });
+  } catch (err) {
+    console.error('Error in /api/db/profile POST:', err);
+    res.status(500).json({ error: 'Failed to update user profile' });
+  }
+});
+
+// 2. Global Leaderboard
+apiRouter.get('/db/leaderboard', async (_req: Request, res: Response) => {
+  try {
+    const leaders = await dbRepo.getLeaderboardUsers();
+    res.json({ success: true, leaders });
+  } catch (err) {
+    console.error('Error in /api/db/leaderboard:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
+// 3. Quizzes
+apiRouter.get('/db/quizzes', async (_req: Request, res: Response) => {
+  try {
+    const quizzesList = await dbRepo.getQuizzes();
+    res.json({ success: true, quizzes: quizzesList });
+  } catch (err) {
+    console.error('Error in /api/db/quizzes GET:', err);
+    res.status(500).json({ error: 'Failed to fetch quizzes' });
+  }
+});
+
+apiRouter.get('/db/quizzes/:id', async (req: Request, res: Response) => {
+  try {
+    const quiz = await dbRepo.getQuizById(req.params.id);
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+    res.json({ success: true, quiz });
+  } catch (err) {
+    console.error('Error in /api/db/quizzes/:id GET:', err);
+    res.status(500).json({ error: 'Failed to fetch quiz' });
+  }
+});
+
+apiRouter.post('/db/quizzes', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    const quizData = req.body;
+    const quizId = quizData.id || `quiz_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const created = await dbRepo.createQuiz({
+      ...quizData,
+      id: quizId,
+      creatorUid: uid,
+      creatorName: quizData.creatorName || req.user?.name || 'Scholar',
+    });
+    res.json({ success: true, quiz: created });
+  } catch (err) {
+    console.error('Error in /api/db/quizzes POST:', err);
+    res.status(500).json({ error: 'Failed to save quiz' });
+  }
+});
+
+apiRouter.delete('/db/quizzes/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    await dbRepo.deleteQuiz(req.params.id, uid);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error in /api/db/quizzes/:id DELETE:', err);
+    res.status(500).json({ error: 'Failed to delete quiz' });
+  }
+});
+
+// 4. Interactions: Likes, Saves, Comments
+apiRouter.post('/db/quizzes/:id/like', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    const isLiked = await dbRepo.toggleQuizLike(req.params.id, uid);
+    res.json({ success: true, isLiked });
+  } catch (err) {
+    console.error('Error in /api/db/quizzes/:id/like:', err);
+    res.status(500).json({ error: 'Failed to toggle quiz like' });
+  }
+});
+
+apiRouter.post('/db/quizzes/:id/save', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    const { quizTitle } = req.body || {};
+    const isSaved = await dbRepo.toggleQuizSave(req.params.id, uid, quizTitle);
+    res.json({ success: true, isSaved });
+  } catch (err) {
+    console.error('Error in /api/db/quizzes/:id/save:', err);
+    res.status(500).json({ error: 'Failed to toggle quiz save' });
+  }
+});
+
+apiRouter.get('/db/quizzes/:id/comments', async (req: Request, res: Response) => {
+  try {
+    const comments = await dbRepo.getQuizComments(req.params.id);
+    res.json({ success: true, comments });
+  } catch (err) {
+    console.error('Error in /api/db/quizzes/:id/comments GET:', err);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+apiRouter.post('/db/quizzes/:id/comments', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    const { content, authorName, authorRole, authorPhotoURL } = req.body || {};
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Content cannot be empty' });
+    }
+    const commentId = `comment_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const comment = await dbRepo.addQuizComment({
+      id: commentId,
+      quizId: req.params.id,
+      authorId: uid,
+      authorName: authorName || req.user?.name || 'Scholar',
+      authorRole: authorRole || 'Student',
+      authorPhotoURL: authorPhotoURL || req.user?.picture || null,
+      content: content.trim(),
+    });
+    res.json({ success: true, comment });
+  } catch (err) {
+    console.error('Error in /api/db/quizzes/:id/comments POST:', err);
+    res.status(500).json({ error: 'Failed to post comment' });
+  }
+});
+
+apiRouter.delete('/db/comments/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    await dbRepo.deleteQuizComment(req.params.id, uid);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error in /api/db/comments/:id DELETE:', err);
+    res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
+
+// 5. Quiz History
+apiRouter.get('/db/history', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    const historyList = await dbRepo.getUserQuizHistory(uid);
+    res.json({ success: true, history: historyList });
+  } catch (err) {
+    console.error('Error in /api/db/history GET:', err);
+    res.status(500).json({ error: 'Failed to fetch quiz history' });
+  }
+});
+
+apiRouter.post('/db/history', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    const record = req.body;
+    const historyId = record.id || `hist_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const saved = await dbRepo.saveQuizHistory({
+      ...record,
+      id: historyId,
+      userId: uid,
+    });
+    res.json({ success: true, record: saved });
+  } catch (err) {
+    console.error('Error in /api/db/history POST:', err);
+    res.status(500).json({ error: 'Failed to save quiz history' });
+  }
+});
+
+apiRouter.delete('/db/history/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    await dbRepo.deleteQuizHistory(req.params.id, uid);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error in /api/db/history/:id DELETE:', err);
+    res.status(500).json({ error: 'Failed to delete history record' });
+  }
+});
+
+apiRouter.delete('/db/history', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Unauthorized' });
+    await dbRepo.clearAllQuizHistory(uid);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error in /api/db/history DELETE all:', err);
+    res.status(500).json({ error: 'Failed to clear quiz history' });
+  }
+});
+
 
 
 

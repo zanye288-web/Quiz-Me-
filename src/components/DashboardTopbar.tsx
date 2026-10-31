@@ -28,12 +28,14 @@ import {
   Coins,
   ShieldCheck,
   Palette,
+  Compass,
 } from 'lucide-react';
 import { DashboardTab } from './DashboardSidebar';
 import { QuizResponse, UserStats, PersonaType } from '../types/quiz';
 import { useTheme, GRAPHICS_MODE_CATALOG, UI_THEME_CATALOG, UI_STYLE_CATALOG } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { usePomodoro } from '../context/PomodoroContext';
+import { useFoundation } from '../context/FoundationContext';
 import { soundFx } from '../utils/audio';
 import { UserAvatar } from './UserAvatar';
 import { AppLogo } from './AppLogo';
@@ -94,6 +96,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
     uiStyle,
     setUiStyle,
   } = useTheme();
+  const { isFoundationMode, toggleFoundationMode } = useFoundation();
   const [isGfxMenuOpen, setIsGfxMenuOpen] = React.useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = React.useState(false);
   const themeMenuRef = React.useRef<HTMLDivElement>(null);
@@ -473,6 +476,25 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
               <Search className="w-4 h-4" />
             </button>
           )}
+
+          {/* Foundation Tier Mode Toggle */}
+          <button
+            type="button"
+            onClick={toggleFoundationMode}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 sm:py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs whitespace-nowrap ${
+              isFoundationMode
+                ? 'bg-amber-500 text-white border-amber-500 shadow-amber-500/25 ring-2 ring-amber-500/20'
+                : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-amber-400'
+            }`}
+            title="Foundation Mode: When active, shows prerequisite axioms, first-principles derivations, and step-by-step scaffolding across all features"
+            aria-label="Toggle Foundation Mode"
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Foundation</span>
+            <span className="text-[10px] uppercase font-mono px-1 py-0.5 rounded bg-black/15 dark:bg-white/15 font-black">
+              {isFoundationMode ? 'ON' : 'OFF'}
+            </span>
+          </button>
 
           {/* UI Themes Studio Popover + Light/Dark Toggle */}
           <div ref={themeMenuRef} className="relative flex items-center gap-1.5">

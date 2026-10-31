@@ -18,6 +18,7 @@ import {
   Heart,
   Brain,
   Feather,
+  Compass,
 } from 'lucide-react';
 import { soundFx } from '../../utils/audio';
 
@@ -33,6 +34,7 @@ interface FloatingExamToolkitDockProps {
   onOpenExamSim?: () => void;
   onOpenWellness?: () => void;
   onOpenMnemonics?: () => void;
+  onOpenFoundation?: () => void;
 }
 
 export const FloatingExamToolkitDock: React.FC<FloatingExamToolkitDockProps> = ({
@@ -47,6 +49,7 @@ export const FloatingExamToolkitDock: React.FC<FloatingExamToolkitDockProps> = (
   onOpenExamSim,
   onOpenWellness,
   onOpenMnemonics,
+  onOpenFoundation,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -230,6 +233,24 @@ export const FloatingExamToolkitDock: React.FC<FloatingExamToolkitDockProps> = (
             >
               <Headphones className="w-4 h-4 text-violet-400" />
               <span>Podcast</span>
+            </button>
+
+            {/* Row 4: Foundation Anchor */}
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playSelect();
+                onOpenFoundation?.();
+                setIsExpanded(false);
+              }}
+              className="col-span-4 p-2 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-400/15 to-indigo-500/20 hover:from-amber-500/30 hover:to-indigo-500/30 border border-amber-400/40 flex items-center justify-center gap-2 text-xs text-amber-300 hover:text-white transition-all cursor-pointer font-bold shadow-xs"
+              title="First-Principles Foundation Explorer & Scaffolding Engine (Alt+0)"
+            >
+              <Compass className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>First-Principles Foundation Explorer</span>
+              <span className="text-[10px] bg-amber-400/30 px-1.5 py-0.5 rounded text-amber-200 border border-amber-400/40">
+                Alt+0
+              </span>
             </button>
           </div>
 

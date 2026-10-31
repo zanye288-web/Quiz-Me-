@@ -39,7 +39,9 @@ import {
   EyeOff,
   Scissors,
   ZoomIn,
+  Compass,
 } from 'lucide-react';
+import { useFoundation } from '../context/FoundationContext';
 import {
   Question,
   QuizResponse,
@@ -213,6 +215,10 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
   const [isGeneratingConcept, setIsGeneratingConcept] = useState<boolean>(false);
   const [showConceptCard, setShowConceptCard] = useState<boolean>(false);
   const [savedConceptToNotes, setSavedConceptToNotes] = useState<Record<number, boolean>>({});
+
+  // Foundation Mode (Cognitive Scaffolding & First Principles)
+  const { isFoundationMode, getFoundationScaffolding } = useFoundation();
+  const [showFoundationCard, setShowFoundationCard] = useState<boolean>(false);
 
   // Interleaving & Adaptive Difficulty (70-80% Target) States
   const [isInterleavedMode, setIsInterleavedMode] = useState<boolean>(
@@ -2981,29 +2987,48 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                   {currentQuestion.question}
                 </h3>
 
-                <button
-                  type="button"
-                  onClick={() => handleExplainConcept(currentQuestion)}
-                  disabled={isGeneratingConcept}
-                  className={`comic-panel-sm shrink-0 self-start inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    showConceptCard
-                      ? 'bg-amber-300 text-slate-950 border-2 border-slate-950'
-                      : 'bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 hover:from-indigo-500 hover:to-violet-500 text-white border-2 border-slate-950'
-                  }`}
-                  title="Call the AI Tutor to generate a simplified 'Explain this Concept' summary specific to this question"
-                >
-                  {isGeneratingConcept ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
-                      <span>Explaining Concept...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                      <span>{showConceptCard ? 'Hide Concept Summary' : 'Explain this Concept'}</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center gap-2 shrink-0 self-start flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundFx.playClick();
+                      setShowFoundationCard((prev) => !prev);
+                    }}
+                    className={`comic-panel-sm shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      showFoundationCard || isFoundationMode
+                        ? 'bg-amber-400 text-slate-950 border-2 border-slate-950 shadow-xs'
+                        : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border-2 border-slate-950 dark:border-slate-700 hover:bg-amber-50 dark:hover:bg-slate-700'
+                    }`}
+                    title="Inspect First-Principles Axiom, Prerequisite Rule & Thinking Ladder for this question"
+                  >
+                    <Compass className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>{showFoundationCard || isFoundationMode ? 'Foundation Active' : 'Foundation Anchor'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleExplainConcept(currentQuestion)}
+                    disabled={isGeneratingConcept}
+                    className={`comic-panel-sm shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                      showConceptCard
+                        ? 'bg-amber-300 text-slate-950 border-2 border-slate-950'
+                        : 'bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-600 hover:from-indigo-500 hover:to-violet-500 text-white border-2 border-slate-950'
+                    }`}
+                    title="Call the AI Tutor to generate a simplified 'Explain this Concept' summary specific to this question"
+                  >
+                    {isGeneratingConcept ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                        <span>Explaining Concept...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                        <span>{showConceptCard ? 'Hide Concept Summary' : 'Explain this Concept'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* AI Tutor 'Explain this Concept' Simplified Summary Panel */}
@@ -3149,6 +3174,93 @@ export const QuizRunner: React.FC<QuizRunnerProps> = ({
                   )}
                 </div>
               )}
+
+              {/* Universal Foundation Scaffolding Card */}
+              {(showFoundationCard || isFoundationMode) && (() => {
+                const currentScaffold = getFoundationScaffolding(currentQuestionTopic || quiz.quiz_title, currentQuestion.question);
+                return (
+                  <div className="comic-panel-sm rounded-2xl p-4 sm:p-5 bg-gradient-to-br from-amber-500/10 via-amber-50/50 dark:via-slate-900 to-indigo-500/10 border-2 border-amber-500/80 dark:border-amber-400/80 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-start justify-between gap-3 border-b border-amber-500/20 dark:border-amber-400/20 pb-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-amber-400 border border-slate-950 flex items-center justify-center shrink-0 shadow-xs">
+                          <Compass className="w-4 h-4 text-slate-950" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="comic-badge px-2 py-0.5 rounded bg-amber-400 text-slate-950 border border-slate-950 text-[10px] font-black uppercase tracking-wider">
+                              FIRST-PRINCIPLES FOUNDATION
+                            </span>
+                            <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                              {(currentScaffold.domain || 'FOUNDATIONS').toUpperCase()} • Level {currentScaffold.depthLevel || 1}
+                            </span>
+                          </div>
+                          <h4 className="font-black text-sm text-slate-900 dark:text-white mt-0.5">
+                            {currentScaffold.topic || currentQuestionTopic || 'Concept'}: {currentScaffold.prerequisiteRule}
+                          </h4>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowFoundationCard(false)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                        title="Hide Foundation Card"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div className="p-3 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-amber-300 dark:border-slate-700">
+                        <div className="font-black text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mb-1">
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>Core Axiom / Law:</span>
+                        </div>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 leading-relaxed">
+                          {currentScaffold.firstPrinciple || currentScaffold.prerequisiteRule}
+                        </p>
+                        {(currentScaffold.formula || currentScaffold.keyFormulaOrDiagram) && (
+                          <div className="mt-2 p-2 rounded-lg bg-amber-100/70 dark:bg-amber-950/40 font-mono font-bold text-amber-900 dark:text-amber-300 text-xs border border-amber-300/60 dark:border-amber-800/60">
+                            {currentScaffold.formula || currentScaffold.keyFormulaOrDiagram}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-rose-300 dark:border-slate-700">
+                        <div className="font-black text-rose-600 dark:text-rose-400 flex items-center gap-1.5 mb-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>Examiner Trap & Misconception:</span>
+                        </div>
+                        <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                          {currentScaffold.examinerTrap || currentScaffold.examinerTrapToAvoid}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Thinking Ladder Steps */}
+                    <div className="p-3 rounded-xl bg-white/90 dark:bg-slate-800/90 border border-amber-200 dark:border-slate-700">
+                      <div className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 mb-2 tracking-wide flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Scaffolded Thinking Ladder (Solve Step-by-Step):</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {(currentScaffold.scaffoldedSteps || currentScaffold.firstPrinciplesSteps || []).map((step, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-start gap-2 p-2 rounded-lg bg-amber-50/60 dark:bg-slate-900/60 border border-amber-200/60 dark:border-slate-800"
+                          >
+                            <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] flex items-center justify-center shrink-0">
+                              {idx + 1}
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-800 dark:text-slate-200 leading-snug">
+                              {step}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Question Contextual Image (with Spoiler Shield before answering & Zoom Lightbox) */}
               {currentQuestion.image_url && (
