@@ -2,6 +2,8 @@
 
 **Live website:** [quiz-me.ai.studio](https://quiz-me.ai.studio)
 
+**Project updates:** [View the update log](./CHANGELOG.md)
+
 
 **Quiz-Me!** is an AI-powered learning and examination-preparation platform built to help students create assessments, practise, understand difficult topics, and track their learning progress.
 
