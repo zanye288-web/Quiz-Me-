@@ -31,6 +31,7 @@ import { searchAllImages, searchWebImages, searchWikimediaImages } from './image
 import { resolveThematicVisual, THEMATIC_VISUAL_ASSETS } from '../src/utils/thematicImages';
 import { synthesizeGoogleCloudSpeech } from './ttsService';
 import { searchOpenAccessLibrary, convertOerToExamPaperAI } from './oerService';
+import { getSupabaseServerStatus, getSupabaseSqlDdlSchema } from './supabaseService.ts';
 import {
   securityHeadersMiddleware,
   aiGenerationRateLimiter,
@@ -1865,6 +1866,21 @@ apiRouter.post('/examiner/audit-question', aiGenerationRateLimiter, async (req: 
     });
   }
 });
+
+// ============================================================================
+// SUPABASE / POSTGRESQL HYBRID MANAGEMENT ENDPOINTS
+// ============================================================================
+
+apiRouter.get('/supabase/status', (_req: Request, res: Response) => {
+  const status = getSupabaseServerStatus();
+  res.json({ success: true, status });
+});
+
+apiRouter.get('/supabase/schema', (_req: Request, res: Response) => {
+  const schemaSql = getSupabaseSqlDdlSchema();
+  res.json({ success: true, schemaSql });
+});
+
 
 
 

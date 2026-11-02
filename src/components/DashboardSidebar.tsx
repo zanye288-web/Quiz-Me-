@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Flame,
   Award,
+  Crown,
   GraduationCap,
   Trophy,
   Upload,
@@ -81,7 +82,8 @@ export type DashboardTab =
   | 'classroom'
   | 'oral_exam'
   | 'verification'
-  | 'timeline';
+  | 'timeline'
+  | 'ascension';
 
 interface DashboardSidebarProps {
   activeTab: DashboardTab;
@@ -327,6 +329,14 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     {
       title: 'Player Rank & Career',
       items: [
+        {
+          id: 'ascension' as DashboardTab,
+          label: 'Project Ascension',
+          shortLabel: 'Ascension',
+          icon: Crown,
+          badge: 'RPG ENGINE',
+          description: 'RPG progression, Academic Ranks, Skill Trees, Quests & Titles',
+        },
         {
           id: 'leaderboard' as DashboardTab,
           label: 'Scholars Leaderboard',

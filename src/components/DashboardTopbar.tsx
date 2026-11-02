@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Palette,
   Compass,
+  Database,
 } from 'lucide-react';
 import { DashboardTab } from './DashboardSidebar';
 import { QuizResponse, UserStats, PersonaType } from '../types/quiz';
@@ -55,6 +56,7 @@ interface DashboardTopbarProps {
   onOpenProfileModal?: () => void;
   onOpenLevelRoadmap?: () => void;
   onOpenUploadQuiz?: () => void;
+  onOpenSupabaseModal?: () => void;
   activeQuiz: QuizResponse | null;
   stats: UserStats;
   soundEnabled: boolean;
@@ -80,6 +82,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
   onToggleSound,
   persona,
   onPersonaChange,
+  onOpenSupabaseModal,
 }) => {
   const {
     resolvedTheme,
@@ -424,11 +427,10 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
             type="button"
             onClick={() => {
               soundFx.playClick();
-              if (onOpenLevelRoadmap) onOpenLevelRoadmap();
-              else onSelectTab('analytics');
+              onSelectTab('ascension');
             }}
-            className="comic-panel-sm pattern-stripes-amber arcade-btn hidden md:flex items-center gap-2.5 px-3 py-1.5 rounded-2xl bg-amber-50/90 dark:bg-slate-900 transition-all cursor-pointer whitespace-nowrap"
-            title={`Lv.${lvlProg.level} ${lvlProg.rank.title} • ${stats.xp.toLocaleString()} XP • Click for Player Rewards & Rank Roadmap`}
+            className="comic-panel-sm pattern-stripes-amber arcade-btn flex items-center gap-1.5 sm:gap-2.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl bg-amber-50/90 dark:bg-slate-900 transition-all cursor-pointer whitespace-nowrap min-h-[36px]"
+            title={`Project Ascension • Lv.${lvlProg.level} ${lvlProg.rank.title} • ${stats.xp.toLocaleString()} XP • Click for RPG Progression, Skill Trees & Quests`}
           >
             <span className="flex items-center gap-1 text-xs font-black text-orange-600 dark:text-orange-400">
               <span>🔥</span>
@@ -495,6 +497,24 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
               {isFoundationMode ? 'ON' : 'OFF'}
             </span>
           </button>
+
+          {/* Supabase & Relational Database Engine Indicator */}
+          {onOpenSupabaseModal && (
+            <button
+              type="button"
+              onClick={() => {
+                soundFx.playClick();
+                onOpenSupabaseModal();
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-bold transition-all cursor-pointer shadow-2xs whitespace-nowrap"
+              title="Supabase & Relational Database Architecture: Inspect connection status, tables, and copy SQL DDL"
+              aria-label="Open Supabase Database Panel"
+            >
+              <Database className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="hidden xl:inline">Supabase</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500" title="PostgreSQL Engine Connected" />
+            </button>
+          )}
 
           {/* UI Themes Studio Popover + Light/Dark Toggle */}
           <div ref={themeMenuRef} className="relative flex items-center gap-1.5">

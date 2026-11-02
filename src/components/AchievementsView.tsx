@@ -351,6 +351,19 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 <span>5 Prestige Tiers • Click Any Unlocked Trophy to Celebrate</span>
               </span>
+              {onSelectTab && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundFx.playClick();
+                    onSelectTab('ascension');
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 hover:opacity-95 cursor-pointer shadow-md transition-all"
+                >
+                  <Crown className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Launch Project Ascension (RPG Hub)</span>
+                </button>
+              )}
             </div>
 
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight drop-shadow-xs">

@@ -99,7 +99,11 @@ import { QuestionIntelligenceView } from './components/QuestionIntelligenceView'
 import { LearningTimelineView } from './components/LearningTimelineView';
 import { FoundationProvider } from './context/FoundationContext';
 import { FoundationExplorerModal } from './components/superpowers/FoundationExplorerModal';
+import { SupabaseSyncModal } from './components/SupabaseSyncModal';
 import { saveRelationalHistory } from './services/relationalDb';
+import { AscensionDashboardView } from './components/ascension/AscensionDashboardView';
+import { recordProgressionEvent } from './services/ascensionEngine';
+import { subscribeRealtimeProgression } from './services/supabaseService';
 
 const STATS_STORAGE_KEY = 'quizme_assessment_stats_v3_revamped';
 const CONFIG_STORAGE_KEY = 'quizme_assessment_config_v1';
@@ -277,6 +281,7 @@ export default function App() {
   const [isExamSimOpen, setIsExamSimOpen] = useState<boolean>(false);
   const [isWellnessOpen, setIsWellnessOpen] = useState<boolean>(false);
   const [isMnemonicsOpen, setIsMnemonicsOpen] = useState<boolean>(false);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState<boolean>(false);
 
   // Global Keyboard Shortcuts (Cmd+K / Ctrl+K, ?)
   useEffect(() => {
@@ -506,6 +511,24 @@ export default function App() {
     };
   }, []);
 
+  // Supabase Real-Time Cross-Session Progression Synchronization
+  useEffect(() => {
+    const activeUid = user?.uid || (typeof window !== 'undefined' ? localStorage.getItem('quizme_active_uid') || 'anonymous_scholar' : 'anonymous_scholar');
+    if (user?.uid) {
+      localStorage.setItem('quizme_active_uid', user.uid);
+    }
+    const unsubscribe = subscribeRealtimeProgression(activeUid, (remoteProg) => {
+      if (remoteProg.cumulativeXp !== undefined && remoteProg.cumulativeXp > stats.xp) {
+        updateStats({
+          xp: remoteProg.cumulativeXp,
+          level: remoteProg.level,
+          gems: remoteProg.gems,
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, [user?.uid, stats.xp]);
+
   // Detect shared quiz in URL (from peer share link)
   useEffect(() => {
     async function checkSharedQuiz() {
@@ -734,6 +757,24 @@ export default function App() {
       setTimeout(() => {
         setCelebratingBadge(newlyUnlocked);
       }, 700);
+    }
+
+    // Trigger Project Ascension authoritative progression engine
+    try {
+      recordProgressionEvent({
+        type: 'quiz_completed',
+        quizTitle: results.quiz.quiz_title,
+        subject: results.quiz.tags?.[0] || 'General Studies',
+        topic: results.quiz.questions?.[0]?.topic || results.quiz.quiz_title,
+        score: results.score,
+        total: results.total,
+        accuracy: percent,
+        timeSpentSeconds: results.timeSpentSeconds,
+        difficulty: results.quiz.difficulty || 'Intermediate',
+        answeredCount,
+      });
+    } catch (e) {
+      console.warn('Notice updating Project Ascension engine:', e);
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -984,6 +1025,7 @@ export default function App() {
             }}
             onOpenUploadQuiz={() => setIsUploadModalOpen(true)}
             onOpenLevelRoadmap={() => setIsLevelRoadmapOpen(true)}
+            onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
             activeQuiz={activeQuiz}
             stats={stats}
             soundEnabled={soundEnabled}
@@ -1124,6 +1166,16 @@ export default function App() {
                   xp: stats.xp + xpDelta,
                   gems: stats.gems + gemsDelta,
                 });
+                try {
+                  recordProgressionEvent({
+                    type: 'flashcard_mastered',
+                    subject: activeQuiz?.tags?.[0] || 'General Studies',
+                    topic: activeQuiz?.quiz_title || 'Active Recall',
+                    count: 1,
+                  });
+                } catch (e) {
+                  console.warn('Notice recording flashcard in ascension:', e);
+                }
               }}
             />
           )}
@@ -1136,6 +1188,23 @@ export default function App() {
                 onStartPracticeQuiz={() => setActiveTab('studio')}
               />
             </div>
+          )}
+
+          {activeTab === 'ascension' && (
+            <AscensionDashboardView
+              stats={stats}
+              persona={persona}
+              onStartQuiz={handleStartQuiz}
+              onOpenNotes={(topic) => {
+                setNotesInitialTopic(topic);
+                setActiveTab('notes');
+              }}
+              onOpenFlashcards={(topic) => {
+                setActiveTab('flashcards');
+              }}
+              onOpenTutor={handleOpenTutor}
+              onUpdateStats={updateStats}
+            />
           )}
 
           {activeTab === 'achievements' && (
@@ -2163,6 +2232,12 @@ export default function App() {
       <MnemonicsMemoryVaultModal
         isOpen={isMnemonicsOpen}
         onClose={() => setIsMnemonicsOpen(false)}
+      />
+
+      {/* Supabase & Relational Database Architecture Modal */}
+      <SupabaseSyncModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
       />
 
       {/* Foundation Explorer Modal */}
