@@ -13,6 +13,7 @@ import { AskTutorDrawer } from './components/AskTutorDrawer';
 import { RawJsonModal } from './components/RawJsonModal';
 import { SettingsModal } from './components/SettingsModal';
 import { SettingsView } from './components/SettingsView';
+import { SchoolHubView } from './components/SchoolHubView';
 import { BadgeCelebrationModal } from './components/BadgeCelebrationModal';
 import { CommandPalette } from './components/CommandPalette';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -1130,6 +1131,8 @@ export default function App() {
               />
             </div>
           )}
+
+          {activeTab === 'school' && <SchoolHubView />}
 
           {activeTab === 'achievements' && (
             <AchievementsView

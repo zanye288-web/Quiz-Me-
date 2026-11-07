@@ -28,6 +28,7 @@ import { searchAllImages, searchWebImages, searchWikimediaImages } from './image
 import { resolveThematicVisual, THEMATIC_VISUAL_ASSETS } from '../src/utils/thematicImages';
 import { synthesizeGoogleCloudSpeech } from './ttsService';
 import { searchOpenAccessLibrary, convertOerToExamPaperAI } from './oerService';
+import { schoolRouter } from './schools/schoolRouter';
 import {
   securityHeadersMiddleware,
   aiGenerationRateLimiter,
@@ -47,6 +48,9 @@ apiRouter.use(securityHeadersMiddleware);
 apiRouter.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// School accounts: register a school, join with a verified school email
+apiRouter.use('/schools', schoolRouter);
 
 // 1. AI Quiz Generation (Rate limited, input bounded, SSRF safe)
 apiRouter.post('/generate-quiz', aiGenerationRateLimiter, async (req: Request, res: Response) => {

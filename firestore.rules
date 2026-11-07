@@ -167,6 +167,38 @@ service cloud.firestore {
                       (resource == null || resource.data.followerId == request.auth.uid || isAdmin());
     }
 
+    // ===============================================================
+    // School accounts
+    // All writes happen on the server (Admin SDK, which bypasses these rules)
+    // after an emailed code is verified. Clients may never create, edit or
+    // delete any of these documents, so nobody can add themselves to a school.
+    // ===============================================================
+
+    // Registered schools: readable by their own members only.
+    match /schools/{schoolId} {
+      allow read: if isAuthenticated() &&
+                    exists(/databases/$(database)/documents/school_members/$(request.auth.uid)) &&
+                    get(/databases/$(database)/documents/school_members/$(request.auth.uid)).data.schoolId == schoolId;
+      allow write: if false;
+    }
+
+    // A member's own membership record.
+    match /school_members/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // Internal bookkeeping (email -> account, pending codes, send quotas): server only.
+    match /school_emails/{docId} {
+      allow read, write: if false;
+    }
+    match /school_verifications/{docId} {
+      allow read, write: if false;
+    }
+    match /school_send_log/{docId} {
+      allow read, write: if false;
+    }
+
     // Live Multiplayer Quiz Sessions (Requires authentication and host ownership validation)
     match /live_sessions/{roomCode} {
       allow read: if isAuthenticated();

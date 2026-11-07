@@ -32,6 +32,7 @@ import {
   AlertTriangle,
   Camera,
   FlaskConical,
+  Building2,
 } from 'lucide-react';
 import { PersonaType, UserStats as UserStatsType, QuizResponse } from '../types/quiz';
 import { useTheme } from '../context/ThemeContext';
@@ -58,6 +59,7 @@ export type DashboardTab =
   | 'authoring'
   | 'suggestions'
   | 'leaderboard'
+  | 'school'
   | 'achievements'
   | 'analytics'
   | 'history'
@@ -267,6 +269,14 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           icon: Trophy,
           badge: 'GLOBAL',
           description: 'Global Scholars Leaderboard by XP & quiz mastery across schools & regions',
+        },
+        {
+          id: 'school' as DashboardTab,
+          label: 'My School',
+          shortLabel: 'School',
+          icon: Building2,
+          badge: null,
+          description: 'Join or register your school with a verified school email',
         },
         {
           id: 'achievements' as DashboardTab,

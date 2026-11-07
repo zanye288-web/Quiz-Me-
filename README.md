@@ -86,6 +86,19 @@ npm start
 npm run lint
 ```
 
+## School accounts
+
+Schools can be represented as one group in the app, using email verification:
+
+- **Register a school** (teachers/admins): enter the school name and an email on the school's own domain. A 6-digit code is emailed to that address; entering it proves domain ownership and creates the school (one school per email domain). Personal providers (Gmail, Yahoo…) and shared suffixes (e.g. `edu.ng`) are refused.
+- **Join your school**: anyone with a registered school-domain email verifies it with an emailed code and joins that school.
+- Codes are 6 digits, stored only as keyed hashes, expire after 10 minutes, allow 5 guesses before a 15-minute lockout, and are rate limited per account, per inbox and per IP. One school email can only be linked to one account. Guest sessions cannot join.
+- Membership is written only by the server (Admin SDK); Firestore rules block all client writes to these collections.
+
+Configuration (see `.env.example`): `SCHOOL_CODE_SECRET` (required in production), plus `RESEND_API_KEY` and `MAIL_FROM` for sending email. Without a mail provider, codes are printed to the server console in development only, and the feature is unavailable in production. The server also needs Google credentials for Firestore (automatic on Google Cloud / Cloud Run; set `GOOGLE_APPLICATION_CREDENTIALS` locally). Optionally enable a Firestore TTL policy on the `expireAt` field of `school_verifications` and `school_send_log`.
+
+Run the logic tests with `npx tsx --test server/schools/schoolService.test.ts`.
+
 ## Environment and deployment notes
 
 - The Express entry point is `server.ts`; API routes are mounted under `/api`.
