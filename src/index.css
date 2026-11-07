@@ -1582,3 +1582,402 @@ html[data-ui-theme="paper_ink"] .comic-panel:hover {
 
 
 
+
+/* ==========================================================================
+   10 EXTRA UI THEMES
+   wooden_workshop, tropical_paradise, chalkboard_classroom, notebook_doodle,
+   candy_pop, space_odyssey, retro_synthwave, desert_sandstone,
+   cherry_blossom, midnight_forest
+
+   Each theme sets a few CSS variables (hero banner, border, hover colours)
+   that the shared rules further below consume, then paints its own page
+   background for light and dark mode.
+   ========================================================================== */
+
+/* ---- Variables per theme ------------------------------------------------ */
+html[data-ui-theme="wooden_workshop"] {
+  --t-hero-img:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 2px, transparent 2px, transparent 28px),
+    repeating-linear-gradient(0deg, rgba(255, 220, 160, 0.06) 0px, rgba(255, 220, 160, 0.06) 1px, transparent 1px, transparent 6px),
+    linear-gradient(135deg, #78350f 0%, #92400e 52%, #b45309 100%);
+  --t-hero-size: 100% 100%, 100% 100%, 100% 100%;
+  --t-hero-border: #fbbf24;
+  --t-hover: rgba(180, 83, 9, 0.34);
+  --t-panel-hover: #b45309;
+  --t-ink: #3b2412;
+}
+html[data-ui-theme="tropical_paradise"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #0d9488 0%, #10b981 48%, #facc15 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fde047;
+  --t-hover: rgba(20, 184, 166, 0.32);
+  --t-panel-hover: #fb7185;
+  --t-ink: #064e3b;
+}
+html[data-ui-theme="chalkboard_classroom"] {
+  --t-hero-img:
+    radial-gradient(ellipse at 20% 30%, rgba(255, 255, 255, 0.10) 0px, transparent 55%),
+    radial-gradient(rgba(255, 255, 255, 0.10) 1.25px, transparent 1.25px),
+    linear-gradient(135deg, #1f4d3a 0%, #14352a 100%);
+  --t-hero-size: 100% 100%, 22px 22px, 100% 100%;
+  --t-hero-border: #f5f5dc;
+  --t-hover: rgba(220, 38, 38, 0.32);
+  --t-panel-hover: #dc2626;
+  --t-ink: #14352a;
+}
+html[data-ui-theme="notebook_doodle"] {
+  --t-hero-img:
+    repeating-linear-gradient(to bottom, transparent 0px, transparent 23px, rgba(255, 255, 255, 0.14) 23px, rgba(255, 255, 255, 0.14) 24px),
+    linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #0ea5e9 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #fde047;
+  --t-hover: rgba(37, 99, 235, 0.30);
+  --t-panel-hover: #ef4444;
+  --t-ink: #1e3a8a;
+}
+html[data-ui-theme="candy_pop"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.35) 2.5px, transparent 2.5px),
+    linear-gradient(135deg, #ec4899 0%, #f472b6 48%, #2dd4bf 100%);
+  --t-hero-size: 22px 22px, 100% 100%;
+  --t-hero-border: #fbcfe8;
+  --t-hover: rgba(236, 72, 153, 0.32);
+  --t-panel-hover: #2dd4bf;
+  --t-ink: #831843;
+}
+html[data-ui-theme="space_odyssey"] {
+  --t-hero-img:
+    radial-gradient(circle at 15% 25%, #ffffff 0.9px, transparent 1.4px),
+    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.8) 0.8px, transparent 1.3px),
+    radial-gradient(circle at 88% 20%, rgba(255, 255, 255, 0.9) 1px, transparent 1.5px),
+    linear-gradient(135deg, #0f172a 0%, #312e81 55%, #6d28d9 100%);
+  --t-hero-size: 90px 90px, 70px 70px, 130px 130px, 100% 100%;
+  --t-hero-border: #818cf8;
+  --t-hover: rgba(124, 58, 237, 0.36);
+  --t-panel-hover: #8b5cf6;
+  --t-ink: #1e1b4b;
+}
+html[data-ui-theme="retro_synthwave"] {
+  --t-hero-img:
+    linear-gradient(to right, rgba(34, 211, 238, 0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 211, 238, 0.22) 1px, transparent 1px),
+    linear-gradient(180deg, #3b0764 0%, #be185d 62%, #fb923c 100%);
+  --t-hero-size: 28px 28px, 28px 28px, 100% 100%;
+  --t-hero-border: #22d3ee;
+  --t-hover: rgba(236, 72, 153, 0.42);
+  --t-panel-hover: #22d3ee;
+  --t-ink: #3b0764;
+}
+html[data-ui-theme="desert_sandstone"] {
+  --t-hero-img:
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 3px, transparent 3px, transparent 18px),
+    linear-gradient(135deg, #9a3412 0%, #c2410c 50%, #d97706 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #2dd4bf;
+  --t-hover: rgba(194, 65, 12, 0.32);
+  --t-panel-hover: #0d9488;
+  --t-ink: #7c2d12;
+}
+html[data-ui-theme="cherry_blossom"] {
+  --t-hero-img:
+    radial-gradient(ellipse 7px 4px, rgba(255, 255, 255, 0.40) 0px, transparent 100%),
+    linear-gradient(135deg, #fb7185 0%, #f472b6 50%, #fda4af 100%);
+  --t-hero-size: 64px 64px, 100% 100%;
+  --t-hero-border: #fecdd3;
+  --t-hover: rgba(244, 63, 94, 0.28);
+  --t-panel-hover: #fb7185;
+  --t-ink: #881337;
+}
+html[data-ui-theme="midnight_forest"] {
+  --t-hero-img:
+    radial-gradient(circle at 80% 25%, rgba(190, 242, 100, 0.25) 0px, transparent 35%),
+    radial-gradient(circle at 25% 70%, rgba(253, 224, 71, 0.65) 1px, transparent 2px),
+    linear-gradient(135deg, #052e16 0%, #14532d 55%, #166534 100%);
+  --t-hero-size: 100% 100%, 80px 80px, 100% 100%;
+  --t-hero-border: #bef264;
+  --t-hover: rgba(132, 204, 22, 0.32);
+  --t-panel-hover: #a3e635;
+  --t-ink: #052e16;
+}
+
+/* ---- Shared rules for the 10 extra themes ------------------------------- */
+html[data-ui-theme="wooden_workshop"] .holo-command-deck,
+html[data-ui-theme="tropical_paradise"] .holo-command-deck,
+html[data-ui-theme="chalkboard_classroom"] .holo-command-deck,
+html[data-ui-theme="notebook_doodle"] .holo-command-deck,
+html[data-ui-theme="candy_pop"] .holo-command-deck,
+html[data-ui-theme="space_odyssey"] .holo-command-deck,
+html[data-ui-theme="retro_synthwave"] .holo-command-deck,
+html[data-ui-theme="desert_sandstone"] .holo-command-deck,
+html[data-ui-theme="cherry_blossom"] .holo-command-deck,
+html[data-ui-theme="midnight_forest"] .holo-command-deck,
+html[data-ui-theme="wooden_workshop"] .command-deck-hero,
+html[data-ui-theme="tropical_paradise"] .command-deck-hero,
+html[data-ui-theme="chalkboard_classroom"] .command-deck-hero,
+html[data-ui-theme="notebook_doodle"] .command-deck-hero,
+html[data-ui-theme="candy_pop"] .command-deck-hero,
+html[data-ui-theme="space_odyssey"] .command-deck-hero,
+html[data-ui-theme="retro_synthwave"] .command-deck-hero,
+html[data-ui-theme="desert_sandstone"] .command-deck-hero,
+html[data-ui-theme="cherry_blossom"] .command-deck-hero,
+html[data-ui-theme="midnight_forest"] .command-deck-hero,
+html[data-ui-theme="wooden_workshop"] .comic-tab-hero,
+html[data-ui-theme="tropical_paradise"] .comic-tab-hero,
+html[data-ui-theme="chalkboard_classroom"] .comic-tab-hero,
+html[data-ui-theme="notebook_doodle"] .comic-tab-hero,
+html[data-ui-theme="candy_pop"] .comic-tab-hero,
+html[data-ui-theme="space_odyssey"] .comic-tab-hero,
+html[data-ui-theme="retro_synthwave"] .comic-tab-hero,
+html[data-ui-theme="desert_sandstone"] .comic-tab-hero,
+html[data-ui-theme="cherry_blossom"] .comic-tab-hero,
+html[data-ui-theme="midnight_forest"] .comic-tab-hero {
+  background-image: var(--t-hero-img) !important;
+  background-size: var(--t-hero-size) !important;
+  border-color: var(--t-hero-border) !important;
+}
+
+html:is(
+  [data-ui-theme="wooden_workshop"],
+  [data-ui-theme="tropical_paradise"],
+  [data-ui-theme="chalkboard_classroom"],
+  [data-ui-theme="notebook_doodle"],
+  [data-ui-theme="candy_pop"],
+  [data-ui-theme="space_odyssey"],
+  [data-ui-theme="retro_synthwave"],
+  [data-ui-theme="desert_sandstone"],
+  [data-ui-theme="cherry_blossom"],
+  [data-ui-theme="midnight_forest"]
+) .comic-pop-card:hover {
+  box-shadow: 4px 7px 0 0 var(--t-hover);
+}
+
+html:is(
+  [data-ui-theme="wooden_workshop"],
+  [data-ui-theme="tropical_paradise"],
+  [data-ui-theme="chalkboard_classroom"],
+  [data-ui-theme="notebook_doodle"],
+  [data-ui-theme="candy_pop"],
+  [data-ui-theme="space_odyssey"],
+  [data-ui-theme="retro_synthwave"],
+  [data-ui-theme="desert_sandstone"],
+  [data-ui-theme="cherry_blossom"],
+  [data-ui-theme="midnight_forest"]
+) .comic-panel:hover {
+  border-bottom-color: var(--t-panel-hover) !important;
+}
+
+/* Resting card "ink" shadow in light mode picks up each theme's ink colour */
+html:not(.dark):is(
+  [data-ui-theme="wooden_workshop"],
+  [data-ui-theme="tropical_paradise"],
+  [data-ui-theme="chalkboard_classroom"],
+  [data-ui-theme="notebook_doodle"],
+  [data-ui-theme="candy_pop"],
+  [data-ui-theme="space_odyssey"],
+  [data-ui-theme="retro_synthwave"],
+  [data-ui-theme="desert_sandstone"],
+  [data-ui-theme="cherry_blossom"],
+  [data-ui-theme="midnight_forest"]
+) .comic-pop-card:not(:hover) {
+  box-shadow: 0 5px 0 0 var(--t-ink);
+}
+
+/* ---- Page backgrounds: light + dark per theme ---------------------------- */
+
+/* 6. WOODEN WORKSHOP: walnut planks with grain and a warm lamp glow */
+html[data-ui-theme="wooden_workshop"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F1DFC0;
+  background-image:
+    radial-gradient(at 15% 0%, rgba(255, 244, 214, 0.75) 0px, transparent 50%),
+    repeating-linear-gradient(90deg, rgba(120, 72, 30, 0.14) 0px, rgba(120, 72, 30, 0.14) 2px, transparent 2px, transparent 140px),
+    repeating-linear-gradient(0deg, rgba(120, 72, 30, 0.05) 0px, rgba(120, 72, 30, 0.05) 1px, transparent 1px, transparent 7px);
+  background-size: 100% 100%, 140px 100%, 100% 7px;
+}
+html[data-ui-theme="wooden_workshop"].dark .atelier-canvas-bg {
+  background-color: #1E140C;
+  background-image:
+    radial-gradient(at 15% 0%, rgba(251, 191, 36, 0.14) 0px, transparent 50%),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0px, rgba(0, 0, 0, 0.35) 2px, transparent 2px, transparent 140px),
+    repeating-linear-gradient(0deg, rgba(255, 200, 130, 0.035) 0px, rgba(255, 200, 130, 0.035) 1px, transparent 1px, transparent 7px);
+  background-size: 100% 100%, 140px 100%, 100% 7px;
+}
+
+/* 7. TROPICAL PARADISE: lagoon teal, hibiscus coral and mango sun */
+html[data-ui-theme="tropical_paradise"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F0FDF8;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(250, 204, 21, 0.28) 0px, transparent 42%),
+    radial-gradient(at 100% 0%, rgba(251, 113, 133, 0.18) 0px, transparent 42%),
+    radial-gradient(at 50% 100%, rgba(20, 184, 166, 0.22) 0px, transparent 55%),
+    radial-gradient(rgba(13, 148, 136, 0.10) 1.5px, transparent 1.5px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 26px 26px;
+}
+html[data-ui-theme="tropical_paradise"].dark .atelier-canvas-bg {
+  background-color: #042521;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(250, 204, 21, 0.14) 0px, transparent 42%),
+    radial-gradient(at 100% 0%, rgba(251, 113, 133, 0.16) 0px, transparent 42%),
+    radial-gradient(at 50% 100%, rgba(20, 184, 166, 0.22) 0px, transparent 55%),
+    radial-gradient(rgba(94, 234, 212, 0.08) 1.5px, transparent 1.5px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 26px 26px;
+}
+
+/* 8. CHALKBOARD CLASSROOM: green slate with chalk dust (light = classroom wall) */
+html[data-ui-theme="chalkboard_classroom"]:not(.dark) .atelier-canvas-bg {
+  background-color: #EEF4E6;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(22, 101, 52, 0.10) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(220, 38, 38, 0.07) 0px, transparent 45%),
+    linear-gradient(to right, rgba(22, 101, 52, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(22, 101, 52, 0.07) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+}
+html[data-ui-theme="chalkboard_classroom"].dark .atelier-canvas-bg {
+  background-color: #14352A;
+  background-image:
+    radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.07) 0px, transparent 50%),
+    radial-gradient(ellipse at 75% 70%, rgba(255, 255, 255, 0.05) 0px, transparent 45%),
+    radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, 0.05) 1.5px, transparent 1.5px);
+  background-size: 100% 100%, 100% 100%, 19px 19px, 41px 41px;
+}
+
+/* 9. NOTEBOOK DOODLE: ruled paper with a red margin line */
+html[data-ui-theme="notebook_doodle"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FFFEF6;
+  background-image:
+    linear-gradient(90deg, transparent 0px, transparent 78px, rgba(239, 68, 68, 0.38) 78px, rgba(239, 68, 68, 0.38) 80px, transparent 80px),
+    repeating-linear-gradient(to bottom, transparent 0px, transparent 31px, rgba(59, 130, 246, 0.22) 31px, rgba(59, 130, 246, 0.22) 32px);
+  background-size: 100% 100%, 100% 32px;
+}
+html[data-ui-theme="notebook_doodle"].dark .atelier-canvas-bg {
+  background-color: #0E1526;
+  background-image:
+    linear-gradient(90deg, transparent 0px, transparent 78px, rgba(248, 113, 113, 0.30) 78px, rgba(248, 113, 113, 0.30) 80px, transparent 80px),
+    repeating-linear-gradient(to bottom, transparent 0px, transparent 31px, rgba(96, 165, 250, 0.16) 31px, rgba(96, 165, 250, 0.16) 32px);
+  background-size: 100% 100%, 100% 32px;
+}
+
+/* 10. CANDY POP: pastel sprinkles on bubblegum */
+html[data-ui-theme="candy_pop"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FFF4F9;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(244, 114, 182, 0.18) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(45, 212, 191, 0.16) 0px, transparent 45%),
+    radial-gradient(rgba(244, 114, 182, 0.30) 3px, transparent 3.5px),
+    radial-gradient(rgba(45, 212, 191, 0.30) 3px, transparent 3.5px),
+    radial-gradient(rgba(250, 204, 21, 0.38) 3px, transparent 3.5px);
+  background-size: 100% 100%, 100% 100%, 64px 64px, 64px 64px, 64px 64px;
+  background-position: 0 0, 0 0, 0 0, 32px 22px, 14px 42px;
+}
+html[data-ui-theme="candy_pop"].dark .atelier-canvas-bg {
+  background-color: #26122D;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(244, 114, 182, 0.20) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(45, 212, 191, 0.14) 0px, transparent 45%),
+    radial-gradient(rgba(244, 114, 182, 0.22) 3px, transparent 3.5px),
+    radial-gradient(rgba(45, 212, 191, 0.20) 3px, transparent 3.5px),
+    radial-gradient(rgba(250, 204, 21, 0.22) 3px, transparent 3.5px);
+  background-size: 100% 100%, 100% 100%, 64px 64px, 64px 64px, 64px 64px;
+  background-position: 0 0, 0 0, 0 0, 32px 22px, 14px 42px;
+}
+
+/* 11. SPACE ODYSSEY: star field and nebula glow */
+html[data-ui-theme="space_odyssey"]:not(.dark) .atelier-canvas-bg {
+  background-color: #EEF0FF;
+  background-image:
+    radial-gradient(at 10% 0%, rgba(99, 102, 241, 0.18) 0px, transparent 45%),
+    radial-gradient(at 95% 90%, rgba(167, 139, 250, 0.20) 0px, transparent 45%),
+    radial-gradient(circle, rgba(79, 70, 229, 0.35) 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(79, 70, 229, 0.22) 1px, transparent 1.6px);
+  background-size: 100% 100%, 100% 100%, 97px 97px, 61px 61px;
+  background-position: 0 0, 0 0, 0 0, 23px 31px;
+}
+html[data-ui-theme="space_odyssey"].dark .atelier-canvas-bg {
+  background-color: #060921;
+  background-image:
+    radial-gradient(at 10% 0%, rgba(99, 102, 241, 0.26) 0px, transparent 45%),
+    radial-gradient(at 95% 90%, rgba(167, 139, 250, 0.22) 0px, transparent 45%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.85) 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(199, 210, 254, 0.55) 1px, transparent 1.6px);
+  background-size: 100% 100%, 100% 100%, 97px 97px, 61px 61px;
+  background-position: 0 0, 0 0, 0 0, 23px 31px;
+}
+
+/* 12. RETRO SYNTHWAVE: neon sunset with a perspective-style grid */
+html[data-ui-theme="retro_synthwave"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FFF1F9;
+  background-image:
+    linear-gradient(to bottom, rgba(168, 85, 247, 0.10) 0%, transparent 40%, rgba(251, 146, 60, 0.16) 100%),
+    linear-gradient(to right, rgba(192, 38, 211, 0.10) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(192, 38, 211, 0.10) 1px, transparent 1px);
+  background-size: 100% 100%, 36px 36px, 36px 36px;
+}
+html[data-ui-theme="retro_synthwave"].dark .atelier-canvas-bg {
+  background-color: #14061F;
+  background-image:
+    linear-gradient(to bottom, #14061F 0%, rgba(76, 5, 110, 0.55) 55%, rgba(190, 24, 93, 0.45) 85%, rgba(251, 146, 60, 0.35) 100%),
+    linear-gradient(to right, rgba(34, 211, 238, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(236, 72, 153, 0.14) 1px, transparent 1px);
+  background-size: 100% 100%, 36px 36px, 36px 36px;
+}
+
+/* 13. DESERT SANDSTONE: dunes, canyon glow and turquoise sky */
+html[data-ui-theme="desert_sandstone"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FBEEDC;
+  background-image:
+    radial-gradient(ellipse at 20% 110%, rgba(194, 65, 12, 0.22) 0px, transparent 55%),
+    radial-gradient(at 95% 0%, rgba(20, 184, 166, 0.16) 0px, transparent 45%),
+    repeating-linear-gradient(115deg, rgba(180, 83, 9, 0.05) 0px, rgba(180, 83, 9, 0.05) 2px, transparent 2px, transparent 16px);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+}
+html[data-ui-theme="desert_sandstone"].dark .atelier-canvas-bg {
+  background-color: #1F120B;
+  background-image:
+    radial-gradient(ellipse at 20% 110%, rgba(234, 88, 12, 0.24) 0px, transparent 55%),
+    radial-gradient(at 95% 0%, rgba(20, 184, 166, 0.12) 0px, transparent 45%),
+    repeating-linear-gradient(115deg, rgba(251, 191, 36, 0.035) 0px, rgba(251, 191, 36, 0.035) 2px, transparent 2px, transparent 16px);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+}
+
+/* 14. CHERRY BLOSSOM GARDEN: soft sakura petals on ivory */
+html[data-ui-theme="cherry_blossom"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FFF7F9;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(251, 113, 133, 0.16) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(244, 114, 182, 0.14) 0px, transparent 45%),
+    radial-gradient(ellipse 7px 4px, rgba(251, 113, 133, 0.30) 0px, transparent 100%),
+    radial-gradient(ellipse 5px 3px, rgba(244, 114, 182, 0.26) 0px, transparent 100%);
+  background-size: 100% 100%, 100% 100%, 96px 96px, 72px 72px;
+  background-position: 0 0, 0 0, 0 0, 36px 28px;
+}
+html[data-ui-theme="cherry_blossom"].dark .atelier-canvas-bg {
+  background-color: #1D1018;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(251, 113, 133, 0.18) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(244, 114, 182, 0.14) 0px, transparent 45%),
+    radial-gradient(ellipse 7px 4px, rgba(253, 164, 175, 0.20) 0px, transparent 100%),
+    radial-gradient(ellipse 5px 3px, rgba(249, 168, 212, 0.16) 0px, transparent 100%);
+  background-size: 100% 100%, 100% 100%, 96px 96px, 72px 72px;
+  background-position: 0 0, 0 0, 0 0, 36px 28px;
+}
+
+/* 15. MIDNIGHT FOREST: moon glow, treeline and fireflies */
+html[data-ui-theme="midnight_forest"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F0F8EA;
+  background-image:
+    radial-gradient(at 90% 0%, rgba(190, 242, 100, 0.30) 0px, transparent 40%),
+    linear-gradient(to top, rgba(22, 101, 52, 0.16) 0%, transparent 38%),
+    radial-gradient(circle, rgba(202, 138, 4, 0.30) 1.5px, transparent 2.5px);
+  background-size: 100% 100%, 100% 100%, 113px 113px;
+}
+html[data-ui-theme="midnight_forest"].dark .atelier-canvas-bg {
+  background-color: #06140E;
+  background-image:
+    radial-gradient(at 90% 0%, rgba(190, 242, 100, 0.14) 0px, transparent 40%),
+    linear-gradient(to top, rgba(6, 60, 32, 0.85) 0%, transparent 38%),
+    radial-gradient(circle, rgba(253, 224, 71, 0.55) 1.5px, transparent 2.5px);
+  background-size: 100% 100%, 100% 100%, 113px 113px;
+}

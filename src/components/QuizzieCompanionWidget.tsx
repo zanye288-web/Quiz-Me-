@@ -1012,7 +1012,7 @@ export const QuizzieCompanionWidget: React.FC<QuizzieCompanionWidgetProps> = ({
                       {UI_THEME_CATALOG.find((t) => t.id === uiTheme)?.name}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1.5 max-h-44 overflow-y-auto pr-1">
                     {UI_THEME_CATALOG.map((th) => {
                       const active = uiTheme === th.id;
                       return (

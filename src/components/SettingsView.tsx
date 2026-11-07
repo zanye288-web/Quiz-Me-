@@ -1544,7 +1544,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <span className="comic-badge px-2 py-0.5 rounded bg-amber-300 text-slate-950 text-[10px] font-black">
                     NEW!
                   </span>
-                  <span>UI Theme Worlds (6 Comic &amp; Arcade Palettes)</span>
+                  <span>UI Theme Worlds ({UI_THEME_CATALOG.length} Palettes)</span>
                 </label>
                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                   Active: <strong className="text-indigo-600 dark:text-indigo-400">{UI_THEME_CATALOG.find((t) => t.id === uiTheme)?.name}</strong>

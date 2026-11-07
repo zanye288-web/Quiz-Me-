@@ -26,7 +26,17 @@ export type UiThemeId =
   | 'cyber_arcade'
   | 'emerald_academy'
   | 'royal_amethyst'
-  | 'paper_ink';
+  | 'paper_ink'
+  | 'wooden_workshop'
+  | 'tropical_paradise'
+  | 'chalkboard_classroom'
+  | 'notebook_doodle'
+  | 'candy_pop'
+  | 'space_odyssey'
+  | 'retro_synthwave'
+  | 'desert_sandstone'
+  | 'cherry_blossom'
+  | 'midnight_forest';
 
 export interface UiThemeCatalogItem {
   id: UiThemeId;
@@ -99,6 +109,106 @@ export const UI_THEME_CATALOG: UiThemeCatalogItem[] = [
     swatchGradient: 'from-amber-600 via-stone-700 to-slate-900',
     recommendedMode: 'light',
     recommendedAccent: 'amber',
+  },
+  {
+    id: 'wooden_workshop',
+    name: 'Wooden Workshop',
+    tagline: 'Warm walnut planks, brass-bolt borders and cozy parchment cards like a carpenter\'s study desk.',
+    emoji: '🪵',
+    badge: 'Cozy Wood',
+    swatchGradient: 'from-amber-800 via-orange-700 to-yellow-600',
+    recommendedMode: 'light',
+    recommendedAccent: 'amber',
+  },
+  {
+    id: 'tropical_paradise',
+    name: 'Tropical Paradise',
+    tagline: 'Palm-green lagoon, hibiscus coral and sunny mango yellow for a beach-side study break.',
+    emoji: '🌴',
+    badge: 'Island Vibes',
+    swatchGradient: 'from-teal-500 via-emerald-500 to-yellow-400',
+    recommendedMode: 'light',
+    recommendedAccent: 'emerald',
+  },
+  {
+    id: 'chalkboard_classroom',
+    name: 'Chalkboard Classroom',
+    tagline: 'Slate-green chalkboard, apple-red accents and a dusting of chalk, straight from the front of class.',
+    emoji: '🍎',
+    badge: 'Cheesy Class',
+    swatchGradient: 'from-green-900 via-emerald-800 to-red-600',
+    recommendedMode: 'dark',
+    recommendedAccent: 'emerald',
+  },
+  {
+    id: 'notebook_doodle',
+    name: 'Notebook Doodle',
+    tagline: 'Ruled notebook paper with a red margin line, blue-pen ink and highlighter-yellow pops.',
+    emoji: '✏️',
+    badge: 'Back to School',
+    swatchGradient: 'from-sky-500 via-blue-600 to-yellow-300',
+    recommendedMode: 'light',
+    recommendedAccent: 'indigo',
+  },
+  {
+    id: 'candy_pop',
+    name: 'Candy Pop Parade',
+    tagline: 'Bubblegum pink, mint and lemon-drop pastels with sprinkle-dot confetti backgrounds.',
+    emoji: '🍭',
+    badge: 'Sweet Tooth',
+    swatchGradient: 'from-pink-400 via-fuchsia-400 to-teal-300',
+    recommendedMode: 'light',
+    recommendedAccent: 'rose',
+  },
+  {
+    id: 'space_odyssey',
+    name: 'Space Odyssey',
+    tagline: 'Deep-space navy, nebula violet and a field of twinkling stars for late-night cramming.',
+    emoji: '🚀',
+    badge: 'Cosmic',
+    swatchGradient: 'from-slate-900 via-indigo-800 to-violet-600',
+    recommendedMode: 'dark',
+    recommendedAccent: 'violet',
+  },
+  {
+    id: 'retro_synthwave',
+    name: 'Retro Synthwave',
+    tagline: '80s neon sunset with magenta-to-orange skies and a glowing perspective grid.',
+    emoji: '🌆',
+    badge: 'Neon 80s',
+    swatchGradient: 'from-fuchsia-600 via-pink-500 to-orange-400',
+    recommendedMode: 'dark',
+    recommendedAccent: 'rose',
+  },
+  {
+    id: 'desert_sandstone',
+    name: 'Desert Sandstone',
+    tagline: 'Sun-baked terracotta, dune sand and turquoise accents with a warm canyon glow.',
+    emoji: '🏜️',
+    badge: 'Warm Earth',
+    swatchGradient: 'from-orange-700 via-amber-500 to-teal-500',
+    recommendedMode: 'light',
+    recommendedAccent: 'amber',
+  },
+  {
+    id: 'cherry_blossom',
+    name: 'Cherry Blossom Garden',
+    tagline: 'Soft sakura pink and calm ivory with a gentle spring-petal wash for relaxed focus.',
+    emoji: '🌸',
+    badge: 'Calm Spring',
+    swatchGradient: 'from-pink-300 via-rose-400 to-rose-600',
+    recommendedMode: 'light',
+    recommendedAccent: 'rose',
+  },
+  {
+    id: 'midnight_forest',
+    name: 'Midnight Forest',
+    tagline: 'Moonlit pine greens and fireflies-gold glow for a quiet, woodland night session.',
+    emoji: '🌲',
+    badge: 'Night Woods',
+    swatchGradient: 'from-emerald-950 via-green-800 to-lime-400',
+    recommendedMode: 'dark',
+    recommendedAccent: 'emerald',
   },
 ];
 

@@ -505,7 +505,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                 setIsThemeMenuOpen((prev) => !prev);
               }}
               className="arcade-btn flex items-center gap-1.5 px-2.5 py-2 rounded-xl border-2 border-slate-900 dark:border-slate-700 bg-amber-300 hover:bg-amber-200 text-slate-950 text-xs font-black transition-all cursor-pointer shadow-2xs"
-              title="Switch UI Theme (6 Comic & Arcade Palettes + 5 UI Geometry Styles)"
+              title={`Switch UI Theme (${UI_THEME_CATALOG.length} Palettes + 5 UI Geometry Styles)`}
               aria-label="Open UI Themes Menu"
             >
               <Palette className="w-3.5 h-3.5 text-slate-950" />
@@ -534,7 +534,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                 <div className="flex items-center justify-between border-b-2 border-slate-200 dark:border-slate-800 pb-2.5">
                   <div className="flex items-center gap-2">
                     <span className="comic-badge px-2 py-0.5 rounded bg-amber-300 text-slate-950 text-[10px] font-black uppercase">
-                      6 UI THEMES
+                      {UI_THEME_CATALOG.length} UI THEMES
                     </span>
                     <span className="text-xs font-black text-slate-900 dark:text-white">
                       Visual Theme &amp; Geometry
@@ -549,8 +549,8 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                   </button>
                 </div>
 
-                {/* 6 Curated UI Themes */}
-                <div className="grid grid-cols-2 gap-2">
+                {/* Curated UI Themes (scrolls when the list is long) */}
+                <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
                   {UI_THEME_CATALOG.map((themeItem) => {
                     const isSelected = uiTheme === themeItem.id;
                     return (
