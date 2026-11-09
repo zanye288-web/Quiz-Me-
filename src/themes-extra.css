@@ -1,0 +1,1902 @@
+/* ==========================================================================
+   50 EXTRA UI THEMES  (GENERATED, do not edit by hand)
+   Source: scripts/generate-extra-themes.mjs  ->  node scripts/generate-extra-themes.mjs
+   Loaded after index.css (see main.tsx) so these rules win ties with the base styles.
+   ========================================================================== */
+
+/* ---- Variables per theme ---- */
+html[data-ui-theme="ocean_reef"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #0891b2 0%, #db6513 52%, #97862a 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fde047;
+  --t-hover: rgba(8, 145, 178, 0.32);
+  --t-panel-hover: #f97316;
+  --t-ink: #02242d;
+}
+html[data-ui-theme="arctic_aurora"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #1790a2 0%, #937adc 52%, #28a477 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #34d399;
+  --t-hover: rgba(34, 211, 238, 0.32);
+  --t-panel-hover: #34d399;
+  --t-ink: #09353c;
+}
+html[data-ui-theme="golden_savanna"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #bf6905 0%, #b45309 52%, #65a30d 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #bad692;
+  --t-hover: rgba(217, 119, 6, 0.32);
+  --t-panel-hover: #65a30d;
+  --t-ink: #361e02;
+}
+html[data-ui-theme="rainforest_canopy"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #15803d 0%, #138f41 52%, #ab8b0e 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #facc15;
+  --t-hover: rgba(21, 128, 61, 0.32);
+  --t-panel-hover: #facc15;
+  --t-ink: #05200f;
+}
+html[data-ui-theme="alpine_snow"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #0c91cd 0%, #64748b 52%, #708a97 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #bae6fd;
+  --t-hover: rgba(14, 165, 233, 0.32);
+  --t-panel-hover: #64748b;
+  --t-ink: #04293a;
+}
+html[data-ui-theme="autumn_maple"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #c2410c 0%, #b91c1c 52%, #be7a09 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #f59e0b;
+  --t-hover: rgba(194, 65, 12, 0.32);
+  --t-panel-hover: #f59e0b;
+  --t-ink: #311003;
+}
+html[data-ui-theme="spring_meadow"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #598f0b 0%, #9f7a05 52%, #d764a0 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fac0de;
+  --t-hover: rgba(101, 163, 13, 0.32);
+  --t-panel-hover: #f472b6;
+  --t-ink: #192903;
+}
+html[data-ui-theme="lavender_fields"] {
+  --t-hero-img:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 2px, transparent 2px, transparent 28px),
+    linear-gradient(135deg, #8b5cf6 0%, #937adc 52%, #669e11 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #84cc16;
+  --t-hover: rgba(139, 92, 246, 0.32);
+  --t-panel-hover: #84cc16;
+  --t-ink: #23173e;
+}
+html[data-ui-theme="volcano_lava"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #dc2626 0%, #ea580c 52%, #ab8219 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fbbf24;
+  --t-hover: rgba(220, 38, 38, 0.32);
+  --t-panel-hover: #fbbf24;
+  --t-ink: #370a0a;
+}
+html[data-ui-theme="deep_ocean"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #0369a1 0%, #0c4a6e 52%, #1790a2 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #22d3ee;
+  --t-hover: rgba(3, 105, 161, 0.32);
+  --t-panel-hover: #22d3ee;
+  --t-ink: #011a28;
+}
+html[data-ui-theme="thunderstorm"] {
+  --t-hero-img:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 10px, transparent 10px, transparent 20px),
+    linear-gradient(135deg, #475569 0%, #6366f1 52%, #97862a 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #fde047;
+  --t-hover: rgba(71, 85, 105, 0.32);
+  --t-panel-hover: #6366f1;
+  --t-ink: #12151a;
+}
+html[data-ui-theme="golden_sunrise"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #db6513 0%, #dd6375 52%, #97862a 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fde047;
+  --t-hover: rgba(249, 115, 22, 0.32);
+  --t-panel-hover: #fb7185;
+  --t-ink: #3e1d06;
+}
+html[data-ui-theme="rainy_day"] {
+  --t-hero-img:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 10px, transparent 10px, transparent 20px),
+    linear-gradient(135deg, #64748b 0%, #2b92c0 52%, #828fa2 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #94a3b8;
+  --t-hover: rgba(100, 116, 139, 0.32);
+  --t-panel-hover: #94a3b8;
+  --t-ink: #191d23;
+}
+html[data-ui-theme="bamboo_zen"] {
+  --t-hero-img:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 2px, transparent 2px, transparent 28px),
+    linear-gradient(135deg, #598f0b 0%, #4d7c0f 52%, #82965d 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #d9f99d;
+  --t-hover: rgba(101, 163, 13, 0.32);
+  --t-panel-hover: #4d7c0f;
+  --t-ink: #192903;
+}
+html[data-ui-theme="moonlit_lake"] {
+  --t-hero-img:
+    radial-gradient(circle, rgba(255, 255, 255, 0.85) 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.6) 0.8px, transparent 1.3px),
+    linear-gradient(135deg, #6366f1 0%, #2b92c0 52%, #868b98 100%);
+  --t-hero-size: 90px 90px, 57px 57px, 100% 100%;
+  --t-hero-border: #e0e7ff;
+  --t-hover: rgba(99, 102, 241, 0.32);
+  --t-panel-hover: #38bdf8;
+  --t-ink: #191a3c;
+}
+html[data-ui-theme="pirate_voyage"] {
+  --t-hero-img:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 2px, transparent 2px, transparent 28px),
+    linear-gradient(135deg, #92400e 0%, #1e3a8a 52%, #ab8219 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #fbbf24;
+  --t-hover: rgba(146, 64, 14, 0.32);
+  --t-panel-hover: #fbbf24;
+  --t-ink: #251004;
+}
+html[data-ui-theme="medieval_castle"] {
+  --t-hero-img:
+    linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(135deg, #57534e 0%, #b91c1c 52%, #ab8219 100%);
+  --t-hero-size: 28px 28px, 28px 28px, 100% 100%;
+  --t-hero-border: #fbbf24;
+  --t-hover: rgba(87, 83, 78, 0.32);
+  --t-panel-hover: #fbbf24;
+  --t-ink: #161514;
+}
+html[data-ui-theme="steampunk_brass"] {
+  --t-hero-img:
+    linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(135deg, #b45309 0%, #78350f 52%, #ac9035 100%);
+  --t-hero-size: 28px 28px, 28px 28px, 100% 100%;
+  --t-hero-border: #fcd34d;
+  --t-hover: rgba(180, 83, 9, 0.32);
+  --t-panel-hover: #fcd34d;
+  --t-ink: #2d1502;
+}
+html[data-ui-theme="ancient_egypt"] {
+  --t-hero-img:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 10px, transparent 10px, transparent 20px),
+    linear-gradient(135deg, #b27904 0%, #0d9488 52%, #1e3a8a 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #9aa6ca;
+  --t-hover: rgba(202, 138, 4, 0.32);
+  --t-panel-hover: #1e3a8a;
+  --t-ink: #332301;
+}
+html[data-ui-theme="greek_olympus"] {
+  --t-hero-img:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 10px, transparent 10px, transparent 20px),
+    linear-gradient(135deg, #0284c7 0%, #a57c12 52%, #869198 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #e0f2fe;
+  --t-hover: rgba(2, 132, 199, 0.32);
+  --t-panel-hover: #d4a017;
+  --t-ink: #012132;
+}
+html[data-ui-theme="samurai_dojo"] {
+  --t-hero-img:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 2px, transparent 2px, transparent 28px),
+    linear-gradient(135deg, #b91c1c 0%, #1c1917 52%, #8a8b8d 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #e5e7eb;
+  --t-hover: rgba(185, 28, 28, 0.32);
+  --t-panel-hover: #1c1917;
+  --t-ink: #2e0707;
+}
+html[data-ui-theme="viking_saga"] {
+  --t-hero-img:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 10px, transparent 10px, transparent 20px),
+    linear-gradient(135deg, #1e3a8a 0%, #78350f 52%, #828fa2 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #94a3b8;
+  --t-hover: rgba(30, 58, 138, 0.32);
+  --t-panel-hover: #94a3b8;
+  --t-ink: #080f23;
+}
+html[data-ui-theme="wild_west"] {
+  --t-hero-img:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 2px, transparent 2px, transparent 28px),
+    linear-gradient(135deg, #b45309 0%, #92400e 52%, #978a52 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #fde68a;
+  --t-hover: rgba(180, 83, 9, 0.32);
+  --t-panel-hover: #92400e;
+  --t-ink: #2d1502;
+}
+html[data-ui-theme="art_deco"] {
+  --t-hero-img:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 10px, transparent 10px, transparent 20px),
+    linear-gradient(135deg, #b27904 0%, #0f172a 52%, #97862a 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #fde047;
+  --t-hover: rgba(202, 138, 4, 0.32);
+  --t-panel-hover: #0f172a;
+  --t-ink: #332301;
+}
+html[data-ui-theme="victorian_library"] {
+  --t-hero-img:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 10px, transparent 10px, transparent 20px),
+    linear-gradient(135deg, #7f1d1d 0%, #166534 52%, #bb8d14 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #d4a017;
+  --t-hover: rgba(127, 29, 29, 0.32);
+  --t-panel-hover: #d4a017;
+  --t-ink: #200707;
+}
+html[data-ui-theme="groovy_70s"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #ea580c 0%, #b27904 52%, #669e11 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #84cc16;
+  --t-hover: rgba(234, 88, 12, 0.32);
+  --t-panel-hover: #84cc16;
+  --t-ink: #3b1603;
+}
+html[data-ui-theme="pixel_arcade"] {
+  --t-hero-img:
+    linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(135deg, #7c3aed 0%, #1790a2 52%, #ab8b0e 100%);
+  --t-hero-size: 28px 28px, 28px 28px, 100% 100%;
+  --t-hero-border: #facc15;
+  --t-hover: rgba(124, 58, 237, 0.32);
+  --t-panel-hover: #facc15;
+  --t-ink: #1f0f3b;
+}
+html[data-ui-theme="y2k_chrome"] {
+  --t-hero-img:
+    linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(135deg, #727e8f 0%, #ec4899 52%, #2b92c0 100%);
+  --t-hero-size: 28px 28px, 28px 28px, 100% 100%;
+  --t-hero-border: #38bdf8;
+  --t-hover: rgba(148, 163, 184, 0.32);
+  --t-panel-hover: #38bdf8;
+  --t-ink: #25292e;
+}
+html[data-ui-theme="vaporwave"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #bd588d 0%, #1790a2 52%, #937adc 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #d7cbfd;
+  --t-hover: rgba(244, 114, 182, 0.32);
+  --t-panel-hover: #a78bfa;
+  --t-ink: #3d1d2e;
+}
+html[data-ui-theme="cyberpunk_city"] {
+  --t-hero-img:
+    linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(135deg, #967a0c 0%, #ec4899 52%, #05a0bb 100%);
+  --t-hero-size: 28px 28px, 28px 28px, 100% 100%;
+  --t-hero-border: #06b6d4;
+  --t-hover: rgba(250, 204, 21, 0.32);
+  --t-panel-hover: #06b6d4;
+  --t-ink: #3f3305;
+}
+html[data-ui-theme="lofi_study"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #8b5cf6 0%, #c2712f 52%, #aa7291 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #f9a8d4;
+  --t-hover: rgba(139, 92, 246, 0.32);
+  --t-panel-hover: #f9a8d4;
+  --t-ink: #23173e;
+}
+html[data-ui-theme="coffee_shop"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #78350f 0%, #a16207 52%, #989178 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fef3c7;
+  --t-hover: rgba(120, 53, 15, 0.32);
+  --t-panel-hover: #a16207;
+  --t-ink: #1e0d04;
+}
+html[data-ui-theme="cozy_cabin"] {
+  --t-hero-img:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 2px, transparent 2px, transparent 28px),
+    linear-gradient(135deg, #b45309 0%, #dc2626 52%, #ac9035 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #fcd34d;
+  --t-hover: rgba(180, 83, 9, 0.32);
+  --t-panel-hover: #fcd34d;
+  --t-ink: #2d1502;
+}
+html[data-ui-theme="science_lab"] {
+  --t-hero-img:
+    linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(135deg, #0c8f64 0%, #048da5 52%, #6f9d24 100%);
+  --t-hero-size: 28px 28px, 28px 28px, 100% 100%;
+  --t-hero-border: #a3e635;
+  --t-hover: rgba(16, 185, 129, 0.32);
+  --t-panel-hover: #a3e635;
+  --t-ink: #042e20;
+}
+html[data-ui-theme="graph_paper_math"] {
+  --t-hero-img:
+    linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(135deg, #2563eb 0%, #ef4444 52%, #16a34a 100%);
+  --t-hero-size: 28px 28px, 28px 28px, 100% 100%;
+  --t-hero-border: #96d6ae;
+  --t-hover: rgba(37, 99, 235, 0.32);
+  --t-panel-hover: #16a34a;
+  --t-ink: #09193b;
+}
+html[data-ui-theme="periodic_neon"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #5a8b0f 0%, #1790a2 52%, #cc6adb 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #e879f9;
+  --t-hover: rgba(132, 204, 22, 0.32);
+  --t-panel-hover: #e879f9;
+  --t-ink: #213306;
+}
+html[data-ui-theme="atlas_maps"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #0e7490 0%, #b45309 52%, #65a30d 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #bad692;
+  --t-hover: rgba(14, 116, 144, 0.32);
+  --t-panel-hover: #65a30d;
+  --t-ink: #041d24;
+}
+html[data-ui-theme="old_parchment"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #92400e 0%, #a16207 52%, #978a52 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fde68a;
+  --t-hover: rgba(146, 64, 14, 0.32);
+  --t-panel-hover: #a16207;
+  --t-ink: #251004;
+}
+html[data-ui-theme="concert_hall"] {
+  --t-hero-img:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 2px, transparent 2px, transparent 28px),
+    linear-gradient(135deg, #7f1d1d 0%, #b45309 52%, #ac9035 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #fcd34d;
+  --t-hover: rgba(127, 29, 29, 0.32);
+  --t-panel-hover: #fcd34d;
+  --t-ink: #200707;
+}
+html[data-ui-theme="art_studio"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #ec4899 0%, #967a0c 52%, #3b82f6 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #a7c7fb;
+  --t-hover: rgba(236, 72, 153, 0.32);
+  --t-panel-hover: #3b82f6;
+  --t-ink: #3b1226;
+}
+html[data-ui-theme="stadium_lights"] {
+  --t-hero-img:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.10) 0px, rgba(0, 0, 0, 0.10) 2px, transparent 2px, transparent 28px),
+    linear-gradient(135deg, #138f41 0%, #2563eb 52%, #838485 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #f8fafc;
+  --t-hover: rgba(22, 163, 74, 0.32);
+  --t-panel-hover: #2563eb;
+  --t-ink: #062913;
+}
+html[data-ui-theme="robotics_lab"] {
+  --t-hero-img:
+    linear-gradient(to right, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(135deg, #64748b 0%, #048da5 52%, #db6513 100%);
+  --t-hero-size: 28px 28px, 28px 28px, 100% 100%;
+  --t-hero-border: #fcc096;
+  --t-hover: rgba(100, 116, 139, 0.32);
+  --t-panel-hover: #f97316;
+  --t-ink: #191d23;
+}
+html[data-ui-theme="detective_noir"] {
+  --t-hero-img:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 10px, transparent 10px, transparent 20px),
+    linear-gradient(135deg, #475569 0%, #967a0c 52%, #888b90 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #e2e8f0;
+  --t-hover: rgba(71, 85, 105, 0.32);
+  --t-panel-hover: #facc15;
+  --t-ink: #12151a;
+}
+html[data-ui-theme="fairy_tale"] {
+  --t-hero-img:
+    radial-gradient(circle, rgba(255, 255, 255, 0.85) 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(255, 255, 255, 0.6) 0.8px, transparent 1.3px),
+    linear-gradient(135deg, #9566c3 0%, #aa7291 52%, #978a52 100%);
+  --t-hero-size: 90px 90px, 57px 57px, 100% 100%;
+  --t-hero-border: #fde68a;
+  --t-hover: rgba(192, 132, 252, 0.32);
+  --t-panel-hover: #f9a8d4;
+  --t-ink: #30213f;
+}
+html[data-ui-theme="dragon_realm"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #dc2626 0%, #15803d 52%, #ab8219 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fbbf24;
+  --t-hover: rgba(220, 38, 38, 0.32);
+  --t-panel-hover: #fbbf24;
+  --t-ink: #370a0a;
+}
+html[data-ui-theme="dino_world"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #598f0b 0%, #a16207 52%, #db6513 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fcc096;
+  --t-hover: rgba(101, 163, 13, 0.32);
+  --t-panel-hover: #f97316;
+  --t-ink: #192903;
+}
+html[data-ui-theme="kawaii_pastel"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #aa7291 0%, #717aac 52%, #978a52 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fde68a;
+  --t-hover: rgba(249, 168, 212, 0.32);
+  --t-panel-hover: #a5b4fc;
+  --t-ink: #3e2a35;
+}
+html[data-ui-theme="monochrome_ink"] {
+  --t-hero-img:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.07) 0px, rgba(255, 255, 255, 0.07) 10px, transparent 10px, transparent 20px),
+    linear-gradient(135deg, #111827 0%, #4b5563 52%, #8a8b8d 100%);
+  --t-hero-size: 100% 100%, 100% 100%;
+  --t-hero-border: #e5e7eb;
+  --t-hover: rgba(17, 24, 39, 0.32);
+  --t-panel-hover: #4b5563;
+  --t-ink: #04060a;
+}
+html[data-ui-theme="sunset_beach"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #c2712f 0%, #f43f5e 52%, #2b92c0 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #38bdf8;
+  --t-hover: rgba(251, 146, 60, 0.32);
+  --t-panel-hover: #38bdf8;
+  --t-ink: #3f250f;
+}
+html[data-ui-theme="midnight_city"] {
+  --t-hero-img:
+    radial-gradient(rgba(255, 255, 255, 0.22) 1.75px, transparent 1.75px),
+    linear-gradient(135deg, #1d4ed8 0%, #7c3aed 52%, #ab8219 100%);
+  --t-hero-size: 18px 18px, 100% 100%;
+  --t-hero-border: #fbbf24;
+  --t-hover: rgba(29, 78, 216, 0.32);
+  --t-panel-hover: #fbbf24;
+  --t-ink: #071436;
+}
+
+/* ---- Shared rules (hero banners, hover colours, card ink shadow) ---- */
+html:is(
+  [data-ui-theme="ocean_reef"],
+  [data-ui-theme="arctic_aurora"],
+  [data-ui-theme="golden_savanna"],
+  [data-ui-theme="rainforest_canopy"],
+  [data-ui-theme="alpine_snow"],
+  [data-ui-theme="autumn_maple"],
+  [data-ui-theme="spring_meadow"],
+  [data-ui-theme="lavender_fields"],
+  [data-ui-theme="volcano_lava"],
+  [data-ui-theme="deep_ocean"],
+  [data-ui-theme="thunderstorm"],
+  [data-ui-theme="golden_sunrise"],
+  [data-ui-theme="rainy_day"],
+  [data-ui-theme="bamboo_zen"],
+  [data-ui-theme="moonlit_lake"],
+  [data-ui-theme="pirate_voyage"],
+  [data-ui-theme="medieval_castle"],
+  [data-ui-theme="steampunk_brass"],
+  [data-ui-theme="ancient_egypt"],
+  [data-ui-theme="greek_olympus"],
+  [data-ui-theme="samurai_dojo"],
+  [data-ui-theme="viking_saga"],
+  [data-ui-theme="wild_west"],
+  [data-ui-theme="art_deco"],
+  [data-ui-theme="victorian_library"],
+  [data-ui-theme="groovy_70s"],
+  [data-ui-theme="pixel_arcade"],
+  [data-ui-theme="y2k_chrome"],
+  [data-ui-theme="vaporwave"],
+  [data-ui-theme="cyberpunk_city"],
+  [data-ui-theme="lofi_study"],
+  [data-ui-theme="coffee_shop"],
+  [data-ui-theme="cozy_cabin"],
+  [data-ui-theme="science_lab"],
+  [data-ui-theme="graph_paper_math"],
+  [data-ui-theme="periodic_neon"],
+  [data-ui-theme="atlas_maps"],
+  [data-ui-theme="old_parchment"],
+  [data-ui-theme="concert_hall"],
+  [data-ui-theme="art_studio"],
+  [data-ui-theme="stadium_lights"],
+  [data-ui-theme="robotics_lab"],
+  [data-ui-theme="detective_noir"],
+  [data-ui-theme="fairy_tale"],
+  [data-ui-theme="dragon_realm"],
+  [data-ui-theme="dino_world"],
+  [data-ui-theme="kawaii_pastel"],
+  [data-ui-theme="monochrome_ink"],
+  [data-ui-theme="sunset_beach"],
+  [data-ui-theme="midnight_city"]
+) :is(.holo-command-deck, .command-deck-hero, .comic-tab-hero) {
+  background-image: var(--t-hero-img) !important;
+  background-size: var(--t-hero-size) !important;
+  border-color: var(--t-hero-border) !important;
+}
+
+html:is(
+  [data-ui-theme="ocean_reef"],
+  [data-ui-theme="arctic_aurora"],
+  [data-ui-theme="golden_savanna"],
+  [data-ui-theme="rainforest_canopy"],
+  [data-ui-theme="alpine_snow"],
+  [data-ui-theme="autumn_maple"],
+  [data-ui-theme="spring_meadow"],
+  [data-ui-theme="lavender_fields"],
+  [data-ui-theme="volcano_lava"],
+  [data-ui-theme="deep_ocean"],
+  [data-ui-theme="thunderstorm"],
+  [data-ui-theme="golden_sunrise"],
+  [data-ui-theme="rainy_day"],
+  [data-ui-theme="bamboo_zen"],
+  [data-ui-theme="moonlit_lake"],
+  [data-ui-theme="pirate_voyage"],
+  [data-ui-theme="medieval_castle"],
+  [data-ui-theme="steampunk_brass"],
+  [data-ui-theme="ancient_egypt"],
+  [data-ui-theme="greek_olympus"],
+  [data-ui-theme="samurai_dojo"],
+  [data-ui-theme="viking_saga"],
+  [data-ui-theme="wild_west"],
+  [data-ui-theme="art_deco"],
+  [data-ui-theme="victorian_library"],
+  [data-ui-theme="groovy_70s"],
+  [data-ui-theme="pixel_arcade"],
+  [data-ui-theme="y2k_chrome"],
+  [data-ui-theme="vaporwave"],
+  [data-ui-theme="cyberpunk_city"],
+  [data-ui-theme="lofi_study"],
+  [data-ui-theme="coffee_shop"],
+  [data-ui-theme="cozy_cabin"],
+  [data-ui-theme="science_lab"],
+  [data-ui-theme="graph_paper_math"],
+  [data-ui-theme="periodic_neon"],
+  [data-ui-theme="atlas_maps"],
+  [data-ui-theme="old_parchment"],
+  [data-ui-theme="concert_hall"],
+  [data-ui-theme="art_studio"],
+  [data-ui-theme="stadium_lights"],
+  [data-ui-theme="robotics_lab"],
+  [data-ui-theme="detective_noir"],
+  [data-ui-theme="fairy_tale"],
+  [data-ui-theme="dragon_realm"],
+  [data-ui-theme="dino_world"],
+  [data-ui-theme="kawaii_pastel"],
+  [data-ui-theme="monochrome_ink"],
+  [data-ui-theme="sunset_beach"],
+  [data-ui-theme="midnight_city"]
+) .comic-pop-card:hover {
+  box-shadow: 4px 7px 0 0 var(--t-hover);
+}
+
+html:is(
+  [data-ui-theme="ocean_reef"],
+  [data-ui-theme="arctic_aurora"],
+  [data-ui-theme="golden_savanna"],
+  [data-ui-theme="rainforest_canopy"],
+  [data-ui-theme="alpine_snow"],
+  [data-ui-theme="autumn_maple"],
+  [data-ui-theme="spring_meadow"],
+  [data-ui-theme="lavender_fields"],
+  [data-ui-theme="volcano_lava"],
+  [data-ui-theme="deep_ocean"],
+  [data-ui-theme="thunderstorm"],
+  [data-ui-theme="golden_sunrise"],
+  [data-ui-theme="rainy_day"],
+  [data-ui-theme="bamboo_zen"],
+  [data-ui-theme="moonlit_lake"],
+  [data-ui-theme="pirate_voyage"],
+  [data-ui-theme="medieval_castle"],
+  [data-ui-theme="steampunk_brass"],
+  [data-ui-theme="ancient_egypt"],
+  [data-ui-theme="greek_olympus"],
+  [data-ui-theme="samurai_dojo"],
+  [data-ui-theme="viking_saga"],
+  [data-ui-theme="wild_west"],
+  [data-ui-theme="art_deco"],
+  [data-ui-theme="victorian_library"],
+  [data-ui-theme="groovy_70s"],
+  [data-ui-theme="pixel_arcade"],
+  [data-ui-theme="y2k_chrome"],
+  [data-ui-theme="vaporwave"],
+  [data-ui-theme="cyberpunk_city"],
+  [data-ui-theme="lofi_study"],
+  [data-ui-theme="coffee_shop"],
+  [data-ui-theme="cozy_cabin"],
+  [data-ui-theme="science_lab"],
+  [data-ui-theme="graph_paper_math"],
+  [data-ui-theme="periodic_neon"],
+  [data-ui-theme="atlas_maps"],
+  [data-ui-theme="old_parchment"],
+  [data-ui-theme="concert_hall"],
+  [data-ui-theme="art_studio"],
+  [data-ui-theme="stadium_lights"],
+  [data-ui-theme="robotics_lab"],
+  [data-ui-theme="detective_noir"],
+  [data-ui-theme="fairy_tale"],
+  [data-ui-theme="dragon_realm"],
+  [data-ui-theme="dino_world"],
+  [data-ui-theme="kawaii_pastel"],
+  [data-ui-theme="monochrome_ink"],
+  [data-ui-theme="sunset_beach"],
+  [data-ui-theme="midnight_city"]
+) .comic-panel:hover {
+  border-bottom-color: var(--t-panel-hover) !important;
+}
+
+html:not(.dark):is(
+  [data-ui-theme="ocean_reef"],
+  [data-ui-theme="arctic_aurora"],
+  [data-ui-theme="golden_savanna"],
+  [data-ui-theme="rainforest_canopy"],
+  [data-ui-theme="alpine_snow"],
+  [data-ui-theme="autumn_maple"],
+  [data-ui-theme="spring_meadow"],
+  [data-ui-theme="lavender_fields"],
+  [data-ui-theme="volcano_lava"],
+  [data-ui-theme="deep_ocean"],
+  [data-ui-theme="thunderstorm"],
+  [data-ui-theme="golden_sunrise"],
+  [data-ui-theme="rainy_day"],
+  [data-ui-theme="bamboo_zen"],
+  [data-ui-theme="moonlit_lake"],
+  [data-ui-theme="pirate_voyage"],
+  [data-ui-theme="medieval_castle"],
+  [data-ui-theme="steampunk_brass"],
+  [data-ui-theme="ancient_egypt"],
+  [data-ui-theme="greek_olympus"],
+  [data-ui-theme="samurai_dojo"],
+  [data-ui-theme="viking_saga"],
+  [data-ui-theme="wild_west"],
+  [data-ui-theme="art_deco"],
+  [data-ui-theme="victorian_library"],
+  [data-ui-theme="groovy_70s"],
+  [data-ui-theme="pixel_arcade"],
+  [data-ui-theme="y2k_chrome"],
+  [data-ui-theme="vaporwave"],
+  [data-ui-theme="cyberpunk_city"],
+  [data-ui-theme="lofi_study"],
+  [data-ui-theme="coffee_shop"],
+  [data-ui-theme="cozy_cabin"],
+  [data-ui-theme="science_lab"],
+  [data-ui-theme="graph_paper_math"],
+  [data-ui-theme="periodic_neon"],
+  [data-ui-theme="atlas_maps"],
+  [data-ui-theme="old_parchment"],
+  [data-ui-theme="concert_hall"],
+  [data-ui-theme="art_studio"],
+  [data-ui-theme="stadium_lights"],
+  [data-ui-theme="robotics_lab"],
+  [data-ui-theme="detective_noir"],
+  [data-ui-theme="fairy_tale"],
+  [data-ui-theme="dragon_realm"],
+  [data-ui-theme="dino_world"],
+  [data-ui-theme="kawaii_pastel"],
+  [data-ui-theme="monochrome_ink"],
+  [data-ui-theme="sunset_beach"],
+  [data-ui-theme="midnight_city"]
+) .comic-pop-card:not(:hover) {
+  box-shadow: 0 5px 0 0 var(--t-ink);
+}
+
+/* ---- Page backgrounds: light + dark per theme ---- */
+/* Coral Reef */
+html[data-ui-theme="ocean_reef"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F7F8F6;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(8, 145, 178, 0.2) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(249, 115, 22, 0.18) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(253, 224, 71, 0.18) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(8, 145, 178, 0.12) 0px, transparent 120px),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(8, 145, 178, 0.12) 22px, rgba(8, 145, 178, 0.12) 24px),
+    radial-gradient(at 100% 0%, rgba(249, 115, 22, 0.14) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="ocean_reef"].dark .atelier-canvas-bg {
+  background-color: #0D0D0A;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(94, 184, 205, 0.25) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(251, 164, 104, 0.225) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(253, 230, 108, 0.225) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(94, 184, 205, 0.15) 0px, transparent 120px),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(94, 184, 205, 0.13) 22px, rgba(94, 184, 205, 0.13) 24px),
+    radial-gradient(at 100% 0%, rgba(251, 164, 104, 0.175) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Arctic Aurora */
+html[data-ui-theme="arctic_aurora"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F6FAFE;
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(34, 211, 238, 0.3) 0px, transparent 55%),
+    radial-gradient(ellipse at 60% 0%, rgba(167, 139, 250, 0.24) 0px, transparent 55%),
+    radial-gradient(ellipse at 95% 15%, rgba(52, 211, 153, 0.2) 0px, transparent 50%),
+    radial-gradient(circle, rgba(52, 211, 153, 0.45) 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(52, 211, 153, 0.3) 1px, transparent 1.6px),
+    radial-gradient(at 10% 0%, rgba(34, 211, 238, 0.18) 0px, transparent 45%),
+    radial-gradient(at 95% 90%, rgba(167, 139, 250, 0.18) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 97px 97px, 61px 61px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 23px 31px, 0 0, 0 0;
+}
+html[data-ui-theme="arctic_aurora"].dark .atelier-canvas-bg {
+  background-color: #0A1118;
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(111, 226, 244, 0.375) 0px, transparent 55%),
+    radial-gradient(ellipse at 60% 0%, rgba(198, 180, 252, 0.3) 0px, transparent 55%),
+    radial-gradient(ellipse at 95% 15%, rgba(93, 220, 173, 0.25) 0px, transparent 50%),
+    radial-gradient(circle, rgba(93, 220, 173, 0.85) 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(93, 220, 173, 0.55) 1px, transparent 1.6px),
+    radial-gradient(at 10% 0%, rgba(111, 226, 244, 0.225) 0px, transparent 45%),
+    radial-gradient(at 95% 90%, rgba(198, 180, 252, 0.225) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 97px 97px, 61px 61px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 23px 31px, 0 0, 0 0;
+}
+/* Golden Savanna */
+html[data-ui-theme="golden_savanna"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FCF6F0;
+  background-image:
+    linear-gradient(to top, rgba(217, 119, 6, 0.28) 0%, transparent 45%),
+    repeating-linear-gradient(-45deg, rgba(217, 119, 6, 0.096) 0px, rgba(217, 119, 6, 0.096) 10px, transparent 10px, transparent 22px),
+    radial-gradient(at 50% 0%, rgba(180, 83, 9, 0.16) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(217, 119, 6, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(180, 83, 9, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="golden_savanna"].dark .atelier-canvas-bg {
+  background-color: #140A01;
+  background-image:
+    linear-gradient(to top, rgba(230, 167, 93, 0.35) 0%, transparent 45%),
+    repeating-linear-gradient(-45deg, rgba(230, 167, 93, 0.104) 0px, rgba(230, 167, 93, 0.104) 10px, transparent 10px, transparent 22px),
+    radial-gradient(at 50% 0%, rgba(206, 143, 95, 0.2) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(230, 167, 93, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(206, 143, 95, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Rainforest Canopy */
+html[data-ui-theme="rainforest_canopy"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F1F8F4;
+  background-image:
+    radial-gradient(rgba(22, 163, 74, 0.18) 3px, transparent 3.5px),
+    radial-gradient(rgba(250, 204, 21, 0.18) 3px, transparent 3.5px),
+    radial-gradient(ellipse at 20% 0%, rgba(21, 128, 61, 0.3) 0px, transparent 55%),
+    radial-gradient(ellipse at 60% 0%, rgba(22, 163, 74, 0.24) 0px, transparent 55%),
+    radial-gradient(ellipse at 95% 15%, rgba(250, 204, 21, 0.2) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(21, 128, 61, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(22, 163, 74, 0.12) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="rainforest_canopy"].dark .atelier-canvas-bg {
+  background-color: #020F07;
+  background-image:
+    radial-gradient(rgba(104, 195, 137, 0.195) 3px, transparent 3.5px),
+    radial-gradient(rgba(251, 214, 68, 0.195) 3px, transparent 3.5px),
+    radial-gradient(ellipse at 20% 0%, rgba(103, 172, 129, 0.375) 0px, transparent 55%),
+    radial-gradient(ellipse at 60% 0%, rgba(104, 195, 137, 0.3) 0px, transparent 55%),
+    radial-gradient(ellipse at 95% 15%, rgba(251, 214, 68, 0.25) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(103, 172, 129, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(104, 195, 137, 0.15) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Alpine Snow */
+html[data-ui-theme="alpine_snow"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F3F8FB;
+  background-image:
+    linear-gradient(to top, rgba(14, 165, 233, 0.28) 0%, transparent 45%),
+    radial-gradient(rgba(14, 165, 233, 0.132) 1.5px, transparent 1.5px),
+    radial-gradient(at 50% 0%, rgba(100, 116, 139, 0.16) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(14, 165, 233, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(100, 116, 139, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 24px 24px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="alpine_snow"].dark .atelier-canvas-bg {
+  background-color: #060E13;
+  background-image:
+    linear-gradient(to top, rgba(98, 197, 241, 0.35) 0%, transparent 45%),
+    radial-gradient(rgba(98, 197, 241, 0.143) 1.5px, transparent 1.5px),
+    radial-gradient(at 50% 0%, rgba(154, 165, 180, 0.2) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(98, 197, 241, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(154, 165, 180, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 24px 24px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Autumn Maple */
+html[data-ui-theme="autumn_maple"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FBF3F1;
+  background-image:
+    radial-gradient(circle at 50% 100%, transparent 9px, rgba(194, 65, 12, 0.144) 9px, rgba(194, 65, 12, 0.144) 10.5px, transparent 10.5px),
+    radial-gradient(at 0% 0%, rgba(194, 65, 12, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(185, 28, 28, 0.12) 0px, transparent 45%);
+  background-size: 28px 16px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="autumn_maple"].dark .atelier-canvas-bg {
+  background-color: #130502;
+  background-image:
+    radial-gradient(circle at 50% 100%, transparent 9px, rgba(215, 132, 97, 0.156) 9px, rgba(215, 132, 97, 0.156) 10.5px, transparent 10.5px),
+    radial-gradient(at 0% 0%, rgba(215, 132, 97, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(210, 107, 107, 0.15) 0px, transparent 45%);
+  background-size: 28px 16px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+/* Spring Meadow */
+html[data-ui-theme="spring_meadow"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FAFAF0;
+  background-image:
+    radial-gradient(rgba(234, 179, 8, 0.18) 3px, transparent 3.5px),
+    radial-gradient(rgba(244, 114, 182, 0.18) 3px, transparent 3.5px),
+    radial-gradient(at 0% 0%, rgba(101, 163, 13, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(234, 179, 8, 0.12) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0;
+}
+html[data-ui-theme="spring_meadow"].dark .atelier-canvas-bg {
+  background-color: #111101;
+  background-image:
+    radial-gradient(rgba(241, 206, 94, 0.195) 3px, transparent 3.5px),
+    radial-gradient(rgba(246, 142, 197, 0.195) 3px, transparent 3.5px),
+    radial-gradient(at 0% 0%, rgba(155, 195, 98, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(241, 206, 94, 0.15) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0;
+}
+/* Lavender Fields */
+html[data-ui-theme="lavender_fields"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F9F7FF;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(139, 92, 246, 0.108) 0px, rgba(139, 92, 246, 0.108) 14px, transparent 14px, transparent 30px),
+    linear-gradient(to top, rgba(139, 92, 246, 0.28) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(167, 139, 250, 0.12) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(167, 139, 250, 0.16) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="lavender_fields"].dark .atelier-canvas-bg {
+  background-color: #0F0C19;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(180, 149, 249, 0.117) 0px, rgba(180, 149, 249, 0.117) 14px, transparent 14px, transparent 30px),
+    linear-gradient(to top, rgba(180, 149, 249, 0.35) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(180, 149, 249, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(198, 180, 252, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(198, 180, 252, 0.2) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Volcanic Lava */
+html[data-ui-theme="volcano_lava"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FDF3F1;
+  background-image:
+    linear-gradient(to top, rgba(220, 38, 38, 0.28) 0%, transparent 45%),
+    repeating-linear-gradient(45deg, rgba(220, 38, 38, 0.072) 0px, rgba(220, 38, 38, 0.072) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(-45deg, rgba(220, 38, 38, 0.072) 0px, rgba(220, 38, 38, 0.072) 1px, transparent 1px, transparent 9px),
+    radial-gradient(at 50% 0%, rgba(234, 88, 12, 0.16) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(220, 38, 38, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(234, 88, 12, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="volcano_lava"].dark .atelier-canvas-bg {
+  background-color: #170602;
+  background-image:
+    linear-gradient(to top, rgba(232, 114, 114, 0.35) 0%, transparent 45%),
+    repeating-linear-gradient(45deg, rgba(232, 114, 114, 0.078) 0px, rgba(232, 114, 114, 0.078) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(-45deg, rgba(232, 114, 114, 0.078) 0px, rgba(232, 114, 114, 0.078) 1px, transparent 1px, transparent 9px),
+    radial-gradient(at 50% 0%, rgba(241, 146, 97, 0.2) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(232, 114, 114, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(241, 146, 97, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Deep Ocean Abyss */
+html[data-ui-theme="deep_ocean"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F0F5F8;
+  background-image:
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(3, 105, 161, 0.12) 22px, rgba(3, 105, 161, 0.12) 24px),
+    radial-gradient(circle at 15% 25%, rgba(3, 105, 161, 0.2) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(12, 74, 110, 0.18) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(34, 211, 238, 0.18) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(3, 105, 161, 0.12) 0px, transparent 120px),
+    radial-gradient(at 100% 0%, rgba(12, 74, 110, 0.14) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="deep_ocean"].dark .atelier-canvas-bg {
+  background-color: #01090E;
+  background-image:
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(91, 158, 194, 0.13) 22px, rgba(91, 158, 194, 0.13) 24px),
+    radial-gradient(circle at 15% 25%, rgba(91, 158, 194, 0.25) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(97, 137, 161, 0.225) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(78, 220, 241, 0.225) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(91, 158, 194, 0.15) 0px, transparent 120px),
+    radial-gradient(at 100% 0%, rgba(97, 137, 161, 0.175) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Thunderstorm */
+html[data-ui-theme="thunderstorm"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F5F5FA;
+  background-image:
+    repeating-linear-gradient(-45deg, rgba(71, 85, 105, 0.096) 0px, rgba(71, 85, 105, 0.096) 10px, transparent 10px, transparent 22px),
+    radial-gradient(ellipse at 20% 0%, rgba(71, 85, 105, 0.3) 0px, transparent 55%),
+    radial-gradient(ellipse at 60% 0%, rgba(99, 102, 241, 0.24) 0px, transparent 55%),
+    radial-gradient(ellipse at 95% 15%, rgba(253, 224, 71, 0.2) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(71, 85, 105, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="thunderstorm"].dark .atelier-canvas-bg {
+  background-color: #080911;
+  background-image:
+    repeating-linear-gradient(-45deg, rgba(135, 145, 158, 0.104) 0px, rgba(135, 145, 158, 0.104) 10px, transparent 10px, transparent 22px),
+    radial-gradient(ellipse at 20% 0%, rgba(135, 145, 158, 0.375) 0px, transparent 55%),
+    radial-gradient(ellipse at 60% 0%, rgba(154, 156, 246, 0.3) 0px, transparent 55%),
+    radial-gradient(ellipse at 95% 15%, rgba(253, 230, 108, 0.25) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(135, 145, 158, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(154, 156, 246, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Golden Sunrise */
+html[data-ui-theme="golden_sunrise"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FFF7F4;
+  background-image:
+    linear-gradient(to top, rgba(249, 115, 22, 0.28) 0%, transparent 45%),
+    radial-gradient(rgba(249, 115, 22, 0.132) 1.5px, transparent 1.5px),
+    radial-gradient(at 50% 0%, rgba(251, 113, 133, 0.16) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(249, 115, 22, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(251, 113, 133, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 24px 24px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="golden_sunrise"].dark .atelier-canvas-bg {
+  background-color: #190B08;
+  background-image:
+    linear-gradient(to top, rgba(251, 164, 104, 0.35) 0%, transparent 45%),
+    radial-gradient(rgba(251, 164, 104, 0.143) 1.5px, transparent 1.5px),
+    radial-gradient(at 50% 0%, rgba(252, 163, 176, 0.2) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(251, 164, 104, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(252, 163, 176, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 24px 24px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Rainy Day Window */
+html[data-ui-theme="rainy_day"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F4F9FB;
+  background-image:
+    repeating-linear-gradient(-45deg, rgba(100, 116, 139, 0.096) 0px, rgba(100, 116, 139, 0.096) 10px, transparent 10px, transparent 22px),
+    radial-gradient(rgba(100, 116, 139, 0.132) 1.5px, transparent 1.5px),
+    radial-gradient(at 0% 0%, rgba(100, 116, 139, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.12) 0px, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(100, 116, 139, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 24px 24px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="rainy_day"].dark .atelier-canvas-bg {
+  background-color: #080F13;
+  background-image:
+    repeating-linear-gradient(-45deg, rgba(154, 165, 180, 0.104) 0px, rgba(154, 165, 180, 0.104) 10px, transparent 10px, transparent 22px),
+    radial-gradient(rgba(154, 165, 180, 0.143) 1.5px, transparent 1.5px),
+    radial-gradient(at 0% 0%, rgba(154, 165, 180, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(126, 212, 250, 0.15) 0px, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(154, 165, 180, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(126, 212, 250, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 24px 24px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Bamboo Zen */
+html[data-ui-theme="bamboo_zen"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F5F8F1;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(101, 163, 13, 0.108) 0px, rgba(101, 163, 13, 0.108) 14px, transparent 14px, transparent 30px),
+    radial-gradient(at 0% 0%, rgba(101, 163, 13, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(77, 124, 15, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="bamboo_zen"].dark .atelier-canvas-bg {
+  background-color: #090E01;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(155, 195, 98, 0.117) 0px, rgba(155, 195, 98, 0.117) 14px, transparent 14px, transparent 30px),
+    radial-gradient(at 0% 0%, rgba(155, 195, 98, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(139, 170, 99, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+/* Moonlit Lake */
+html[data-ui-theme="moonlit_lake"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F4F8FE;
+  background-image:
+    radial-gradient(circle, rgba(224, 231, 255, 0.45) 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(224, 231, 255, 0.3) 1px, transparent 1.6px),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(99, 102, 241, 0.12) 22px, rgba(99, 102, 241, 0.12) 24px),
+    radial-gradient(at 10% 0%, rgba(99, 102, 241, 0.18) 0px, transparent 45%),
+    radial-gradient(at 95% 90%, rgba(56, 189, 248, 0.18) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(56, 189, 248, 0.14) 0px, transparent 45%);
+  background-size: 97px 97px, 61px 61px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 23px 31px, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="moonlit_lake"].dark .atelier-canvas-bg {
+  background-color: #080F18;
+  background-image:
+    radial-gradient(circle, rgba(230, 236, 255, 0.85) 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(230, 236, 255, 0.55) 1px, transparent 1.6px),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(154, 156, 246, 0.13) 22px, rgba(154, 156, 246, 0.13) 24px),
+    radial-gradient(at 10% 0%, rgba(154, 156, 246, 0.225) 0px, transparent 45%),
+    radial-gradient(at 95% 90%, rgba(126, 212, 250, 0.225) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(126, 212, 250, 0.175) 0px, transparent 45%);
+  background-size: 97px 97px, 61px 61px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 23px 31px, 0 0, 0 0, 0 0, 0 0;
+}
+/* Pirate Voyage */
+html[data-ui-theme="pirate_voyage"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F5F3F4;
+  background-image:
+    linear-gradient(90deg, rgba(146, 64, 14, 0.156) 2px, transparent 2px),
+    repeating-linear-gradient(0deg, rgba(146, 64, 14, 0.048) 0px, rgba(146, 64, 14, 0.048) 1px, transparent 1px, transparent 7px),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(146, 64, 14, 0.12) 22px, rgba(146, 64, 14, 0.12) 24px),
+    radial-gradient(at 15% 0%, rgba(30, 58, 138, 0.16) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(30, 58, 138, 0.14) 0px, transparent 45%);
+  background-size: 140px 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="pirate_voyage"].dark .atelier-canvas-bg {
+  background-color: #090608;
+  background-image:
+    linear-gradient(90deg, rgba(184, 131, 98, 0.169) 2px, transparent 2px),
+    repeating-linear-gradient(0deg, rgba(184, 131, 98, 0.052) 0px, rgba(184, 131, 98, 0.052) 1px, transparent 1px, transparent 7px),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(184, 131, 98, 0.13) 22px, rgba(184, 131, 98, 0.13) 24px),
+    radial-gradient(at 15% 0%, rgba(109, 127, 179, 0.2) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(109, 127, 179, 0.175) 0px, transparent 45%);
+  background-size: 140px 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Medieval Castle */
+html[data-ui-theme="medieval_castle"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F8F3F3;
+  background-image:
+    linear-gradient(to right, rgba(87, 83, 78, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(87, 83, 78, 0.12) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(87, 83, 78, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(185, 28, 28, 0.12) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="medieval_castle"].dark .atelier-canvas-bg {
+  background-color: #0E0605;
+  background-image:
+    linear-gradient(to right, rgba(146, 143, 140, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(146, 143, 140, 0.13) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(146, 143, 140, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(210, 107, 107, 0.15) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+/* Steampunk Brass */
+html[data-ui-theme="steampunk_brass"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F9F4F0;
+  background-image:
+    linear-gradient(to right, rgba(180, 83, 9, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(180, 83, 9, 0.12) 1px, transparent 1px),
+    linear-gradient(45deg, rgba(180, 83, 9, 0.12) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(180, 83, 9, 0.12) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(180, 83, 9, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(120, 53, 15, 0.12) 0px, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(180, 83, 9, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(120, 53, 15, 0.12) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 36px 36px, 36px 36px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="steampunk_brass"].dark .atelier-canvas-bg {
+  background-color: #0F0701;
+  background-image:
+    linear-gradient(to right, rgba(206, 143, 95, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(206, 143, 95, 0.13) 1px, transparent 1px),
+    linear-gradient(45deg, rgba(206, 143, 95, 0.13) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(206, 143, 95, 0.13) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(206, 143, 95, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(167, 124, 99, 0.15) 0px, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(206, 143, 95, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(167, 124, 99, 0.15) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 36px 36px, 36px 36px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Ancient Egypt */
+html[data-ui-theme="ancient_egypt"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F6F8F4;
+  background-image:
+    linear-gradient(135deg, rgba(202, 138, 4, 0.132) 25%, transparent 25%),
+    linear-gradient(225deg, rgba(202, 138, 4, 0.132) 25%, transparent 25%),
+    linear-gradient(315deg, rgba(202, 138, 4, 0.132) 25%, transparent 25%),
+    linear-gradient(45deg, rgba(202, 138, 4, 0.132) 25%, transparent 25%),
+    radial-gradient(at 100% 100%, rgba(13, 148, 136, 0.12) 0px, transparent 45%);
+  background-size: 36px 36px, 36px 36px, 36px 36px, 36px 36px, 100% 100%;
+  background-position: -18px 0, -18px 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="ancient_egypt"].dark .atelier-canvas-bg {
+  background-color: #0B0E07;
+  background-image:
+    linear-gradient(135deg, rgba(221, 179, 92, 0.143) 25%, transparent 25%),
+    linear-gradient(225deg, rgba(221, 179, 92, 0.143) 25%, transparent 25%),
+    linear-gradient(315deg, rgba(221, 179, 92, 0.143) 25%, transparent 25%),
+    linear-gradient(45deg, rgba(221, 179, 92, 0.143) 25%, transparent 25%),
+    radial-gradient(at 100% 100%, rgba(98, 185, 178, 0.15) 0px, transparent 45%);
+  background-size: 36px 36px, 36px 36px, 36px 36px, 36px 36px, 100% 100%;
+  background-position: -18px 0, -18px 0, 0 0, 0 0, 0 0;
+}
+/* Greek Olympus */
+html[data-ui-theme="greek_olympus"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F6F8F6;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(2, 132, 199, 0.144) 0px, rgba(2, 132, 199, 0.144) 2px, transparent 2px, transparent 26px),
+    linear-gradient(to top, rgba(2, 132, 199, 0.28) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(2, 132, 199, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(212, 160, 23, 0.12) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(212, 160, 23, 0.16) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="greek_olympus"].dark .atelier-canvas-bg {
+  background-color: #0B0F0B;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(91, 175, 219, 0.156) 0px, rgba(91, 175, 219, 0.156) 2px, transparent 2px, transparent 26px),
+    linear-gradient(to top, rgba(91, 175, 219, 0.35) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(91, 175, 219, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(227, 193, 104, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(227, 193, 104, 0.2) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Samurai Dojo */
+html[data-ui-theme="samurai_dojo"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F6F1F1;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(185, 28, 28, 0.108) 0px, rgba(185, 28, 28, 0.108) 14px, transparent 14px, transparent 30px),
+    radial-gradient(at 0% 0%, rgba(185, 28, 28, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(28, 25, 23, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="samurai_dojo"].dark .atelier-canvas-bg {
+  background-color: #0B0303;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(210, 107, 107, 0.117) 0px, rgba(210, 107, 107, 0.117) 14px, transparent 14px, transparent 30px),
+    radial-gradient(at 0% 0%, rgba(210, 107, 107, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(107, 106, 104, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+/* Viking Saga */
+html[data-ui-theme="viking_saga"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F4F3F4;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(30, 58, 138, 0.072) 0px, rgba(30, 58, 138, 0.072) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(-45deg, rgba(30, 58, 138, 0.072) 0px, rgba(30, 58, 138, 0.072) 1px, transparent 1px, transparent 9px),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(30, 58, 138, 0.12) 22px, rgba(30, 58, 138, 0.12) 24px),
+    radial-gradient(at 0% 0%, rgba(30, 58, 138, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(120, 53, 15, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(120, 53, 15, 0.14) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="viking_saga"].dark .atelier-canvas-bg {
+  background-color: #070608;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(109, 127, 179, 0.078) 0px, rgba(109, 127, 179, 0.078) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(-45deg, rgba(109, 127, 179, 0.078) 0px, rgba(109, 127, 179, 0.078) 1px, transparent 1px, transparent 9px),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(109, 127, 179, 0.13) 22px, rgba(109, 127, 179, 0.13) 24px),
+    radial-gradient(at 0% 0%, rgba(109, 127, 179, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(167, 124, 99, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(167, 124, 99, 0.175) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Wild West */
+html[data-ui-theme="wild_west"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F9F4F0;
+  background-image:
+    linear-gradient(90deg, rgba(180, 83, 9, 0.156) 2px, transparent 2px),
+    repeating-linear-gradient(0deg, rgba(180, 83, 9, 0.048) 0px, rgba(180, 83, 9, 0.048) 1px, transparent 1px, transparent 7px),
+    radial-gradient(at 15% 0%, rgba(146, 64, 14, 0.16) 0px, transparent 50%);
+  background-size: 140px 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="wild_west"].dark .atelier-canvas-bg {
+  background-color: #100701;
+  background-image:
+    linear-gradient(90deg, rgba(206, 143, 95, 0.169) 2px, transparent 2px),
+    repeating-linear-gradient(0deg, rgba(206, 143, 95, 0.052) 0px, rgba(206, 143, 95, 0.052) 1px, transparent 1px, transparent 7px),
+    radial-gradient(at 15% 0%, rgba(184, 131, 98, 0.2) 0px, transparent 50%);
+  background-size: 140px 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+/* Art Deco Gold */
+html[data-ui-theme="art_deco"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F6F5F1;
+  background-image:
+    linear-gradient(45deg, rgba(202, 138, 4, 0.12) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(202, 138, 4, 0.12) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(202, 138, 4, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.12) 0px, transparent 45%);
+  background-size: 36px 36px, 36px 36px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="art_deco"].dark .atelier-canvas-bg {
+  background-color: #0B0802;
+  background-image:
+    linear-gradient(45deg, rgba(221, 179, 92, 0.13) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(221, 179, 92, 0.13) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(221, 179, 92, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(99, 104, 117, 0.15) 0px, transparent 45%);
+  background-size: 36px 36px, 36px 36px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+/* Victorian Library */
+html[data-ui-theme="victorian_library"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F4F4F2;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(127, 29, 29, 0.072) 0px, rgba(127, 29, 29, 0.072) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(-45deg, rgba(127, 29, 29, 0.072) 0px, rgba(127, 29, 29, 0.072) 1px, transparent 1px, transparent 9px),
+    linear-gradient(to top, rgba(127, 29, 29, 0.28) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(127, 29, 29, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(22, 101, 52, 0.12) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(22, 101, 52, 0.16) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="victorian_library"].dark .atelier-canvas-bg {
+  background-color: #070604;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(172, 108, 108, 0.078) 0px, rgba(172, 108, 108, 0.078) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(-45deg, rgba(172, 108, 108, 0.078) 0px, rgba(172, 108, 108, 0.078) 1px, transparent 1px, transparent 9px),
+    linear-gradient(to top, rgba(172, 108, 108, 0.35) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(172, 108, 108, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(104, 155, 123, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(104, 155, 123, 0.2) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Groovy 70s */
+html[data-ui-theme="groovy_70s"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FDF6F0;
+  background-image:
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(234, 88, 12, 0.12) 22px, rgba(234, 88, 12, 0.12) 24px),
+    radial-gradient(at 100% 0%, rgba(202, 138, 4, 0.14) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0;
+}
+html[data-ui-theme="groovy_70s"].dark .atelier-canvas-bg {
+  background-color: #160B01;
+  background-image:
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(241, 146, 97, 0.13) 22px, rgba(241, 146, 97, 0.13) 24px),
+    radial-gradient(at 100% 0%, rgba(221, 179, 92, 0.175) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0;
+}
+/* Pixel Arcade */
+html[data-ui-theme="pixel_arcade"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F4F8FE;
+  background-image:
+    linear-gradient(45deg, rgba(124, 58, 237, 0.108) 25%, transparent 25%, transparent 75%, rgba(124, 58, 237, 0.108) 75%),
+    linear-gradient(45deg, rgba(124, 58, 237, 0.108) 25%, transparent 25%, transparent 75%, rgba(124, 58, 237, 0.108) 75%),
+    radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(34, 211, 238, 0.12) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0;
+}
+html[data-ui-theme="pixel_arcade"].dark .atelier-canvas-bg {
+  background-color: #080D18;
+  background-image:
+    linear-gradient(45deg, rgba(170, 127, 243, 0.117) 25%, transparent 25%, transparent 75%, rgba(170, 127, 243, 0.117) 75%),
+    linear-gradient(45deg, rgba(170, 127, 243, 0.117) 25%, transparent 25%, transparent 75%, rgba(170, 127, 243, 0.117) 75%),
+    radial-gradient(at 0% 0%, rgba(170, 127, 243, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(111, 226, 244, 0.15) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0;
+}
+/* Y2K Chrome */
+html[data-ui-theme="y2k_chrome"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FBF7FA;
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(148, 163, 184, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.12) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="y2k_chrome"].dark .atelier-canvas-bg {
+  background-color: #130C11;
+  background-image:
+    linear-gradient(to right, rgba(185, 195, 209, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(185, 195, 209, 0.13) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(185, 195, 209, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(243, 136, 189, 0.15) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+/* Vaporwave */
+html[data-ui-theme="vaporwave"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F8F9FC;
+  background-image:
+    linear-gradient(to top, rgba(244, 114, 182, 0.28) 0%, transparent 45%),
+    linear-gradient(to right, rgba(244, 114, 182, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(244, 114, 182, 0.12) 1px, transparent 1px),
+    radial-gradient(at 50% 0%, rgba(34, 211, 238, 0.16) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(244, 114, 182, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(34, 211, 238, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 28px 28px, 28px 28px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="vaporwave"].dark .atelier-canvas-bg {
+  background-color: #0E1015;
+  background-image:
+    linear-gradient(to top, rgba(248, 163, 208, 0.35) 0%, transparent 45%),
+    linear-gradient(to right, rgba(248, 163, 208, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(248, 163, 208, 0.13) 1px, transparent 1px),
+    radial-gradient(at 50% 0%, rgba(111, 226, 244, 0.2) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(248, 163, 208, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(111, 226, 244, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 28px 28px, 28px 28px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Cyberpunk City */
+html[data-ui-theme="cyberpunk_city"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FEF8F5;
+  background-image:
+    linear-gradient(to right, rgba(250, 204, 21, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(250, 204, 21, 0.12) 1px, transparent 1px),
+    radial-gradient(ellipse at 20% 0%, rgba(250, 204, 21, 0.3) 0px, transparent 55%),
+    radial-gradient(ellipse at 60% 0%, rgba(236, 72, 153, 0.24) 0px, transparent 55%),
+    radial-gradient(ellipse at 95% 15%, rgba(6, 182, 212, 0.2) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(250, 204, 21, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.12) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="cyberpunk_city"].dark .atelier-canvas-bg {
+  background-color: #180E09;
+  background-image:
+    linear-gradient(to right, rgba(252, 222, 103, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(252, 222, 103, 0.13) 1px, transparent 1px),
+    radial-gradient(ellipse at 20% 0%, rgba(252, 222, 103, 0.375) 0px, transparent 55%),
+    radial-gradient(ellipse at 60% 0%, rgba(243, 136, 189, 0.3) 0px, transparent 55%),
+    radial-gradient(ellipse at 95% 15%, rgba(56, 197, 221, 0.25) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(252, 222, 103, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(243, 136, 189, 0.15) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Lo-fi Study Room */
+html[data-ui-theme="lofi_study"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FBF7F9;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(139, 92, 246, 0.2) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(251, 146, 60, 0.18) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(249, 168, 212, 0.18) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(139, 92, 246, 0.12) 0px, transparent 120px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="lofi_study"].dark .atelier-canvas-bg {
+  background-color: #130C0F;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(180, 149, 249, 0.25) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(252, 184, 128, 0.225) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(250, 185, 221, 0.225) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(180, 149, 249, 0.15) 0px, transparent 120px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+/* Coffee Shop */
+html[data-ui-theme="coffee_shop"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F8F4F0;
+  background-image:
+    radial-gradient(rgba(120, 53, 15, 0.132) 1.5px, transparent 1.5px),
+    linear-gradient(to top, rgba(120, 53, 15, 0.28) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(120, 53, 15, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(161, 98, 7, 0.12) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(161, 98, 7, 0.16) 0px, transparent 50%);
+  background-size: 24px 24px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="coffee_shop"].dark .atelier-canvas-bg {
+  background-color: #0E0801;
+  background-image:
+    radial-gradient(rgba(167, 124, 99, 0.143) 1.5px, transparent 1.5px),
+    linear-gradient(to top, rgba(167, 124, 99, 0.35) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(167, 124, 99, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(194, 153, 94, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(194, 153, 94, 0.2) 0px, transparent 50%);
+  background-size: 24px 24px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Cozy Cabin */
+html[data-ui-theme="cozy_cabin"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FCF3F1;
+  background-image:
+    linear-gradient(90deg, rgba(180, 83, 9, 0.156) 2px, transparent 2px),
+    repeating-linear-gradient(0deg, rgba(180, 83, 9, 0.048) 0px, rgba(180, 83, 9, 0.048) 1px, transparent 1px, transparent 7px),
+    linear-gradient(to top, rgba(180, 83, 9, 0.28) 0%, transparent 45%),
+    radial-gradient(at 15% 0%, rgba(220, 38, 38, 0.16) 0px, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(220, 38, 38, 0.16) 0px, transparent 50%);
+  background-size: 140px 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="cozy_cabin"].dark .atelier-canvas-bg {
+  background-color: #140602;
+  background-image:
+    linear-gradient(90deg, rgba(206, 143, 95, 0.169) 2px, transparent 2px),
+    repeating-linear-gradient(0deg, rgba(206, 143, 95, 0.052) 0px, rgba(206, 143, 95, 0.052) 1px, transparent 1px, transparent 7px),
+    linear-gradient(to top, rgba(206, 143, 95, 0.35) 0%, transparent 45%),
+    radial-gradient(at 15% 0%, rgba(232, 114, 114, 0.2) 0px, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(232, 114, 114, 0.2) 0px, transparent 50%);
+  background-size: 140px 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Science Lab */
+html[data-ui-theme="science_lab"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F0FBFA;
+  background-image:
+    linear-gradient(to right, rgba(16, 185, 129, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.12) 1px, transparent 1px),
+    radial-gradient(circle at 15% 25%, rgba(16, 185, 129, 0.2) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(6, 182, 212, 0.18) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(163, 230, 53, 0.18) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(16, 185, 129, 0.12) 0px, transparent 120px),
+    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="science_lab"].dark .atelier-canvas-bg {
+  background-color: #011211;
+  background-image:
+    linear-gradient(to right, rgba(100, 210, 173, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(100, 210, 173, 0.13) 1px, transparent 1px),
+    radial-gradient(circle at 15% 25%, rgba(100, 210, 173, 0.25) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(93, 208, 227, 0.225) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(181, 235, 93, 0.225) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(100, 210, 173, 0.15) 0px, transparent 120px),
+    radial-gradient(at 0% 0%, rgba(100, 210, 173, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(93, 208, 227, 0.15) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Graph Paper Math */
+html[data-ui-theme="graph_paper_math"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F8F5F9;
+  background-image:
+    linear-gradient(to right, rgba(37, 99, 235, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37, 99, 235, 0.12) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(239, 68, 68, 0.12) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="graph_paper_math"].dark .atelier-canvas-bg {
+  background-color: #0E080F;
+  background-image:
+    linear-gradient(to right, rgba(113, 154, 242, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(113, 154, 242, 0.13) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(113, 154, 242, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(245, 133, 133, 0.15) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+/* Periodic Neon */
+html[data-ui-theme="periodic_neon"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F5FCF8;
+  background-image:
+    radial-gradient(rgba(34, 211, 238, 0.18) 3px, transparent 3.5px),
+    radial-gradient(rgba(232, 121, 249, 0.18) 3px, transparent 3.5px),
+    linear-gradient(to right, rgba(132, 204, 22, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(132, 204, 22, 0.12) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(132, 204, 22, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(34, 211, 238, 0.12) 0px, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(132, 204, 22, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(34, 211, 238, 0.12) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 28px 28px, 28px 28px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="periodic_neon"].dark .atelier-canvas-bg {
+  background-color: #08150D;
+  background-image:
+    radial-gradient(rgba(111, 226, 244, 0.195) 3px, transparent 3.5px),
+    radial-gradient(rgba(237, 148, 250, 0.195) 3px, transparent 3.5px),
+    linear-gradient(to right, rgba(175, 222, 104, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(175, 222, 104, 0.13) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(175, 222, 104, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(111, 226, 244, 0.15) 0px, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(175, 222, 104, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(111, 226, 244, 0.15) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 28px 28px, 28px 28px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Atlas & Maps */
+html[data-ui-theme="atlas_maps"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F6F6F4;
+  background-image:
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(14, 116, 144, 0.12) 22px, rgba(14, 116, 144, 0.12) 24px),
+    radial-gradient(at 100% 0%, rgba(180, 83, 9, 0.14) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0;
+}
+html[data-ui-theme="atlas_maps"].dark .atelier-canvas-bg {
+  background-color: #0A0A08;
+  background-image:
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(98, 165, 183, 0.13) 22px, rgba(98, 165, 183, 0.13) 24px),
+    radial-gradient(at 100% 0%, rgba(206, 143, 95, 0.175) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0;
+}
+/* Old Parchment */
+html[data-ui-theme="old_parchment"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F9F5F0;
+  background-image:
+    radial-gradient(rgba(146, 64, 14, 0.132) 1.5px, transparent 1.5px),
+    radial-gradient(at 0% 0%, rgba(146, 64, 14, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(161, 98, 7, 0.12) 0px, transparent 45%);
+  background-size: 24px 24px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="old_parchment"].dark .atelier-canvas-bg {
+  background-color: #0F0801;
+  background-image:
+    radial-gradient(rgba(184, 131, 98, 0.143) 1.5px, transparent 1.5px),
+    radial-gradient(at 0% 0%, rgba(184, 131, 98, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(194, 153, 94, 0.15) 0px, transparent 45%);
+  background-size: 24px 24px, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0;
+}
+/* Concert Hall */
+html[data-ui-theme="concert_hall"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F9F3F1;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(127, 29, 29, 0.108) 0px, rgba(127, 29, 29, 0.108) 14px, transparent 14px, transparent 30px),
+    linear-gradient(to top, rgba(127, 29, 29, 0.28) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(127, 29, 29, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(180, 83, 9, 0.12) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(180, 83, 9, 0.16) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="concert_hall"].dark .atelier-canvas-bg {
+  background-color: #0F0602;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(172, 108, 108, 0.117) 0px, rgba(172, 108, 108, 0.117) 14px, transparent 14px, transparent 30px),
+    linear-gradient(to top, rgba(172, 108, 108, 0.35) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(172, 108, 108, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(206, 143, 95, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(206, 143, 95, 0.2) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Art Studio Splash */
+html[data-ui-theme="art_studio"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FEF8F5;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(236, 72, 153, 0.2) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(250, 204, 21, 0.18) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(59, 130, 246, 0.18) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(236, 72, 153, 0.12) 0px, transparent 120px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="art_studio"].dark .atelier-canvas-bg {
+  background-color: #180E09;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(243, 136, 189, 0.25) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(252, 222, 103, 0.225) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(98, 155, 248, 0.225) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(243, 136, 189, 0.15) 0px, transparent 120px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+/* Stadium Lights */
+html[data-ui-theme="stadium_lights"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F2F8F9;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(22, 163, 74, 0.108) 0px, rgba(22, 163, 74, 0.108) 14px, transparent 14px, transparent 30px),
+    linear-gradient(to top, rgba(22, 163, 74, 0.28) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(22, 163, 74, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(37, 99, 235, 0.12) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(37, 99, 235, 0.16) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="stadium_lights"].dark .atelier-canvas-bg {
+  background-color: #030D0F;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(104, 195, 137, 0.117) 0px, rgba(104, 195, 137, 0.117) 14px, transparent 14px, transparent 30px),
+    linear-gradient(to top, rgba(104, 195, 137, 0.35) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(104, 195, 137, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(113, 154, 242, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(113, 154, 242, 0.2) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Robotics Lab */
+html[data-ui-theme="robotics_lab"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F3F9FA;
+  background-image:
+    linear-gradient(to right, rgba(100, 116, 139, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(100, 116, 139, 0.12) 1px, transparent 1px),
+    linear-gradient(45deg, rgba(100, 116, 139, 0.12) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(100, 116, 139, 0.12) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(100, 116, 139, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(100, 116, 139, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 36px 36px, 36px 36px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="robotics_lab"].dark .atelier-canvas-bg {
+  background-color: #050F12;
+  background-image:
+    linear-gradient(to right, rgba(154, 165, 180, 0.13) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(154, 165, 180, 0.13) 1px, transparent 1px),
+    linear-gradient(45deg, rgba(154, 165, 180, 0.13) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(154, 165, 180, 0.13) 1px, transparent 1px),
+    radial-gradient(at 0% 0%, rgba(154, 165, 180, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(93, 208, 227, 0.15) 0px, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(154, 165, 180, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(93, 208, 227, 0.15) 0px, transparent 45%);
+  background-size: 28px 28px, 28px 28px, 36px 36px, 36px 36px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Detective Noir */
+html[data-ui-theme="detective_noir"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F9F8F3;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(71, 85, 105, 0.144) 0px, rgba(71, 85, 105, 0.144) 2px, transparent 2px, transparent 26px),
+    linear-gradient(to top, rgba(71, 85, 105, 0.28) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(71, 85, 105, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(250, 204, 21, 0.12) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(250, 204, 21, 0.16) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="detective_noir"].dark .atelier-canvas-bg {
+  background-color: #100E06;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(135, 145, 158, 0.156) 0px, rgba(135, 145, 158, 0.156) 2px, transparent 2px, transparent 26px),
+    linear-gradient(to top, rgba(135, 145, 158, 0.35) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(135, 145, 158, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(252, 222, 103, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(252, 222, 103, 0.2) 0px, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Fairy Tale */
+html[data-ui-theme="fairy_tale"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FDF9FE;
+  background-image:
+    radial-gradient(circle, rgba(253, 230, 138, 0.45) 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(253, 230, 138, 0.3) 1px, transparent 1.6px),
+    radial-gradient(circle at 15% 25%, rgba(192, 132, 252, 0.2) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(249, 168, 212, 0.18) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(253, 230, 138, 0.18) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(192, 132, 252, 0.12) 0px, transparent 120px),
+    radial-gradient(at 10% 0%, rgba(192, 132, 252, 0.18) 0px, transparent 45%),
+    radial-gradient(at 95% 90%, rgba(249, 168, 212, 0.18) 0px, transparent 45%);
+  background-size: 97px 97px, 61px 61px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 23px 31px, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="fairy_tale"].dark .atelier-canvas-bg {
+  background-color: #160F17;
+  background-image:
+    radial-gradient(circle, rgba(253, 235, 161, 0.85) 1px, transparent 1.6px),
+    radial-gradient(circle, rgba(253, 235, 161, 0.55) 1px, transparent 1.6px),
+    radial-gradient(circle at 15% 25%, rgba(214, 175, 253, 0.25) 0px, transparent 150px),
+    radial-gradient(circle at 85% 20%, rgba(251, 198, 227, 0.225) 0px, transparent 140px),
+    radial-gradient(circle at 70% 85%, rgba(253, 235, 161, 0.225) 0px, transparent 160px),
+    radial-gradient(circle at 25% 90%, rgba(214, 175, 253, 0.15) 0px, transparent 120px),
+    radial-gradient(at 10% 0%, rgba(214, 175, 253, 0.225) 0px, transparent 45%),
+    radial-gradient(at 95% 90%, rgba(251, 198, 227, 0.225) 0px, transparent 45%);
+  background-size: 97px 97px, 61px 61px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 23px 31px, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Dragon Realm */
+html[data-ui-theme="dragon_realm"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F7F5F3;
+  background-image:
+    radial-gradient(circle at 50% 100%, transparent 9px, rgba(220, 38, 38, 0.144) 9px, rgba(220, 38, 38, 0.144) 10.5px, transparent 10.5px),
+    linear-gradient(to top, rgba(220, 38, 38, 0.28) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(220, 38, 38, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(21, 128, 61, 0.12) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(21, 128, 61, 0.16) 0px, transparent 50%);
+  background-size: 28px 16px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="dragon_realm"].dark .atelier-canvas-bg {
+  background-color: #0C0805;
+  background-image:
+    radial-gradient(circle at 50% 100%, transparent 9px, rgba(232, 114, 114, 0.156) 9px, rgba(232, 114, 114, 0.156) 10.5px, transparent 10.5px),
+    linear-gradient(to top, rgba(232, 114, 114, 0.35) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(232, 114, 114, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(103, 172, 129, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(103, 172, 129, 0.2) 0px, transparent 50%);
+  background-size: 28px 16px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0;
+}
+/* Dino World */
+html[data-ui-theme="dino_world"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F8F8F0;
+  background-image:
+    radial-gradient(rgba(161, 98, 7, 0.18) 3px, transparent 3.5px),
+    radial-gradient(rgba(249, 115, 22, 0.18) 3px, transparent 3.5px),
+    linear-gradient(to top, rgba(101, 163, 13, 0.28) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(101, 163, 13, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(161, 98, 7, 0.12) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(161, 98, 7, 0.16) 0px, transparent 50%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="dino_world"].dark .atelier-canvas-bg {
+  background-color: #0D0D01;
+  background-image:
+    radial-gradient(rgba(194, 153, 94, 0.195) 3px, transparent 3.5px),
+    radial-gradient(rgba(250, 143, 69, 0.195) 3px, transparent 3.5px),
+    linear-gradient(to top, rgba(155, 195, 98, 0.35) 0%, transparent 45%),
+    radial-gradient(at 0% 0%, rgba(155, 195, 98, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(194, 153, 94, 0.15) 0px, transparent 45%),
+    radial-gradient(at 50% 0%, rgba(194, 153, 94, 0.2) 0px, transparent 50%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0, 0 0, 0 0;
+}
+/* Kawaii Pastel */
+html[data-ui-theme="kawaii_pastel"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FCFAFE;
+  background-image:
+    radial-gradient(rgba(165, 180, 252, 0.18) 3px, transparent 3.5px),
+    radial-gradient(rgba(253, 230, 138, 0.18) 3px, transparent 3.5px),
+    radial-gradient(at 0% 0%, rgba(249, 168, 212, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(165, 180, 252, 0.12) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0;
+}
+html[data-ui-theme="kawaii_pastel"].dark .atelier-canvas-bg {
+  background-color: #151117;
+  background-image:
+    radial-gradient(rgba(197, 206, 253, 0.195) 3px, transparent 3.5px),
+    radial-gradient(rgba(253, 235, 161, 0.195) 3px, transparent 3.5px),
+    radial-gradient(at 0% 0%, rgba(251, 198, 227, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(197, 206, 253, 0.15) 0px, transparent 45%);
+  background-size: 44px 44px, 44px 44px, 100% 100%, 100% 100%;
+  background-position: 0 0, 22px 22px, 0 0, 0 0;
+}
+/* Monochrome Ink */
+html[data-ui-theme="monochrome_ink"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F2F3F4;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(17, 24, 39, 0.072) 0px, rgba(17, 24, 39, 0.072) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(-45deg, rgba(17, 24, 39, 0.072) 0px, rgba(17, 24, 39, 0.072) 1px, transparent 1px, transparent 9px),
+    radial-gradient(at 0% 0%, rgba(17, 24, 39, 0.12) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(75, 85, 99, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="monochrome_ink"].dark .atelier-canvas-bg {
+  background-color: #050507;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(100, 105, 115, 0.078) 0px, rgba(100, 105, 115, 0.078) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(-45deg, rgba(100, 105, 115, 0.078) 0px, rgba(100, 105, 115, 0.078) 1px, transparent 1px, transparent 9px),
+    radial-gradient(at 0% 0%, rgba(100, 105, 115, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(138, 145, 154, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+/* Sunset Beach */
+html[data-ui-theme="sunset_beach"]:not(.dark) .atelier-canvas-bg {
+  background-color: #FFF6F4;
+  background-image:
+    linear-gradient(to top, rgba(251, 146, 60, 0.28) 0%, transparent 45%),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(251, 146, 60, 0.12) 22px, rgba(251, 146, 60, 0.12) 24px),
+    radial-gradient(at 50% 0%, rgba(244, 63, 94, 0.16) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(244, 63, 94, 0.14) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="sunset_beach"].dark .atelier-canvas-bg {
+  background-color: #190A08;
+  background-image:
+    linear-gradient(to top, rgba(252, 184, 128, 0.35) 0%, transparent 45%),
+    repeating-radial-gradient(circle at 0% 100%, transparent 0px, transparent 22px, rgba(252, 184, 128, 0.13) 22px, rgba(252, 184, 128, 0.13) 24px),
+    radial-gradient(at 50% 0%, rgba(248, 130, 150, 0.2) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(248, 130, 150, 0.175) 0px, transparent 45%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+/* Midnight Skyline */
+html[data-ui-theme="midnight_city"]:not(.dark) .atelier-canvas-bg {
+  background-color: #F4F4FD;
+  background-image:
+    linear-gradient(to top, rgba(29, 78, 216, 0.28) 0%, transparent 45%),
+    radial-gradient(rgba(124, 58, 237, 0.18) 3px, transparent 3.5px),
+    radial-gradient(rgba(251, 191, 36, 0.18) 3px, transparent 3.5px),
+    radial-gradient(at 50% 0%, rgba(124, 58, 237, 0.16) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(29, 78, 216, 0.14) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(124, 58, 237, 0.12) 0px, transparent 45%);
+  background-size: 100% 100%, 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 22px 22px, 0 0, 0 0, 0 0;
+}
+html[data-ui-theme="midnight_city"].dark .atelier-canvas-bg {
+  background-color: #080717;
+  background-image:
+    linear-gradient(to top, rgba(108, 140, 230, 0.35) 0%, transparent 45%),
+    radial-gradient(rgba(170, 127, 243, 0.195) 3px, transparent 3.5px),
+    radial-gradient(rgba(252, 204, 80, 0.195) 3px, transparent 3.5px),
+    radial-gradient(at 50% 0%, rgba(170, 127, 243, 0.2) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(108, 140, 230, 0.175) 0px, transparent 45%),
+    radial-gradient(at 100% 100%, rgba(170, 127, 243, 0.15) 0px, transparent 45%);
+  background-size: 100% 100%, 44px 44px, 44px 44px, 100% 100%, 100% 100%, 100% 100%;
+  background-position: 0 0, 0 0, 22px 22px, 0 0, 0 0, 0 0;
+}

@@ -2,6 +2,7 @@ import React, { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import './themes-extra.css';
 import { ThemeProvider } from './context/ThemeContext.tsx';
 import { AuthProvider } from './context/AuthContext.tsx';
 import { PomodoroProvider } from './context/PomodoroContext.tsx';

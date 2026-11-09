@@ -197,6 +197,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   } = useTheme();
 
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
+  const [themeQuery, setThemeQuery] = useState('');
+  const [themeFilter, setThemeFilter] = useState<'all' | 'light' | 'dark'>('all');
+  const normalizedThemeQuery = themeQuery.trim().toLowerCase();
+  const filteredThemes = UI_THEME_CATALOG.filter(
+    (t) =>
+      (themeFilter === 'all' || t.recommendedMode === themeFilter) &&
+      (normalizedThemeQuery === '' ||
+        `${t.name} ${t.badge} ${t.tagline}`.toLowerCase().includes(normalizedThemeQuery))
+  );
   const [currentSoundProfile, setCurrentSoundProfile] = useState<SoundProfileType>(() => soundFx.getSoundProfile());
   const [isFocusHummingPreview, setIsFocusHummingPreview] = useState<boolean>(soundFx.isFocusHumming);
   const [ambientMode, setAmbientMode] = useState<AmbientSoundscapeMode>(soundFx.ambientMode);
@@ -834,6 +843,115 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-6 space-y-5">
         {activeSection === 'appearance' && (
           <div className="space-y-5">
+            {/* UI THEME GALLERY: searchable + filterable, first thing on the Appearance tab */}
+            <div
+              id="ui-theme-gallery"
+              className="p-5 comic-pop-card bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-900 dark:border-slate-700 shadow-sm space-y-3.5"
+            >
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                  <span className="comic-badge px-2 py-0.5 rounded bg-amber-300 text-slate-950 text-[10px] font-black">
+                    NEW!
+                  </span>
+                  <span>UI Theme Worlds ({UI_THEME_CATALOG.length} Palettes)</span>
+                </label>
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                  Active: <strong className="text-indigo-600 dark:text-indigo-400">{UI_THEME_CATALOG.find((t) => t.id === uiTheme)?.name}</strong>
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="search"
+                  value={themeQuery}
+                  onChange={(e) => setThemeQuery(e.target.value)}
+                  placeholder="Search themes: wood, space, ocean, school..."
+                  aria-label="Search UI themes"
+                  className="flex-1 min-w-[12rem] px-3 py-2 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-indigo-500"
+                />
+                {([
+                  { id: 'all', label: 'All' },
+                  { id: 'light', label: '☀️ Light' },
+                  { id: 'dark', label: '🌙 Dark' },
+                ] as const).map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => {
+                      soundFx.playSelect();
+                      setThemeFilter(f.id);
+                    }}
+                    className={`px-3 py-2 rounded-xl text-[11px] font-black border-2 transition-all cursor-pointer ${
+                      themeFilter === f.id
+                        ? 'bg-indigo-600 text-white border-slate-900'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pick = UI_THEME_CATALOG[Math.floor(Math.random() * UI_THEME_CATALOG.length)];
+                    soundFx.playPop();
+                    setUiTheme(pick.id);
+                    triggerSaveNotice(`Surprise! Switched UI Theme to ${pick.name}!`);
+                  }}
+                  className="px-3 py-2 rounded-xl text-[11px] font-black border-2 border-slate-900 bg-amber-300 hover:bg-amber-200 text-slate-950 cursor-pointer"
+                >
+                  🎲 Surprise me
+                </button>
+              </div>
+
+              <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                Showing {filteredThemes.length} of {UI_THEME_CATALOG.length} themes. Light/Dark is each theme's recommended color mode; switch modes any time under Color Mode.
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[30rem] overflow-y-auto pr-1">
+                {filteredThemes.length === 0 && (
+                  <div className="col-span-full py-6 text-center text-xs font-bold text-slate-500 dark:text-slate-400">
+                    No themes match "{themeQuery}". Try another word or clear the filter.
+                  </div>
+                )}
+                {filteredThemes.map((themeItem) => {
+                  const isSelected = uiTheme === themeItem.id;
+                  return (
+                    <button
+                      key={themeItem.id}
+                      type="button"
+                      onClick={() => {
+                        soundFx.playPop();
+                        setUiTheme(themeItem.id);
+                        triggerSaveNotice(`Switched UI Theme to ${themeItem.name}!`);
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                        isSelected
+                          ? 'border-slate-950 dark:border-amber-300 bg-indigo-50/80 dark:bg-indigo-950/50 ring-2 ring-indigo-500/25 shadow-sm'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-400 bg-slate-50/70 dark:bg-slate-850'
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-lg">{themeItem.emoji}</span>
+                          <span className="px-2 py-0.5 rounded-md bg-slate-900 text-amber-300 text-[9px] font-black uppercase tracking-wider">
+                            {themeItem.badge}
+                          </span>
+                        </div>
+                        <div className="text-xs font-black text-slate-900 dark:text-white">
+                          {themeItem.name}
+                        </div>
+                        <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-snug font-medium">
+                          {themeItem.tagline}
+                        </p>
+                      </div>
+                      <div className={`w-full h-2 rounded-full bg-gradient-to-r ${themeItem.swatchGradient} border border-slate-900/20 mt-1`} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* 5 UI STYLES SELECTOR: 3D, Modern, Legacy, Playful, Default */}
             <div className="p-5 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3 shadow-2xs">
               <div className="flex items-center justify-between">
@@ -1534,59 +1652,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* 6 Curated Neo-Comic & Arcade UI Themes Card */}
-            <div className="p-5 comic-pop-card bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-900 dark:border-slate-700 shadow-sm space-y-3.5">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
-                  <span className="comic-badge px-2 py-0.5 rounded bg-amber-300 text-slate-950 text-[10px] font-black">
-                    NEW!
-                  </span>
-                  <span>UI Theme Worlds ({UI_THEME_CATALOG.length} Palettes)</span>
-                </label>
-                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                  Active: <strong className="text-indigo-600 dark:text-indigo-400">{UI_THEME_CATALOG.find((t) => t.id === uiTheme)?.name}</strong>
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {UI_THEME_CATALOG.map((themeItem) => {
-                  const isSelected = uiTheme === themeItem.id;
-                  return (
-                    <button
-                      key={themeItem.id}
-                      type="button"
-                      onClick={() => {
-                        soundFx.playPop();
-                        setUiTheme(themeItem.id);
-                        triggerSaveNotice(`Switched UI Theme to ${themeItem.name}!`);
-                      }}
-                      className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
-                        isSelected
-                          ? 'border-slate-950 dark:border-amber-300 bg-indigo-50/80 dark:bg-indigo-950/50 ring-2 ring-indigo-500/25 shadow-sm'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-400 bg-slate-50/70 dark:bg-slate-850'
-                      }`}
-                    >
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-lg">{themeItem.emoji}</span>
-                          <span className="px-2 py-0.5 rounded-md bg-slate-900 text-amber-300 text-[9px] font-black uppercase tracking-wider">
-                            {themeItem.badge}
-                          </span>
-                        </div>
-                        <div className="text-xs font-black text-slate-900 dark:text-white">
-                          {themeItem.name}
-                        </div>
-                        <p className="text-[10px] text-slate-600 dark:text-slate-300 leading-snug font-medium">
-                          {themeItem.tagline}
-                        </p>
-                      </div>
-                      <div className={`w-full h-2 rounded-full bg-gradient-to-r ${themeItem.swatchGradient} border border-slate-900/20 mt-1`} />
-                    </button>
-                  );
-                })}
               </div>
             </div>
 
