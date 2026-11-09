@@ -164,362 +164,6 @@ export const REGIONAL_SCHOOLS_DIRECTORY: Record<
   ],
 };
 
-// Benchmark Global Scholars across schools and regions to complement live Firestore scholars
-const GLOBAL_BENCHMARK_SCHOLARS: Omit<LeaderboardUser, 'rank'>[] = [
-  {
-    id: 'scholar_ng_1',
-    name: 'Chidinma Okafor',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=ChidinmaOkafor',
-    persona: 'Student',
-    level: 14,
-    xp: 2840,
-    streak: 24,
-    accuracy: 96,
-    quizMastery: 97,
-    quizzesCompleted: 42,
-    school: 'Loyola Jesuit College',
-    region: 'West Africa',
-    examBoardFocus: 'WAEC · JAMB · IGCSE',
-    topSubjects: ['Further Mathematics', 'Physics', 'Chemistry'],
-    tier: 'Diamond',
-    badgeTitle: 'Distinction Grandmaster',
-    countryCode: 'NG',
-    weeklyMasteryGained: 34,
-    weeklyMistakesFixed: 14,
-    weeklyImprovementIndex: 346,
-  },
-  {
-    id: 'scholar_sg_1',
-    name: 'Wei Jie Tan',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=WeiJieTan',
-    persona: 'Student',
-    level: 14,
-    xp: 2790,
-    streak: 21,
-    accuracy: 95,
-    quizMastery: 96,
-    quizzesCompleted: 39,
-    school: 'Raffles Institution',
-    region: 'Asia-Pacific & Middle East',
-    examBoardFocus: 'Cambridge GCE A-Level',
-    topSubjects: ['Mathematics', 'Chemistry', 'Computer Science'],
-    tier: 'Diamond',
-    badgeTitle: 'Olympiad Laureate',
-    countryCode: 'SG',
-    weeklyMasteryGained: 31,
-    weeklyMistakesFixed: 12,
-    weeklyImprovementIndex: 304,
-  },
-  {
-    id: 'scholar_uk_1',
-    name: 'Amara Nwosu',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=AmaraNwosu',
-    persona: 'Student',
-    level: 13,
-    xp: 2610,
-    streak: 19,
-    accuracy: 94,
-    quizMastery: 95,
-    quizzesCompleted: 36,
-    school: 'Brampton Manor Academy',
-    region: 'United Kingdom',
-    examBoardFocus: 'GCSE & A-Level',
-    topSubjects: ['Biology', 'Chemistry', 'Mathematics'],
-    tier: 'Diamond',
-    badgeTitle: 'A* Honour Scholar',
-    countryCode: 'GB',
-    weeklyMasteryGained: 29,
-    weeklyMistakesFixed: 11,
-    weeklyImprovementIndex: 281,
-  },
-  {
-    id: 'scholar_ng_2',
-    name: 'Toluwanimi Adeyemi',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=ToluwanimiAdeyemi',
-    persona: 'Student',
-    level: 12,
-    xp: 2450,
-    streak: 18,
-    accuracy: 93,
-    quizMastery: 94,
-    quizzesCompleted: 35,
-    school: "King's College Lagos",
-    region: 'West Africa',
-    examBoardFocus: 'WAEC & JAMB UTME',
-    topSubjects: ['Mathematics', 'Physics', 'Economics'],
-    tier: 'Diamond',
-    badgeTitle: 'UTME 340+ Vanguard',
-    countryCode: 'NG',
-    weeklyMasteryGained: 28,
-    weeklyMistakesFixed: 10,
-    weeklyImprovementIndex: 262,
-  },
-  {
-    id: 'scholar_us_1',
-    name: 'Maya Lin',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=MayaLin',
-    persona: 'Student',
-    level: 12,
-    xp: 2390,
-    streak: 16,
-    accuracy: 94,
-    quizMastery: 94,
-    quizzesCompleted: 33,
-    school: 'Stuyvesant High School',
-    region: 'North America',
-    examBoardFocus: 'SAT & AP Calculus BC',
-    topSubjects: ['AP Calculus', 'AP Physics C', 'Computer Science'],
-    tier: 'Diamond',
-    badgeTitle: 'AP Scholar with Distinction',
-    countryCode: 'US',
-    weeklyMasteryGained: 26,
-    weeklyMistakesFixed: 11,
-    weeklyImprovementIndex: 269,
-  },
-  {
-    id: 'scholar_gh_1',
-    name: 'Kwame Mensah',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=KwameMensah',
-    persona: 'Student',
-    level: 11,
-    xp: 2180,
-    streak: 15,
-    accuracy: 92,
-    quizMastery: 93,
-    quizzesCompleted: 31,
-    school: 'Achimota School',
-    region: 'West Africa',
-    examBoardFocus: 'WASSCE & Cambridge IGCSE',
-    topSubjects: ['Elective Mathematics', 'Biology', 'Chemistry'],
-    tier: 'Master',
-    badgeTitle: 'National Science Quiz Finalist',
-    countryCode: 'GH',
-    weeklyMasteryGained: 25,
-    weeklyMistakesFixed: 9,
-    weeklyImprovementIndex: 235,
-  },
-  {
-    id: 'scholar_ng_3',
-    name: 'Zainab Ibrahim',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=ZainabIbrahim',
-    persona: 'Student',
-    level: 11,
-    xp: 2090,
-    streak: 17,
-    accuracy: 91,
-    quizMastery: 92,
-    quizzesCompleted: 30,
-    school: 'Corona Secondary School',
-    region: 'West Africa',
-    examBoardFocus: 'Cambridge Checkpoint & IGCSE',
-    topSubjects: ['Lower Secondary Science', 'Mathematics', 'English'],
-    tier: 'Master',
-    badgeTitle: 'Checkpoint Band 6.0 Master',
-    countryCode: 'NG',
-    weeklyMasteryGained: 27,
-    weeklyMistakesFixed: 9,
-    weeklyImprovementIndex: 243,
-  },
-  {
-    id: 'scholar_eu_1',
-    name: 'Lukas Schneider',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=LukasSchneider',
-    persona: 'Student',
-    level: 10,
-    xp: 1960,
-    streak: 14,
-    accuracy: 91,
-    quizMastery: 91,
-    quizzesCompleted: 28,
-    school: 'International School of Geneva',
-    region: 'Europe & International',
-    examBoardFocus: 'IB Diploma & IGCSE',
-    topSubjects: ['IB Higher Level Math', 'Economics', 'Physics'],
-    tier: 'Master',
-    badgeTitle: 'IB 44-Point Contender',
-    countryCode: 'CH',
-    weeklyMasteryGained: 22,
-    weeklyMistakesFixed: 8,
-    weeklyImprovementIndex: 208,
-  },
-  {
-    id: 'scholar_ke_1',
-    name: 'Wanjiku Kamau',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=WanjikuKamau',
-    persona: 'Student',
-    level: 10,
-    xp: 1875,
-    streak: 13,
-    accuracy: 90,
-    quizMastery: 91,
-    quizzesCompleted: 27,
-    school: 'Kenya High School',
-    region: 'East & Southern Africa',
-    examBoardFocus: 'KCSE & Cambridge IGCSE',
-    topSubjects: ['Biology', 'Chemistry', 'Mathematics'],
-    tier: 'Master',
-    badgeTitle: 'East Africa STEM Fellow',
-    countryCode: 'KE',
-    weeklyMasteryGained: 24,
-    weeklyMistakesFixed: 8,
-    weeklyImprovementIndex: 216,
-  },
-  {
-    id: 'scholar_uk_2',
-    name: 'Oliver Kensington',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=OliverKensington',
-    persona: 'Student',
-    level: 9,
-    xp: 1740,
-    streak: 12,
-    accuracy: 89,
-    quizMastery: 90,
-    quizzesCompleted: 25,
-    school: 'Westminster School',
-    region: 'United Kingdom',
-    examBoardFocus: 'GCSE & A-Level',
-    topSubjects: ['History', 'English Literature', 'Mathematics'],
-    tier: 'Master',
-    badgeTitle: 'Grade 9 Strategist',
-    countryCode: 'GB',
-    weeklyMasteryGained: 20,
-    weeklyMistakesFixed: 7,
-    weeklyImprovementIndex: 185,
-  },
-  {
-    id: 'scholar_ng_4',
-    name: 'Favour Eze',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=FavourEze',
-    persona: 'Student',
-    level: 9,
-    xp: 1680,
-    streak: 14,
-    accuracy: 90,
-    quizMastery: 90,
-    quizzesCompleted: 26,
-    school: "Queen's College Yaba",
-    region: 'West Africa',
-    examBoardFocus: 'WAEC · NECO · JAMB',
-    topSubjects: ['Biology', 'Chemistry', 'English Language'],
-    tier: 'Master',
-    badgeTitle: 'Clinical Sciences Aspirant',
-    countryCode: 'NG',
-    weeklyMasteryGained: 23,
-    weeklyMistakesFixed: 8,
-    weeklyImprovementIndex: 212,
-  },
-  {
-    id: 'scholar_us_2',
-    name: 'Devon Brooks',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=DevonBrooks',
-    persona: 'Student',
-    level: 8,
-    xp: 1540,
-    streak: 11,
-    accuracy: 88,
-    quizMastery: 89,
-    quizzesCompleted: 23,
-    school: 'Thomas Jefferson High School for Science & Tech',
-    region: 'North America',
-    examBoardFocus: 'SAT & AP Chemistry',
-    topSubjects: ['AP Chemistry', 'AP Biology', 'SAT Math'],
-    tier: 'Gold',
-    badgeTitle: 'National Merit Semifinalist',
-    countryCode: 'US',
-    weeklyMasteryGained: 19,
-    weeklyMistakesFixed: 7,
-    weeklyImprovementIndex: 181,
-  },
-  {
-    id: 'scholar_ae_1',
-    name: 'Tariq Al-Mansoor',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=TariqAlMansoor',
-    persona: 'Student',
-    level: 8,
-    xp: 1490,
-    streak: 10,
-    accuracy: 88,
-    quizMastery: 88,
-    quizzesCompleted: 22,
-    school: 'Dubai College',
-    region: 'Asia-Pacific & Middle East',
-    examBoardFocus: 'IGCSE & A-Level',
-    topSubjects: ['Physics', 'Mathematics', 'Business Studies'],
-    tier: 'Gold',
-    badgeTitle: 'Gulf STEM Medalist',
-    countryCode: 'AE',
-    weeklyMasteryGained: 18,
-    weeklyMistakesFixed: 6,
-    weeklyImprovementIndex: 162,
-  },
-  {
-    id: 'scholar_za_1',
-    name: 'Sipho Ndlovu',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=SiphoNdlovu',
-    persona: 'Student',
-    level: 7,
-    xp: 1320,
-    streak: 9,
-    accuracy: 86,
-    quizMastery: 87,
-    quizzesCompleted: 20,
-    school: 'Bishops Diocesan College',
-    region: 'East & Southern Africa',
-    examBoardFocus: 'NSC & Cambridge IGCSE',
-    topSubjects: ['Physical Sciences', 'Mathematics', 'Accounting'],
-    tier: 'Gold',
-    badgeTitle: 'Cape Distinction Scholar',
-    countryCode: 'ZA',
-    weeklyMasteryGained: 17,
-    weeklyMistakesFixed: 6,
-    weeklyImprovementIndex: 158,
-  },
-  {
-    id: 'scholar_eu_2',
-    name: 'Nour El-Din',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=NourElDin',
-    persona: 'Student',
-    level: 7,
-    xp: 1260,
-    streak: 9,
-    accuracy: 87,
-    quizMastery: 87,
-    quizzesCompleted: 19,
-    school: 'British International School Cairo',
-    region: 'Europe & International',
-    examBoardFocus: 'Cambridge Checkpoint & IGCSE',
-    topSubjects: ['Primary & Lower Sec Checkpoint', 'Mathematics', 'Biology'],
-    tier: 'Gold',
-    badgeTitle: 'Checkpoint Honors',
-    countryCode: 'EG',
-    weeklyMasteryGained: 18,
-    weeklyMistakesFixed: 5,
-    weeklyImprovementIndex: 147,
-  },
-  {
-    id: 'scholar_in_1',
-    name: 'Aarav Sharma',
-    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=AaravSharma',
-    persona: 'Student',
-    level: 7,
-    xp: 1190,
-    streak: 8,
-    accuracy: 85,
-    quizMastery: 86,
-    quizzesCompleted: 18,
-    school: 'Delhi Public School RK Puram',
-    region: 'Asia-Pacific & Middle East',
-    examBoardFocus: 'CBSE & AP',
-    topSubjects: ['Mathematics', 'Computer Science', 'Physics'],
-    tier: 'Gold',
-    badgeTitle: 'STEM Problem Solver',
-    countryCode: 'IN',
-    weeklyMasteryGained: 16,
-    weeklyMistakesFixed: 5,
-    weeklyImprovementIndex: 139,
-  },
-];
-
 const USER_AFFILIATION_STORAGE_KEY = 'quizme_scholar_affiliation_v1';
 
 interface SavedAffiliation {
@@ -541,8 +185,9 @@ function getDefaultAffiliation(): SavedAffiliation {
       // ignore
     }
   }
+  // No school is assumed: the user picks their own in the affiliation editor.
   return {
-    school: "King's College Lagos",
+    school: '',
     region: 'West Africa',
   };
 }
@@ -584,7 +229,6 @@ export const GlobalScholarsLeaderboard: React.FC<GlobalScholarsLeaderboardProps>
   const [tierFilter, setTierFilter] = useState<'ALL' | 'Diamond' | 'Master' | 'Gold' | 'Silver' | 'Bronze'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [onlyMySchool, setOnlyMySchool] = useState<boolean>(false);
-  const [showReferenceBenchmarks, setShowReferenceBenchmarks] = useState<boolean>(true);
 
   // User's Own School & Region Affiliation State
   const [myAffiliation, setMyAffiliation] = useState<SavedAffiliation>(() => getDefaultAffiliation());
@@ -685,58 +329,36 @@ export const GlobalScholarsLeaderboard: React.FC<GlobalScholarsLeaderboardProps>
     weeklyImprovementIndex: userImprovement.improvementIndex,
   };
 
-  // Merge live Firestore public_profiles with clearly labeled reference benchmark targets
+  // Live Firestore public_profiles plus the current user
   const allScholarsMerged = useMemo(() => {
-    const fallbackRegions: Array<Exclude<ScholarRegionId, 'ALL'>> = [
-      'West Africa',
-      'United Kingdom',
-      'North America',
-      'Europe & International',
-      'East & Southern Africa',
-      'Asia-Pacific & Middle East',
-    ];
-
+    // Only real, signed-up users appear here. Fields a user has not provided stay empty
+    // instead of being invented.
     const normalizedCloud = cloudUsers
       .filter((u) => !u.isCurrentUser && (user ? u.id !== user.uid : true))
-      .map((u, idx) => {
-        const assignedRegion =
-          (u.region as Exclude<ScholarRegionId, 'ALL'>) ||
-          fallbackRegions[idx % fallbackRegions.length];
-        const regionalSchools = REGIONAL_SCHOOLS_DIRECTORY[assignedRegion] || REGIONAL_SCHOOLS_DIRECTORY['West Africa'];
-        const assignedSchoolObj = regionalSchools[idx % regionalSchools.length];
-        const masteryGained = u.weeklyMasteryGained ?? Math.max(8, ((u.xp % 34) + 12));
-        const mistakesFixed = u.weeklyMistakesFixed ?? Math.max(2, ((u.streak % 9) + 3));
+      .map((u) => {
+        const masteryGained = u.weeklyMasteryGained ?? 0;
+        const mistakesFixed = u.weeklyMistakesFixed ?? 0;
+        const quizzesCompleted = u.quizzesCompleted ?? 0;
         const quizMastery =
           u.quizMastery ??
-          computeQuizMasteryScore(u.accuracy, u.quizzesCompleted || Math.max(1, Math.floor(u.xp / 85)), masteryGained);
+          (quizzesCompleted > 0 ? computeQuizMasteryScore(u.accuracy, quizzesCompleted, masteryGained) : 0);
 
         return {
           ...u,
-          school: u.school || assignedSchoolObj.name,
-          region: assignedRegion,
-          countryCode: u.countryCode || assignedSchoolObj.countryCode,
-          examBoardFocus: u.examBoardFocus || assignedSchoolObj.examBoardFocus,
-          topSubjects: u.topSubjects || ['Mathematics', 'Core Sciences', 'Critical Reading'],
+          school: u.school || '',
+          region: (u.region as Exclude<ScholarRegionId, 'ALL'>) || undefined,
+          countryCode: u.countryCode || '',
+          examBoardFocus: u.examBoardFocus || '',
+          topSubjects: u.topSubjects || [],
           quizMastery,
-          quizzesCompleted: u.quizzesCompleted ?? Math.max(1, Math.floor(u.xp / 85)),
+          quizzesCompleted,
           weeklyMasteryGained: masteryGained,
           weeklyMistakesFixed: mistakesFixed,
           weeklyImprovementIndex: u.weeklyImprovementIndex ?? masteryGained * 4 + mistakesFixed * 15,
         };
       });
 
-    const existingIds = new Set(normalizedCloud.map((c) => c.id));
-    const benchmarkFiltered = showReferenceBenchmarks
-      ? GLOBAL_BENCHMARK_SCHOLARS.filter((b) => !existingIds.has(b.id)).map((b) => ({
-          ...b,
-          badgeTitle: b.badgeTitle.includes('Benchmark')
-            ? b.badgeTitle
-            : `${b.badgeTitle} · Reference Target`,
-          rank: 0,
-        }))
-      : [];
-
-    const combined = [...normalizedCloud, ...benchmarkFiltered, currentUserItem];
+    const combined = [...normalizedCloud, currentUserItem];
 
     // Sort according to active rankingMetric
     combined.sort((a, b) => {
@@ -760,7 +382,7 @@ export const GlobalScholarsLeaderboard: React.FC<GlobalScholarsLeaderboardProps>
       ...item,
       rank: index + 1,
     }));
-  }, [cloudUsers, currentUserItem, rankingMetric, showReferenceBenchmarks, user]);
+  }, [cloudUsers, currentUserItem, rankingMetric, user]);
 
   // Available schools for the selected region (including any custom user schools)
   const availableSchoolsForFilter = useMemo(() => {
@@ -871,7 +493,8 @@ export const GlobalScholarsLeaderboard: React.FC<GlobalScholarsLeaderboardProps>
     > = {};
 
     allScholarsMerged.forEach((scholar) => {
-      const sName = scholar.school || 'Independent Scholars Academy';
+      if (!scholar.school) return; // scholars without a school are not grouped into a fake one
+      const sName = scholar.school;
       if (selectedRegion !== 'ALL' && scholar.region !== selectedRegion) {
         return;
       }
@@ -888,8 +511,8 @@ export const GlobalScholarsLeaderboard: React.FC<GlobalScholarsLeaderboardProps>
       if (!map[sName]) {
         map[sName] = {
           schoolName: sName,
-          region: scholar.region || 'West Africa',
-          examBoardFocus: scholar.examBoardFocus || 'Global Curriculum',
+          region: scholar.region || '',
+          examBoardFocus: scholar.examBoardFocus || '',
           scholarsCount: 0,
           totalXp: 0,
           avgMasterySum: 0,
@@ -1280,21 +903,6 @@ export const GlobalScholarsLeaderboard: React.FC<GlobalScholarsLeaderboardProps>
               }`}
             >
               My School ({myAffiliation.school})
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                soundFx.playClick();
-                setShowReferenceBenchmarks((prev) => !prev);
-              }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 border ${
-                showReferenceBenchmarks
-                  ? 'bg-slate-900 dark:bg-slate-200 text-white dark:text-slate-900 border-slate-900 dark:border-slate-200'
-                  : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-              }`}
-              title="Toggle reference benchmark targets alongside verified live profiles"
-            >
-              {showReferenceBenchmarks ? 'Live + Reference Targets' : 'Live Cloud Profiles Only'}
             </button>
           </div>
         </div>
@@ -1696,7 +1304,7 @@ export const GlobalScholarsLeaderboard: React.FC<GlobalScholarsLeaderboardProps>
                       {/* Col 3: School & Region */}
                       <div className="md:col-span-3 min-w-0">
                         <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-                          {scholar.school || 'Global Scholars Academy'}
+                          {scholar.school || 'No school set'}
                         </div>
                         <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                           {scholar.region || 'Worldwide'} · {scholar.tier} Division

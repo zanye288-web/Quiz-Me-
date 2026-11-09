@@ -27,7 +27,6 @@ import { SavedQuizDocument, toggleQuizLike } from '../services/firestore';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { soundFx } from '../utils/audio';
-import { COMMUNITY_SEED_QUIZZES } from '../data/communitySeedQuizzes';
 import { CANONICAL_PEDAGOGICAL_TOPICS, derivePedagogicalTopic } from '../utils/pedagogicalClassifier';
 import { QuizCommentsModal } from './QuizCommentsModal';
 import { ShareQuizModal } from './ShareQuizModal';
@@ -116,7 +115,7 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({
     }
   }, [likedIds]);
 
-  // Combine custom Firestore quizzes with curated community seed quizzes (deduplicating by ID)
+  // Public community quizzes from Firestore
   const allCommunityQuizzes = useMemo(() => {
     const map = new Map<string, SavedQuizDocument>();
 
@@ -124,13 +123,6 @@ export const CommunityFeed: React.FC<CommunityFeedProps> = ({
     customQuizzes.forEach((q) => {
       if (q.isPublic !== false) {
         map.set(q.id, q);
-      }
-    });
-
-    // Add seed quizzes if not already present
-    COMMUNITY_SEED_QUIZZES.forEach((sq) => {
-      if (!map.has(sq.id)) {
-        map.set(sq.id, sq);
       }
     });
 

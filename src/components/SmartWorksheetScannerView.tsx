@@ -167,8 +167,8 @@ export const SmartWorksheetScannerView: React.FC<SmartWorksheetScannerViewProps>
       persona: 'Teacher',
       questions: formattedQuestions,
       tags: [scanResult.subject, scanResult.detectedTopic, 'Scanned Worksheet'],
-      aiVerified: true,
-      aiVerificationScore: scanResult.confidenceScore,
+      // Extraction confidence is not a quality verification, so the quiz is not marked as verified.
+      aiVerified: false,
     };
 
     onStartQuizWithQuestions(newQuiz);

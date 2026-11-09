@@ -238,11 +238,15 @@ export const QuestionAuthoringStudio: React.FC<QuestionAuthoringStudioProps> = (
       });
       const data = await res.json();
       const v = data.verification;
-      if (v && !v.approved) {
+      if (!v) {
+        // No verification result came back: never present the quiz as verified.
+        throw new Error('Verification unavailable');
+      }
+      if (!v.approved) {
         soundFx.playIncorrect();
         setVerificationFeedback({
           approved: false,
-          score: v.overallScore || 45,
+          score: v.overallScore ?? 0,
           message: v.summaryFeedback || 'Quiz did not pass AI quality & safety standards.',
         });
         setIsVerifyingPublish(false);
@@ -252,8 +256,8 @@ export const QuestionAuthoringStudio: React.FC<QuestionAuthoringStudioProps> = (
       const verifiedQuiz: QuizResponse = {
         ...currentQuiz,
         aiVerified: true,
-        aiVerificationScore: v?.overallScore || 95,
-        aiVerificationSummary: v?.summaryFeedback || 'Verified by AI Standards Engine',
+        aiVerificationScore: v.overallScore,
+        aiVerificationSummary: v.summaryFeedback,
       };
 
       if (onSaveToLibrary) {
@@ -262,17 +266,18 @@ export const QuestionAuthoringStudio: React.FC<QuestionAuthoringStudioProps> = (
       soundFx.playComplete();
       setVerificationFeedback({
         approved: true,
-        score: verifiedQuiz.aiVerificationScore || 95,
+        score: verifiedQuiz.aiVerificationScore ?? 0,
         message: `AI Verified (${verifiedQuiz.aiVerificationScore}% Score) & Published to Database!`,
       });
     } catch {
+      // The verifier could not be reached. Publish honestly as NOT verified.
       if (onSaveToLibrary) {
-        onSaveToLibrary({ ...currentQuiz, aiVerified: true, aiVerificationScore: 94 });
+        onSaveToLibrary({ ...currentQuiz, aiVerified: false, aiVerificationScore: undefined });
       }
       setVerificationFeedback({
-        approved: true,
-        score: 94,
-        message: 'AI Verified & Published to Database!',
+        approved: false,
+        score: 0,
+        message: 'Published without AI verification: the verifier could not be reached. You can re-verify later.',
       });
     } finally {
       setIsVerifyingPublish(false);

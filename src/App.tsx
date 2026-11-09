@@ -14,6 +14,7 @@ import { RawJsonModal } from './components/RawJsonModal';
 import { SettingsModal } from './components/SettingsModal';
 import { SettingsView } from './components/SettingsView';
 import { SchoolHubView } from './components/SchoolHubView';
+import { buildPrebuiltExamByFormat } from './utils/examFormats';
 import { BadgeCelebrationModal } from './components/BadgeCelebrationModal';
 import { CommandPalette } from './components/CommandPalette';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -1992,6 +1993,7 @@ export default function App() {
         isOpen={isExamSimOpen}
         onClose={() => setIsExamSimOpen(false)}
         studentName={userProfile?.displayName || user?.displayName || 'Scholar Candidate'}
+        questions={isExamSimOpen ? buildPrebuiltExamByFormat('jamb', persona).questions : []}
       />
 
       <CandidateWellnessModal

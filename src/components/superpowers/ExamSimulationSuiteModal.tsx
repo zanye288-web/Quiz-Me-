@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Monitor,
@@ -11,10 +11,10 @@ import {
   Circle,
   Sparkles,
   ShieldCheck,
-  QrCode,
   Download,
 } from 'lucide-react';
 import { soundFx } from '../../utils/audio';
+import type { Question } from '../../types/quiz';
 import { ExamSimTab, CandidateSlipData } from '../../types/extendedSuperpowers';
 import { EXAM_PACKING_LIST } from '../../data/extendedExaminationData';
 
@@ -23,6 +23,8 @@ interface ExamSimulationSuiteModalProps {
   onClose: () => void;
   initialTab?: ExamSimTab;
   studentName?: string;
+  /** Real multiple-choice questions (4 options) to run the CBT simulation with. */
+  questions?: Question[];
 }
 
 export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> = ({
@@ -30,6 +32,7 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
   onClose,
   initialTab = 'jamb_cbt',
   studentName = 'Scholar Candidate',
+  questions = [],
 }) => {
   const [activeTab, setActiveTab] = useState<ExamSimTab>(initialTab);
 
@@ -42,17 +45,12 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
   // Candidate Seat Slip State
   const [slipData, setSlipData] = useState<CandidateSlipData>({
     candidateName: studentName,
-    registrationNumber: `JAMB2026/894120`,
-    centerNumber: `CTR-WA-489`,
-    centerName: `Apex International Examination CBT Center, Hall A`,
-    examinationBoard: `Joint Admissions and Matriculation Board (JAMB UTME)`,
-    sessionYear: `2026/2027 Academic Session`,
-    subjects: [
-      { code: 'ENG101', name: 'Use of English', date: 'April 22, 2026', time: '08:30 AM', paper: 'Paper 1 (CBT)' },
-      { code: 'MTH102', name: 'Mathematics', date: 'April 22, 2026', time: '10:45 AM', paper: 'Paper 1 (CBT)' },
-      { code: 'PHY103', name: 'Physics', date: 'April 23, 2026', time: '08:30 AM', paper: 'Paper 1 (CBT)' },
-      { code: 'CHM104', name: 'Chemistry', date: 'April 23, 2026', time: '10:45 AM', paper: 'Paper 1 (CBT)' },
-    ],
+    registrationNumber: '',
+    centerNumber: '',
+    centerName: '',
+    examinationBoard: '',
+    sessionYear: '',
+    subjects: [],
   });
 
   // Time Budget Advisor State
@@ -77,6 +75,42 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
   const [confidenceLevel, setConfidenceLevel] = useState<number>(60); // % confidence in knowledge
   const [penaltyPerWrong, setPenaltyPerWrong] = useState<number>(0.25); // -0.25 or -1.0
 
+  // Only genuine 4-option multiple-choice questions are used; nothing is hardcoded here.
+  const examQuestions = useMemo(
+    () =>
+      questions
+        .filter((q) => q.type === 'multiple_choice' && Array.isArray(q.options) && q.options.length === 4)
+        .map((q) => {
+          const opts = q.options as string[];
+          const idx = opts.findIndex((o) => o === q.correct_answer);
+          return {
+            q: q.question,
+            a: opts[0],
+            b: opts[1],
+            c: opts[2],
+            d: opts[3],
+            key: idx >= 0 ? 'ABCD'[idx] : '',
+          };
+        }),
+    [questions]
+  );
+  const questionCount = examQuestions.length;
+
+  // Real countdown (replaces a frozen label)
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'jamb_cbt' || jambSubmitted || questionCount === 0) return;
+    const t = setInterval(() => {
+      setJambTimeRemaining((prev) => {
+        if (prev <= 1) {
+          setJambSubmitted(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [isOpen, activeTab, jambSubmitted, questionCount]);
+
   // 8-Key Keyboard listener for JAMB CBT
   useEffect(() => {
     if (!isOpen || activeTab !== 'jamb_cbt') return;
@@ -85,6 +119,7 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
+      if (questionCount === 0) return;
       const key = e.key.toUpperCase();
       if (['A', 'B', 'C', 'D'].includes(key)) {
         e.preventDefault();
@@ -93,7 +128,7 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
       } else if (key === 'N') {
         e.preventDefault();
         soundFx.playClick();
-        setJambQuestionIndex((prev) => Math.min(9, prev + 1));
+        setJambQuestionIndex((prev) => Math.min(questionCount - 1, prev + 1));
       } else if (key === 'P') {
         e.preventDefault();
         soundFx.playClick();
@@ -115,22 +150,12 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
 
     window.addEventListener('keydown', handleJambKey);
     return () => window.removeEventListener('keydown', handleJambKey);
-  }, [isOpen, activeTab, jambQuestionIndex]);
+  }, [isOpen, activeTab, jambQuestionIndex, questionCount]);
 
   if (!isOpen) return null;
 
-  const mockQuestions = [
-    { q: 'Which of the following organic compounds decolorizes bromine water most rapidly?', a: 'Ethene (C₂H₄)', b: 'Ethane (C₂H₆)', c: 'Benzene (C₆H₆)', d: 'Ethanol (C₂H₅OH)', key: 'A' },
-    { q: 'In the simple pendulum experiment, doubling the mass of the bob will cause the period T to:', a: 'Double', b: 'Halve', c: 'Remain unchanged', d: 'Quadruple', key: 'C' },
-    { q: 'What is the value of x if 2^(2x + 1) = 32?', a: 'x = 1', b: 'x = 2', c: 'x = 3', d: 'x = 4', key: 'B' },
-    { q: 'The organelle primarily responsible for cellular aerobic respiration and ATP synthesis is the:', a: 'Ribosome', b: 'Golgi body', c: 'Mitochondrion', d: 'Chloroplast', key: 'C' },
-    { q: 'Which constitutional conference introduced direct election to the central legislature in Nigeria?', a: 'Clifford 1922', b: 'Richards 1946', c: 'Macpherson 1951', d: 'Lyttelton 1954', key: 'C' },
-    { q: 'If sin θ = 3/5 for an acute angle θ, what is the exact value of tan θ?', a: '3/4', b: '4/3', c: '4/5', d: '5/4', key: 'A' },
-    { q: 'Which of the following is an amphoteric oxide?', a: 'Na₂O', b: 'SO₂', c: 'Al₂O₃', d: 'CaO', key: 'C' },
-    { q: 'A car traveling at 20 m/s decelerates uniformly to rest in 5 seconds. What is the braking distance?', a: '25 m', b: '50 m', c: '100 m', d: '200 m', key: 'B' },
-    { q: 'In literary analysis, when an inanimate object is given human feelings or moods, the device is:', a: 'Hyperbole', b: 'Pathetic Fallacy', c: 'Metonymy', d: 'Chiasmus', key: 'B' },
-    { q: 'The boiling point of water decreases at higher altitudes because:', a: 'Atmospheric pressure is lower', b: 'Temperature is lower', c: 'Gravity is weaker', d: 'Humidity is higher', key: 'A' },
-  ];
+  const mm = String(Math.floor(jambTimeRemaining / 60)).padStart(2, '0');
+  const ss = String(jambTimeRemaining % 60).padStart(2, '0');
 
   // Time Budget calculations
   const netSolvingMinutes = Math.max(10, totalExamMinutes - readingTimeMinutes - reviewBufferMinutes);
@@ -213,7 +238,17 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
         {/* Main Stage Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {/* TAB 1: JAMB 8-KEY CBT */}
-          {activeTab === 'jamb_cbt' && (
+          {activeTab === 'jamb_cbt' && questionCount === 0 && (
+            <div className="p-8 rounded-3xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-center space-y-2">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">No questions loaded yet</h3>
+              <p className="text-xs text-slate-500">
+                The CBT simulator runs on real exam questions. Generate or open an exam from Exam Mode, then launch the
+                simulator again.
+              </p>
+            </div>
+          )}
+
+          {activeTab === 'jamb_cbt' && questionCount > 0 && (
             <div className="space-y-5">
               {/* CBT Topbar Banner */}
               <div className="p-3.5 rounded-2xl bg-slate-900 text-white flex items-center justify-between text-xs font-mono shadow-md">
@@ -223,7 +258,7 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
                 </div>
                 <div className="flex items-center gap-4">
                   <span>Candidate: <strong>{studentName}</strong></span>
-                  <span className="text-amber-400 font-bold">Time Left: 29:45</span>
+                  <span className="text-amber-400 font-bold">Time Left: {mm}:{ss}</span>
                 </div>
               </div>
 
@@ -233,24 +268,24 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
                 <div className="lg:col-span-3 p-5 rounded-3xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 space-y-4">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-rose-600 dark:text-rose-400 font-bold">
-                      Question {jambQuestionIndex + 1} of 10
+                      Question {jambQuestionIndex + 1} of {questionCount}
                     </span>
                     <span className="text-slate-500">
-                      Answered: {Object.keys(jambAnswers).length} / 10
+                      Answered: {Object.keys(jambAnswers).length} / {questionCount}
                     </span>
                   </div>
 
                   <h3 className="text-base font-bold text-slate-900 dark:text-white leading-relaxed">
-                    {mockQuestions[jambQuestionIndex].q}
+                    {examQuestions[jambQuestionIndex].q}
                   </h3>
 
                   {/* Options A, B, C, D */}
                   <div className="space-y-2 pt-2">
                     {[
-                      { key: 'A', text: mockQuestions[jambQuestionIndex].a },
-                      { key: 'B', text: mockQuestions[jambQuestionIndex].b },
-                      { key: 'C', text: mockQuestions[jambQuestionIndex].c },
-                      { key: 'D', text: mockQuestions[jambQuestionIndex].d },
+                      { key: 'A', text: examQuestions[jambQuestionIndex].a },
+                      { key: 'B', text: examQuestions[jambQuestionIndex].b },
+                      { key: 'C', text: examQuestions[jambQuestionIndex].c },
+                      { key: 'D', text: examQuestions[jambQuestionIndex].d },
                     ].map((opt) => {
                       const isSelected = jambAnswers[jambQuestionIndex] === opt.key;
                       return (
@@ -321,7 +356,7 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
                         type="button"
                         onClick={() => {
                           soundFx.playClick();
-                          setJambQuestionIndex((prev) => Math.min(9, prev + 1));
+                          setJambQuestionIndex((prev) => Math.min(questionCount - 1, prev + 1));
                         }}
                         className="py-2.5 rounded-xl font-mono font-bold text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
                       >
@@ -361,7 +396,7 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
                 <div className="p-4 rounded-3xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-800 space-y-3">
                   <div className="font-bold text-xs text-slate-900 dark:text-white">Question Palette</div>
                   <div className="grid grid-cols-5 gap-2">
-                    {mockQuestions.map((_, idx) => {
+                    {examQuestions.map((_, idx) => {
                       const isAnswered = !!jambAnswers[idx];
                       const isCurrent = jambQuestionIndex === idx;
                       return (
@@ -393,7 +428,7 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-3 h-3 rounded-md bg-white dark:bg-slate-800 border border-slate-300" />
-                      <span>Unattempted ({10 - Object.keys(jambAnswers).length})</span>
+                      <span>Unattempted ({questionCount - Object.keys(jambAnswers).length})</span>
                     </div>
                   </div>
                 </div>
@@ -406,10 +441,11 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Official Examination Docket &amp; Photo Admission Pass
-                  </h3>
-                  <p className="text-xs text-slate-500">Printable admission pass required at the examination hall gate</p>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">My Exam Day Card</h3>
+                  <p className="text-xs text-slate-500">
+                    A personal reminder you fill in yourself. It is not an official document and does not replace your
+                    admission slip from the exam body.
+                  </p>
                 </div>
 
                 <button
@@ -418,49 +454,32 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Print Docket</span>
+                  <span>Print Card</span>
                 </button>
               </div>
 
-              {/* Admission Pass Document */}
-              <div className="p-6 rounded-3xl bg-white dark:bg-slate-850 border-2 border-slate-300 dark:border-slate-700 shadow-md space-y-5 max-w-2xl mx-auto">
-                <div className="flex items-start justify-between border-b-2 border-slate-900 dark:border-white pb-4">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-rose-600 dark:text-rose-400 font-black">
-                      OFFICIAL EXAMINATION DOCKET
-                    </span>
-                    <h2 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">
-                      {slipData.examinationBoard}
-                    </h2>
-                    <div className="text-xs font-mono text-slate-500">{slipData.sessionYear}</div>
-                  </div>
-                  <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-xl border">
-                    <QrCode className="w-10 h-10 text-slate-900 dark:text-white" />
-                  </div>
-                </div>
+              <div className="p-6 rounded-3xl bg-white dark:bg-slate-850 border-2 border-dashed border-slate-300 dark:border-slate-700 space-y-4 max-w-2xl mx-auto">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500 font-black">
+                  Personal reminder · not an official document
+                </span>
+                {([
+                  ['candidateName', 'Your name'],
+                  ['registrationNumber', 'Registration number (from your official slip)'],
+                  ['examinationBoard', 'Exam (e.g. JAMB UTME, WAEC)'],
+                  ['sessionYear', 'Session / year'],
+                  ['centerName', 'Exam centre name'],
+                  ['centerNumber', 'Centre number'],
+                ] as const).map(([field, label]) => (
+                  <label key={field} className="block text-xs">
+                    <span className="text-slate-500">{label}</span>
+                    <input
+                      value={slipData[field]}
+                      onChange={(e) => setSlipData((prev) => ({ ...prev, [field]: e.target.value.slice(0, 120) }))}
+                      className="mt-1 w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 font-mono"
+                    />
+                  </label>
+                ))}
 
-                <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-                  <div>
-                    <div className="text-slate-400 text-[10px]">CANDIDATE FULL NAME</div>
-                    <div className="font-bold text-slate-900 dark:text-white text-sm mt-0.5">
-                      {slipData.candidateName}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-[10px]">REGISTRATION NUMBER</div>
-                    <div className="font-bold text-rose-600 dark:text-rose-400 text-sm mt-0.5">
-                      {slipData.registrationNumber}
-                    </div>
-                  </div>
-                  <div className="col-span-2">
-                    <div className="text-slate-400 text-[10px]">EXAMINATION CENTER</div>
-                    <div className="font-bold text-slate-900 dark:text-white mt-0.5">
-                      {slipData.centerName} ({slipData.centerNumber})
-                    </div>
-                  </div>
-                </div>
-
-                {/* Registered Subjects Table */}
                 <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden text-xs">
                   <div className="grid grid-cols-4 bg-slate-100 dark:bg-slate-800 p-2.5 font-bold font-mono text-[11px]">
                     <span>Subject</span>
@@ -468,23 +487,40 @@ export const ExamSimulationSuiteModal: React.FC<ExamSimulationSuiteModalProps> =
                     <span>Time</span>
                     <span>Paper</span>
                   </div>
-                  {slipData.subjects.map((s, idx) => (
-                    <div
-                      key={idx}
-                      className="grid grid-cols-4 p-2.5 border-b border-slate-100 dark:border-slate-800 font-mono text-[11px]"
-                    >
-                      <span className="font-bold text-slate-900 dark:text-white">{s.name}</span>
-                      <span className="text-slate-600 dark:text-slate-400">{s.date}</span>
-                      <span className="text-slate-600 dark:text-slate-400">{s.time}</span>
-                      <span className="text-rose-600 dark:text-rose-400 font-semibold">{s.paper}</span>
+                  {slipData.subjects.map((sub, idx) => (
+                    <div key={idx} className="grid grid-cols-4 gap-1 p-1.5 border-b border-slate-100 dark:border-slate-800">
+                      {(['name', 'date', 'time', 'paper'] as const).map((f) => (
+                        <input
+                          key={f}
+                          value={sub[f]}
+                          aria-label={f}
+                          onChange={(e) =>
+                            setSlipData((prev) => ({
+                              ...prev,
+                              subjects: prev.subjects.map((x, i) => (i === idx ? { ...x, [f]: e.target.value.slice(0, 60) } : x)),
+                            }))
+                          }
+                          className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 font-mono text-[11px]"
+                        />
+                      ))}
                     </div>
                   ))}
+                  {slipData.subjects.length === 0 && (
+                    <div className="p-3 text-slate-500">No subjects added yet.</div>
+                  )}
                 </div>
-
-                <div className="pt-2 flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                  <span>Authorized Signature &amp; Stamp Required</span>
-                  <span>Watermark: VERIFIED_CANDIDATE_2026</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSlipData((prev) => ({
+                      ...prev,
+                      subjects: [...prev.subjects, { code: '', name: '', date: '', time: '', paper: '' }],
+                    }))
+                  }
+                  className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-bold cursor-pointer"
+                >
+                  + Add subject
+                </button>
               </div>
             </div>
           )}

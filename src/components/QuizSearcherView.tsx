@@ -33,7 +33,6 @@ import {
   CreatorLeaderboardEntry,
 } from '../services/firestore';
 import { QuizHistoryRecord } from './HistoryView';
-import { COMMUNITY_SEED_QUIZZES } from '../data/communitySeedQuizzes';
 import { QuizCommentsModal } from './QuizCommentsModal';
 import { ShareQuizModal } from './ShareQuizModal';
 import { TopCreatorBadge } from './TopCreatorBadge';
@@ -158,8 +157,8 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
       if (q.isPublic !== false) {
         map.set(q.id, {
           ...q,
-          aiVerified: q.aiVerified ?? true,
-          aiVerificationScore: q.aiVerificationScore ?? 95,
+          aiVerified: q.aiVerified === true,
+          aiVerificationScore: q.aiVerificationScore ?? 0,
           calculatorEnabled:
             q.calculatorEnabled ??
             (q.pedagogical_topic === 'STEM' ||
@@ -167,21 +166,6 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
               q.quiz_title.toLowerCase().includes('physics') ||
               q.quiz_title.toLowerCase().includes('calculus')),
           dictionaryEnabled: q.dictionaryEnabled ?? true,
-        });
-      }
-    });
-    COMMUNITY_SEED_QUIZZES.forEach((sq) => {
-      if (!map.has(sq.id)) {
-        map.set(sq.id, {
-          ...sq,
-          aiVerified: sq.aiVerified ?? true,
-          aiVerificationScore: sq.aiVerificationScore ?? 96,
-          calculatorEnabled:
-            sq.calculatorEnabled ??
-            (sq.pedagogical_topic === 'STEM' ||
-              sq.quiz_title.toLowerCase().includes('math') ||
-              sq.quiz_title.toLowerCase().includes('physics')),
-          dictionaryEnabled: sq.dictionaryEnabled ?? true,
         });
       }
     });
@@ -291,7 +275,7 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
           return (likesCountMap[b.id] ?? b.likesCount ?? 0) - (likesCountMap[a.id] ?? a.likesCount ?? 0);
         }
         if (sortBy === 'verified_score') {
-          return (b.aiVerificationScore ?? 90) - (a.aiVerificationScore ?? 90);
+          return (b.aiVerificationScore ?? 0) - (a.aiVerificationScore ?? 0);
         }
         return (b.id > a.id ? 1 : -1);
       });
@@ -324,8 +308,8 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
       const cid = q.creatorId || q.creatorName;
       const existing = map.get(cid);
       const qLikes = likesCountMap[q.id] ?? q.likesCount ?? 0;
-      const qComments = q.commentsCount ?? 2;
-      const vScore = q.aiVerificationScore ?? 94;
+      const qComments = q.commentsCount ?? 0;
+      const vScore = q.aiVerificationScore ?? 0;
 
       if (!existing) {
         map.set(cid, {
@@ -1055,10 +1039,10 @@ export const QuizSearcherView: React.FC<QuizSearcherViewProps> = ({
                         <span>{quiz.questions?.length || 0} Qs</span>
                       </div>
 
-                      {quiz.aiVerified !== false && (
+                      {quiz.aiVerified === true && (
                         <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
                           <ShieldCheck className="w-3.5 h-3.5" />
-                          <span>AI Verified ({quiz.aiVerificationScore ?? 95}%)</span>
+                          <span>AI Verified ({quiz.aiVerificationScore ?? 0}%)</span>
                         </div>
                       )}
                     </div>
