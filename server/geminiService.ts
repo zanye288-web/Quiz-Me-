@@ -39,6 +39,33 @@ function setModelCooldown(model: string, durationMs = 60_000) {
   modelCooldownMap.set(model, Date.now() + durationMs);
 }
 
+// Models that rejected a "thinking off" request. Remembered so we only pay for that once.
+const thinkingControlUnsupported = new Set<string>();
+
+/**
+ * Flash-class models "think" before answering by default. For structured quiz JSON that is pure
+ * latency, so fast calls switch thinking off on those models. Pro models cannot disable thinking.
+ */
+function canDisableThinking(model: string): boolean {
+  return /flash/i.test(model) && !/pro/i.test(model) && !thinkingControlUnsupported.has(model);
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label = 'operation'): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      }
+    );
+  });
+}
+
 /**
  * Resilient Gemini caller with automatic multi-model fallback, intelligent cooldown routing,
  * and transient error retry (Handles 503 high demand spikes, 429 rate limits, and network jitter).
@@ -47,6 +74,8 @@ async function callGeminiWithFallback(params: {
   contents: unknown;
   config?: Record<string, unknown>;
   models?: string[];
+  /** Latency-first mode: disables thinking on flash models (used for quiz generation). */
+  fast?: boolean;
 }) {
   const ai = getGenAI();
   const apiKey = process.env.GEMINI_API_KEY;
@@ -80,14 +109,20 @@ async function callGeminiWithFallback(params: {
     const maxRetries = 2;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        console.info(`[Gemini Engine] Querying model: ${model} (tier ${i + 1}/${sortedQueue.length}${attempt > 0 ? `, retry ${attempt}` : ''})...`);
+        const startedAt = Date.now();
+        const turnThinkingOff = Boolean(params.fast) && canDisableThinking(model);
+        const callConfig = turnThinkingOff
+          ? { ...(params.config || {}), thinkingConfig: { thinkingBudget: 0 } }
+          : params.config;
+        console.info(`[Gemini Engine] Querying model: ${model} (tier ${i + 1}/${sortedQueue.length}${attempt > 0 ? `, retry ${attempt}` : ''}${turnThinkingOff ? ', thinking off' : ''})...`);
         const response = await ai.models.generateContent({
           model,
           contents: params.contents as any,
-          config: params.config as any,
+          config: callConfig as any,
         });
 
         if (response && response.text) {
+          console.info(`[Gemini Engine] ${model} answered in ${Date.now() - startedAt}ms`);
           return response;
         }
       } catch (err: unknown) {
@@ -106,6 +141,19 @@ async function callGeminiWithFallback(params: {
           lowerErr.includes('high demand') ||
           lowerErr.includes('unavailable') ||
           lowerErr.includes('overloaded');
+
+        // This model does not accept the "thinking off" setting: remember it and retry the same model once without it.
+        if (params.fast && lowerErr.includes('thinking') && canDisableThinking(model)) {
+          thinkingControlUnsupported.add(model);
+          console.info(`[Gemini Engine] ${model} does not support disabling thinking; retrying without it.`);
+          attempt -= 1;
+          continue;
+        }
+
+        // Model id does not exist / is not available to this key: stop trying it for a while.
+        if (lowerErr.includes('404') || lowerErr.includes('not found') || lowerErr.includes('not supported')) {
+          setModelCooldown(model, 10 * 60_000);
+        }
 
         if (isQuotaExceeded) {
           // Put this model on a 45-second cooldown so subsequent queries route smoothly to alternate models
@@ -273,8 +321,11 @@ Respond in valid raw JSON conforming strictly to the requested schema. Ensure di
 
   // Split into parallel chunks of max 15 questions per batch so large requests (31–100 questions)
   // never suffer from single-call output token truncation and cover distinct curriculum pillars!
-  const MAX_PER_CHUNK = 15;
-  const numChunks = targetCount > MAX_PER_CHUNK ? Math.ceil(targetCount / MAX_PER_CHUNK) : 1;
+  // Smaller batches generate in parallel, so wall-clock time follows the size of ONE batch, not the whole quiz.
+  // Parallelism is capped to stay within provider rate limits.
+  const TARGET_PER_CHUNK = 8;
+  const MAX_PARALLEL_CHUNKS = 8;
+  const numChunks = Math.min(MAX_PARALLEL_CHUNKS, Math.max(1, Math.ceil(targetCount / TARGET_PER_CHUNK)));
   const chunkSizes: number[] = [];
   let remaining = targetCount;
   for (let c = 0; c < numChunks; c++) {
@@ -383,6 +434,7 @@ Respond in valid raw JSON conforming strictly to the requested schema. Ensure di
     const primaryParts = [...promptParts, { text: primaryPromptText }];
 
     const primaryPromise = callGeminiWithFallback({
+      fast: true,
       contents: { parts: primaryParts },
       config: {
         systemInstruction,
@@ -441,6 +493,32 @@ Respond in valid raw JSON conforming strictly to the requested schema. Ensure di
       },
     });
 
+    // Questions-only batch request, shared by the secondary chunks and the repair step.
+    const generateQuestionBatch = async (promptText: string, temperatureBump = 0.05): Promise<any[]> => {
+      const response = await callGeminiWithFallback({
+        fast: true,
+        contents: { parts: [...promptParts, { text: promptText }] },
+        config: {
+          systemInstruction,
+          temperature: Math.min(1.0, Math.max(0.1, (Number(creativityLevel) || 0.7) + temperatureBump)),
+          maxOutputTokens: 16384,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              questions: {
+                type: Type.ARRAY,
+                items: questionItemSchema,
+              },
+            },
+            required: ['questions'],
+          },
+        },
+      });
+      const parsedBatch = JSON.parse(response.text || '');
+      return Array.isArray(parsedBatch.questions) ? parsedBatch.questions : [];
+    };
+
     // 6 Distinct Secondary Curriculum Pillars so up to 7 parallel batches (100 questions) have zero overlap
     const secondaryFocusThemes = [
       'Pillar 2 — Internal Mechanisms, Causal Pathways, Component Dynamics & State Transitions',
@@ -456,32 +534,8 @@ Respond in valid raw JSON conforming strictly to the requested schema. Ensure di
       const theme = secondaryFocusThemes[idx % secondaryFocusThemes.length];
       const chunkPromptText = `Generate EXACTLY ${chunkCount} UNIQUE questions for ${persona} persona at ${difficulty} difficulty.\nAllowed question types to mix: [${allowedTypesStr}]\nBATCH ${chunkNumber} OF ${numChunks}: Curriculum Scope Focus: ${theme}.\nEvery question MUST be completely distinct from other batches, test a unique sub-concept or scenario, and include detailed explanations.\n${baseTextContent}\nOutput the JSON object containing all ${chunkCount} questions now.`;
 
-      const chunkParts = [...promptParts, { text: chunkPromptText }];
-
       try {
-        const chunkResponse = await callGeminiWithFallback({
-          contents: { parts: chunkParts },
-          config: {
-            systemInstruction,
-            temperature: Math.min(1.0, Math.max(0.1, (Number(creativityLevel) || 0.7) + 0.05)),
-            maxOutputTokens: 16384,
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                questions: {
-                  type: Type.ARRAY,
-                  items: questionItemSchema,
-                },
-              },
-              required: ['questions'],
-            },
-          },
-        });
-
-        const raw = chunkResponse.text || '';
-        const parsedChunk = JSON.parse(raw);
-        return Array.isArray(parsedChunk.questions) ? parsedChunk.questions : [];
+        return await generateQuestionBatch(chunkPromptText);
       } catch (err) {
         console.warn(`[Gemini Engine] Secondary chunk ${chunkNumber} generation warning:`, err);
         return [];
@@ -526,8 +580,31 @@ Respond in valid raw JSON conforming strictly to the requested schema. Ensure di
       throw new Error('The AI did not return any usable questions.');
     }
     if (allQuestions.length < targetCount) {
-      console.info(`[Gemini Engine] AI returned ${allQuestions.length}/${targetCount} questions; not padding.`);
-    } else if (allQuestions.length > targetCount) {
+      // Duplicates or a failed batch left us short: ask the AI (never a template) for just the missing ones.
+      const deficit = targetCount - allQuestions.length;
+      console.info(`[Gemini Engine] Short by ${deficit} (${allQuestions.length}/${targetCount}); requesting the missing questions.`);
+      try {
+        const avoidList = allQuestions
+          .slice(0, 40)
+          .map((q) => `- ${String(q.question).replace(/\s+/g, ' ').slice(0, 140)}`)
+          .join('\n');
+        const extra = await generateQuestionBatch(
+          `Generate EXACTLY ${deficit} additional UNIQUE questions for ${persona} persona at ${difficulty} difficulty.\nAllowed question types to mix: [${allowedTypesStr}]\nDo NOT repeat or paraphrase any of these existing questions:\n${avoidList}\n${baseTextContent}\nOutput the JSON object containing all ${deficit} questions now.`,
+          0.1
+        );
+        for (const q of extra) {
+          if (!q || typeof q.question !== 'string') continue;
+          const normStem = q.question.trim().toLowerCase().replace(/\s+/g, ' ');
+          if (!seenStems.has(normStem)) {
+            seenStems.add(normStem);
+            allQuestions.push(q);
+          }
+        }
+      } catch (repairErr) {
+        console.warn('[Gemini Engine] Repair request failed; returning the questions we have.', repairErr);
+      }
+    }
+    if (allQuestions.length > targetCount) {
       allQuestions.length = targetCount;
     }
 
@@ -543,7 +620,7 @@ Respond in valid raw JSON conforming strictly to the requested schema. Ensure di
     if (Array.isArray(parsed.questions)) {
       const usedImageUrls = new Set<string>();
       const liveSearchLimit = Math.min(parsed.questions.length, 16);
-      const batchSize = 8;
+      const batchSize = 16; // all live searches run together; a slow one can no longer hold up the others
 
       for (let i = 0; i < liveSearchLimit; i += batchSize) {
         const slice = parsed.questions.slice(i, Math.min(liveSearchLimit, i + batchSize));
@@ -553,13 +630,17 @@ Respond in valid raw JSON conforming strictly to the requested schema. Ensure di
             try {
               if (!q.image_url || q.image_url.trim() === '') {
                 const queryToSearch = q.image_search_query || extractCoreSubject(q.question, q.correct_answer);
-                const visual = await resolveDirectQuestionImage(
-                  queryToSearch,
-                  q.question,
-                  parsed.quiz_title,
-                  overallIdx,
-                  usedImageUrls,
-                  q.correct_answer
+                const visual = await withTimeout(
+                  resolveDirectQuestionImage(
+                    queryToSearch,
+                    q.question,
+                    parsed.quiz_title,
+                    overallIdx,
+                    usedImageUrls,
+                    q.correct_answer
+                  ),
+                  4000,
+                  'image search'
                 );
                 q.image_url = visual.url;
                 q.image_caption = sanitizeCaptionSpoiler(
@@ -580,8 +661,9 @@ Respond in valid raw JSON conforming strictly to the requested schema. Ensure di
         );
       }
 
-      // Fast synchronous thematic visual enrichment for questions 17..100
-      for (let i = liveSearchLimit; i < parsed.questions.length; i++) {
+      // Instant thematic visuals for every question still without one: questions beyond the live-search
+      // limit, plus any live search that failed or timed out.
+      for (let i = 0; i < parsed.questions.length; i++) {
         const q = parsed.questions[i];
         if (!q.image_url || q.image_url.trim() === '') {
           const queryToSearch = q.image_search_query || extractCoreSubject(q.question, q.correct_answer) || parsed.quiz_title;
